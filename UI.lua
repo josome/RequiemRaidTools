@@ -1127,8 +1127,14 @@ function UI.BuildLogPanel(parent)
     panel:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", 0, 0)
     panel:Hide()
 
+    -- Export-Button oben rechts
+    local exportBtn = MakeButton(panel, "Export JSON", 100, 22, function()
+        UI.ShowExportPopup()
+    end)
+    exportBtn:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -4, -4)
+
     local scroll = CreateFrame("ScrollFrame", nil, panel, "UIPanelScrollFrameTemplate")
-    scroll:SetPoint("TOPLEFT", panel, "TOPLEFT", 4, -4)
+    scroll:SetPoint("TOPLEFT",     panel, "TOPLEFT",  4,  -4)
     scroll:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -26, 4)
     local content = CreateFrame("Frame", nil, scroll)
     content:SetSize(scroll:GetWidth(), 1)
@@ -1136,6 +1142,44 @@ function UI.BuildLogPanel(parent)
     panel.content = content
 
     return panel
+end
+
+-- ============================================================
+-- JSON-Export Popup
+-- ============================================================
+
+local exportPopup
+
+function UI.ShowExportPopup()
+    if not exportPopup then
+        exportPopup = CreateFrame("Frame", "RaidLootExportPopup", UIParent, "BasicFrameTemplateWithInset")
+        exportPopup:SetSize(600, 400)
+        exportPopup:SetPoint("CENTER")
+        exportPopup:SetFrameStrata("DIALOG")
+        exportPopup:SetMovable(true)
+        exportPopup:EnableMouse(true)
+        exportPopup:RegisterForDrag("LeftButton")
+        exportPopup:SetScript("OnDragStart", exportPopup.StartMoving)
+        exportPopup:SetScript("OnDragStop",  exportPopup.StopMovingOrSizing)
+
+        local title = exportPopup:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        title:SetPoint("TOP", exportPopup, "TOP", 0, -8)
+        title:SetText("JSON Export – Strg+A dann Strg+C zum Kopieren")
+
+        local eb = CreateFrame("EditBox", nil, exportPopup, "InputBoxTemplate")
+        eb:SetPoint("TOPLEFT",     exportPopup, "TOPLEFT",   10, -30)
+        eb:SetPoint("BOTTOMRIGHT", exportPopup, "BOTTOMRIGHT", -10, 10)
+        eb:SetMultiLine(true)
+        eb:SetAutoFocus(false)
+        eb:SetFontObject(GameFontHighlightSmall)
+        eb:SetScript("OnEscapePressed", function() exportPopup:Hide() end)
+        exportPopup.editBox = eb
+    end
+
+    exportPopup.editBox:SetText(GL.ExportJSON())
+    exportPopup.editBox:HighlightText()
+    exportPopup:Show()
+    exportPopup.editBox:SetFocus()
 end
 
 function UI.RefreshLogTab()

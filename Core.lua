@@ -90,8 +90,11 @@ end
 
 function GL.PostToRaid(msg)
     if not GuildLootDB.settings.postToChat then return end
-    if not IsInRaid() then return end
-    SendChatMessage(msg, "RAID")
+    if IsInRaid() then
+        SendChatMessage(msg, "RAID")
+    elseif IsInGroup() then
+        SendChatMessage(msg, "PARTY")
+    end
 end
 
 -- ============================================================
@@ -279,6 +282,7 @@ eventFrame:RegisterEvent("ADDON_LOADED")
 eventFrame:RegisterEvent("PLAYER_LOGIN")
 eventFrame:RegisterEvent("PLAYER_LOGOUT")
 eventFrame:RegisterEvent("RAID_ROSTER_UPDATE")
+eventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
 eventFrame:RegisterEvent("ENCOUNTER_END")
 eventFrame:RegisterEvent("LOOT_OPENED")
 eventFrame:RegisterEvent("LOOT_CLOSED")
@@ -305,7 +309,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         -- Position speichern (wird in UI.lua behandelt)
         if GL.UI and GL.UI.SavePosition then GL.UI.SavePosition() end
 
-    elseif event == "RAID_ROSTER_UPDATE" then
+    elseif event == "RAID_ROSTER_UPDATE" or event == "GROUP_ROSTER_UPDATE" then
         GL.SyncRoster()
 
     elseif event == "ENCOUNTER_END" then

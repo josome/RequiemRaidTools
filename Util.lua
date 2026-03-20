@@ -166,3 +166,55 @@ function GL.ShortName(fullName)
     local name = fullName:match("^([^%-]+)")
     return name or fullName
 end
+
+-- ============================================================
+-- JSON-Export
+-- ============================================================
+
+local function JsonVal(val, seen)
+    local t = type(val)
+    if t == "string" then
+        return '"' .. val:gsub('\\','\\\\'):gsub('"','\\"'):gsub('\n','\\n'):gsub('\r','\\r') .. '"'
+    elseif t == "number"  then return tostring(val)
+    elseif t == "boolean" then return val and "true" or "false"
+    elseif t == "table" then
+        if seen[val] then return '"[circular]"' end
+        seen[val] = true
+        -- Array-Erkennung: ausschließlich integer-keys 1..#t
+        local isArr = (#val > 0)
+        if isArr then
+            for k in pairs(val) do
+                if type(k) ~= "number" or k < 1 or k ~= math.floor(k) then
+                    isArr = false; break
+                end
+            end
+        end
+        local parts = {}
+        if isArr then
+            for i = 1, #val do
+                parts[i] = JsonVal(val[i], seen)
+            end
+            seen[val] = nil
+            return "[" .. table.concat(parts, ",") .. "]"
+        else
+            for k, v in pairs(val) do
+                local key = type(k) == "string" and k or tostring(k)
+                table.insert(parts, '"' .. key:gsub('"','\\"') .. '":' .. JsonVal(v, seen))
+            end
+            seen[val] = nil
+            return "{" .. table.concat(parts, ",") .. "}"
+        end
+    else
+        return "null"
+    end
+end
+
+--- Serialisiert die relevanten GuildLootDB-Daten als JSON-String.
+function GL.ExportJSON()
+    local data = {
+        exportedAt  = GL.FormatTimestamp(time()),
+        currentRaid = GuildLootDB.currentRaid,
+        players     = GuildLootDB.players,
+    }
+    return JsonVal(data, {})
+end
