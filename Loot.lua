@@ -138,6 +138,14 @@ end
 function Loot.ActivateItem(link, name, iLevel, equipLoc, quality)
     local itemID = tonumber(link:match("item:(%d+)"))
 
+    -- Laufende Timer canceln bevor currentItem überschrieben wird
+    if currentItem.prioState and currentItem.prioState.timer then
+        currentItem.prioState.timer:Cancel()
+    end
+    if currentItem.rollState and currentItem.rollState.timer then
+        currentItem.rollState.timer:Cancel()
+    end
+
     currentItem.link       = link
     currentItem.name       = name
     currentItem.itemID     = itemID
@@ -145,12 +153,12 @@ function Loot.ActivateItem(link, name, iLevel, equipLoc, quality)
     currentItem.category   = GL.GetItemCategory(itemID, equipLoc or "", quality or 0)
     currentItem.candidates = {}
     currentItem.winner     = nil
+    currentItem.prioState  = { active=false, timeLeft=0, timer=nil }
     currentItem.rollState  = { active=false, players={}, results={}, timer=nil, timeLeft=0 }
-
-    GL.PostToRaid("Loot: " .. link .. " -- Bitte Prio posten (" .. prioSecs .. " Sek): 1=BIS, 2=Upgrade, 3=OS, 4=Fun")
 
     -- Prio-Sammel-Timer starten
     local prioSecs = PRIO_SECONDS()
+    GL.PostToRaid("Loot: " .. link .. " -- Bitte Prio posten (" .. prioSecs .. " Sek): 1=BIS, 2=Upgrade, 3=OS, 4=Fun")
     currentItem.prioState.active   = true
     currentItem.prioState.timeLeft = prioSecs
     currentItem.prioState.timer = C_Timer.NewTicker(1, function()
@@ -159,13 +167,20 @@ function Loot.ActivateItem(link, name, iLevel, equipLoc, quality)
             GL.UI.RefreshPrioCountdown(currentItem.prioState.timeLeft)
         end
         if currentItem.prioState.timeLeft <= 0 then
-            currentItem.prioState.timer:Cancel()
+            if currentItem.prioState.timer then
+                currentItem.prioState.timer:Cancel()
+                currentItem.prioState.timer = nil
+            end
             currentItem.prioState.active = false
             Loot.StartRoll()
         end
     end, prioSecs)
 
-    if GL.UI and GL.UI.RefreshLootTab then GL.UI.RefreshLootTab() end
+    if GL.UI then
+        if GL.UI.RefreshCandidates  then GL.UI.RefreshCandidates()  end
+        if GL.UI.RefreshRollResults then GL.UI.RefreshRollResults() end
+        if GL.UI.RefreshLootTab     then GL.UI.RefreshLootTab()     end
+    end
 end
 
 -- ============================================================

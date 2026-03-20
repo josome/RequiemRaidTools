@@ -11,6 +11,7 @@ local UI = GL.UI
 -- ============================================================
 
 local FRAME_W, FRAME_H = 720, 560
+local SIDEBAR_W = 210
 local TAB_LOOT, TAB_SPIELER, TAB_LOG = 1, 2, 3
 local DIFF_COLORS = { N = "|cff1eff00", H = "|cff0070dd", M = "|cffff8000" }
 
@@ -60,6 +61,7 @@ local activeItemCategoryLabel
 local candidateRows = {}
 local rollResultRows = {}
 local sessionLootRows = {}
+local sessionDisplayState = {}   -- [timestamp] = { checked=false, hidden=false }
 local countdownLabel
 local resetItemBtn
 local startRollBtn
@@ -379,8 +381,6 @@ function UI.BuildLootPanel(parent)
     panel:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", 0, 0)
     panel:Hide()
 
-    local SIDEBAR_W = 210   -- Pending-Loot Sidebar rechts
-
     -- ── RECHTE SIDEBAR: Pending Loot ──────────────────────────
     local sidebar = CreateFrame("Frame", nil, panel, "BackdropTemplate")
     sidebar:SetBackdrop({ bgFile="Interface\\DialogFrame\\UI-DialogBox-Background",
@@ -476,6 +476,7 @@ function UI.BuildLootPanel(parent)
     candContent:SetSize(candScroll:GetWidth(), 1)
     candScroll:SetScrollChild(candContent)
     panel.candContent = candContent
+    panel.candScroll  = candScroll
 
     -- Buttons: Roll-Aktion + Abbrechen + Countdown
     startRollBtn = MakeButton(main, "Roll freigeben", 130, 24, function()
@@ -507,6 +508,7 @@ function UI.BuildLootPanel(parent)
     resultContent:SetSize(resultScroll:GetWidth(), 1)
     resultScroll:SetScrollChild(resultContent)
     panel.resultContent = resultContent
+    panel.resultScroll  = resultScroll
 
     -- Session-Loot
     local divS = main:CreateTexture(nil, "BACKGROUND")
@@ -519,6 +521,17 @@ function UI.BuildLootPanel(parent)
     sessionLabel:SetPoint("TOPLEFT", divS, "BOTTOMLEFT", 0, -4)
     sessionLabel:SetText("|cffffcc00Session-Loot:|r")
 
+    local clearSessionBtn = MakeButton(main, "Liste leeren", 90, 18, function()
+        local log = GuildLootDB.currentRaid.lootLog
+        for _, entry in ipairs(log) do
+            local k = tostring(entry.timestamp) .. entry.player
+            sessionDisplayState[k] = { checked = false, hidden = true }
+        end
+        UI.RefreshSessionLoot()
+    end)
+    clearSessionBtn:SetPoint("LEFT", sessionLabel, "RIGHT", 8, 0)
+    clearSessionBtn:SetPoint("TOP",  sessionLabel, "TOP",   0,  2)
+
     local sessionScroll = CreateFrame("ScrollFrame", nil, main, "UIPanelScrollFrameTemplate")
     sessionScroll:SetPoint("TOPLEFT",     sessionLabel, "BOTTOMLEFT", 0, -2)
     sessionScroll:SetPoint("BOTTOMRIGHT", main,         "BOTTOMRIGHT", -22, 4)
@@ -526,6 +539,7 @@ function UI.BuildLootPanel(parent)
     sessionContent:SetSize(sessionScroll:GetWidth(), 1)
     sessionScroll:SetScrollChild(sessionContent)
     panel.sessionContent = sessionContent
+    panel.sessionScroll  = sessionScroll
 
     return panel
 end
@@ -545,10 +559,7 @@ function UI.RefreshLootTab()
     for _, btn in ipairs(pendingButtons) do btn:Hide() end
     pendingButtons = {}
     local pf = lootPanel.pendingContent
-    -- Breite anpassen sobald der Scroll-Frame gerendert ist
-    local ps = lootPanel.pendingScroll
-    local pw = ps and ps:GetWidth() or 0
-    if pw > 10 then pf:SetWidth(pw) end
+    pf:SetWidth(SIDEBAR_W - 26)  -- feste Breite (Sidebar minus Scrollbar)
     local yOff = -2
     local ROW_H = 26
     for i, item in ipairs(pl) do
@@ -651,6 +662,8 @@ function UI.RefreshCandidates()
     local ci = GL.Loot.GetCurrentItem()
     local content = lootPanel and lootPanel.candContent
     if not content then return end
+    local sw = lootPanel.candScroll and lootPanel.candScroll:GetWidth() or 0
+    if sw > 10 then content:SetWidth(sw) end
 
     -- Alte Rows entfernen
     for _, r in ipairs(candidateRows) do r:Hide() end
@@ -689,6 +702,8 @@ function UI.RefreshRollResults()
     local ci      = GL.Loot.GetCurrentItem()
     local content = lootPanel and lootPanel.resultContent
     if not content then return end
+    local sw = lootPanel.resultScroll and lootPanel.resultScroll:GetWidth() or 0
+    if sw > 10 then content:SetWidth(sw) end
 
     for _, r in ipairs(rollResultRows) do r:Hide() end
     rollResultRows = {}
@@ -778,41 +793,89 @@ end
 function UI.RefreshSessionLoot()
     local content = lootPanel and lootPanel.sessionContent
     if not content then return end
+    local sw = lootPanel.sessionScroll and lootPanel.sessionScroll:GetWidth() or 0
+    if sw > 10 then content:SetWidth(sw) end
 
     for _, r in ipairs(sessionLootRows) do r:Hide() end
     sessionLootRows = {}
 
     local log = GuildLootDB.currentRaid.lootLog
-    local yOff = 0
+    local ROW_H = 22
+    local yOff  = 0
+    local shown = 0
     -- Neueste zuerst
     for i = #log, 1, -1 do
         local entry = log[i]
-        local row = CreateFrame("Frame", nil, content)
-        row:SetSize(content:GetWidth() - 10, 20)
-        row:SetPoint("TOPLEFT", content, "TOPLEFT", 0, yOff)
+        local k = tostring(entry.timestamp) .. (entry.player or "")
+        if not sessionDisplayState[k] then
+            sessionDisplayState[k] = { checked = false, hidden = false }
+        end
+        local state = sessionDisplayState[k]
+        if not state.hidden then
+            local row = CreateFrame("Frame", nil, content)
+            row:SetPoint("TOPLEFT",  content, "TOPLEFT",  0, yOff)
+            row:SetPoint("TOPRIGHT", content, "TOPRIGHT", 0, yOff)
+            row:SetHeight(ROW_H)
 
-        local playerLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        playerLbl:SetPoint("LEFT", row, "LEFT", 4, 0)
-        playerLbl:SetWidth(110)
-        playerLbl:SetText("|cffffcc00" .. GL.ShortName(entry.player or "?") .. "|r")
+            -- Upvalues für Closure vorab deklarieren
+            local nameText, itemLbl
 
-        local diffLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        diffLbl:SetPoint("LEFT", playerLbl, "RIGHT", 2, 0)
-        diffLbl:SetWidth(22)
-        diffLbl:SetText(ColorDiff(entry.difficulty))
+            -- Checkbox (links)
+            local cb = CreateFrame("CheckButton", nil, row, "UICheckButtonTemplate")
+            cb:SetSize(18, 18)
+            cb:SetPoint("LEFT", row, "LEFT", 0, 0)
+            cb:SetChecked(state.checked)
+            cb:SetScript("OnClick", function(self)
+                state.checked = self:GetChecked()
+                local alpha = state.checked and 0.4 or 1
+                if nameText then nameText:SetAlpha(alpha) end
+                if itemLbl  then itemLbl:SetAlpha(alpha)  end
+            end)
 
-        local itemLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        itemLbl:SetPoint("LEFT", diffLbl, "RIGHT", 2, 0)
-        itemLbl:SetPoint("RIGHT", row, "RIGHT", 0, 0)
-        itemLbl:SetJustifyH("LEFT")
-        itemLbl:SetText(entry.item or "?")
+            -- X-Button (rechts)
+            local xBtn = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+            xBtn:SetSize(18, 18)
+            xBtn:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+            xBtn:SetText("×")
+            xBtn:SetScript("OnClick", function()
+                state.hidden = true
+                UI.RefreshSessionLoot()
+            end)
 
-        row:Show()
-        table.insert(sessionLootRows, row)
-        yOff = yOff - 20
+            -- Spieler
+            nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            nameText:SetPoint("LEFT", cb, "RIGHT", 2, 0)
+            nameText:SetWidth(100)
+            nameText:SetJustifyH("LEFT")
+            nameText:SetText("|cffffcc00" .. GL.ShortName(entry.player or "?") .. "|r")
+
+            -- Schwierigkeit
+            local diffLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            diffLbl:SetPoint("LEFT", nameText, "RIGHT", 2, 0)
+            diffLbl:SetWidth(20)
+            diffLbl:SetText(ColorDiff(entry.difficulty))
+
+            -- Item-Link
+            itemLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            itemLbl:SetPoint("LEFT",  diffLbl, "RIGHT",  2,  0)
+            itemLbl:SetPoint("RIGHT", xBtn,    "LEFT",  -4,  0)
+            itemLbl:SetJustifyH("LEFT")
+            itemLbl:SetText(entry.item or "?")
+
+            -- Ausgegraut wenn bereits abgehakt
+            if state.checked then
+                nameText:SetAlpha(0.4)
+                itemLbl:SetAlpha(0.4)
+            end
+
+            row:Show()
+            table.insert(sessionLootRows, row)
+            yOff  = yOff - ROW_H - 1
+            shown = shown + 1
+        end
     end
 
-    if #log == 0 then
+    if shown == 0 then
         local empty = content:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         empty:SetPoint("TOPLEFT", content, "TOPLEFT", 4, -4)
         empty:SetText("|cff888888Noch kein Loot verteilt.|r")
