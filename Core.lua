@@ -18,9 +18,9 @@ local DB_DEFAULTS = {
         absent       = {},
         lootLog         = {},
         pendingLoot     = {},
-        sessionHidden   = {},
-        sessionChecked  = {},
-        rosterLocked    = false,
+        sessionHidden           = {},
+        sessionChecked          = {},
+        currentKillParticipants = {},
     },
     settings = {
         postToChat     = true,
@@ -181,14 +181,12 @@ function GL.SyncRoster()
         AddCurrent(UnitName("player"), true)
     end
 
-    -- Neu beigetreten? (nur wenn Roster nicht gesperrt)
+    -- Neu beigetreten? → immer zur kumulativen Liste hinzufügen
     for name, online in pairs(currentMembers) do
         if not GL.TableContains(raid.participants, name) then
-            if not raid.rosterLocked then
-                GL.CreatePlayerRecord(name)
-                table.insert(raid.participants, name)
-                GL.Print(GL.ShortName(name) .. " ist dem Raid beigetreten.")
-            end
+            GL.CreatePlayerRecord(name)
+            table.insert(raid.participants, name)
+            GL.Print(GL.ShortName(name) .. " ist dem Raid beigetreten.")
         end
         -- Reconnect
         if raid.absent[name] and online then
@@ -234,10 +232,10 @@ function GL.ResetRaid()
     raid.difficulty   = ""
     raid.participants = {}
     raid.absent       = {}
-    raid.lootLog        = {}
-    raid.sessionHidden  = {}
-    raid.sessionChecked = {}
-    raid.rosterLocked   = false
+    raid.lootLog                = {}
+    raid.sessionHidden          = {}
+    raid.sessionChecked         = {}
+    raid.currentKillParticipants = {}
     if GL.Loot and GL.Loot.ClearCurrentItem then GL.Loot.ClearCurrentItem() end
     GL.Print("Session wurde zurückgesetzt.")
     if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
@@ -320,10 +318,23 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         -- arg: encounterID, encounterName, difficultyID, groupSize, success
         local success = select(5, ...)
         if success == 1 then
-            -- Roster zum Kill-Zeitpunkt einfrieren
-            GuildLootDB.currentRaid.rosterLocked = false  -- kurz entsperren für LoadRaidRoster
-            GL.LoadRaidRoster()
-            GuildLootDB.currentRaid.rosterLocked = true   -- sperren: keine neuen Mitglieder mehr
+            -- Snapshot der aktuellen Gruppe für Loot-Berechtigung
+            local kill = {}
+            if IsInRaid() then
+                for i = 1, GetNumGroupMembers() do
+                    local n = GetRaidRosterInfo(i)
+                    if n then table.insert(kill, NormalizeName(n)) end
+                end
+            elseif IsInGroup() then
+                table.insert(kill, NormalizeName(UnitName("player")))
+                for i = 1, GetNumGroupMembers() - 1 do
+                    local n = UnitName("party" .. i)
+                    if n then table.insert(kill, NormalizeName(n)) end
+                end
+            else
+                table.insert(kill, NormalizeName(UnitName("player")))
+            end
+            GuildLootDB.currentRaid.currentKillParticipants = kill
             if GL.IsMasterLooter() then
                 if GL.UI and GL.UI.AutoExpand then GL.UI.AutoExpand() end
             end

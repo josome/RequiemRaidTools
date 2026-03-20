@@ -189,9 +189,15 @@ end
 
 local function IsParticipant(name)
     if not GuildLootDB.currentRaid.active then return false end
-    local absent = GuildLootDB.currentRaid.absent
+    local raid   = GuildLootDB.currentRaid
+    local absent = raid.absent
     local short  = GL.ShortName(name)
-    for _, p in ipairs(GuildLootDB.currentRaid.participants) do
+    -- Loot-Berechtigung: wer beim Kill dabei war (Snapshot)
+    -- Fallback auf kumulative Liste wenn noch kein Kill stattfand (z.B. Testmodus)
+    local list = (#raid.currentKillParticipants > 0)
+                 and raid.currentKillParticipants
+                 or  raid.participants
+    for _, p in ipairs(list) do
         if p == name or GL.ShortName(p) == short then
             return not absent[p]
         end
