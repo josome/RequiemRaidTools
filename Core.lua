@@ -9,7 +9,9 @@ local GL = GuildLoot
 -- ============================================================
 
 local DB_DEFAULTS = {
-    players = {},
+    players     = {},
+    raidHistory = {},
+    lastLogout  = 0,
     currentRaid = {
         active       = false,
         tier         = "",
@@ -213,15 +215,64 @@ end
 -- Raid-Kontrolle
 -- ============================================================
 
+--- Hilfsfunktion: Instanzname + Datum als Tier-String
+local function AutoTierName()
+    local instanceName, instanceType = GetInstanceInfo()
+    if instanceType == "raid" or instanceType == "party" then
+        return instanceName .. " (" .. date("%d.%m.%Y") .. ")"
+    end
+    return date("%d.%m.%Y")
+end
+
+--- Difficulty-String aus difficultyID
+local function DiffFromInstance()
+    local _, instanceType, difficultyID = GetInstanceInfo()
+    if instanceType == "raid" or instanceType == "party" then
+        if difficultyID == 14 or difficultyID == 1  then return "N" end
+        if difficultyID == 15 or difficultyID == 2  then return "H" end
+        if difficultyID == 16 or difficultyID == 8  then return "M" end
+        if difficultyID == 17                        then return "N" end
+    end
+    return ""
+end
+
 function GL.StartRaid(tier)
-    local raid = GuildLootDB.currentRaid
+    local raid      = GuildLootDB.currentRaid
     raid.active     = true
-    raid.tier       = tier or ""
-    raid.difficulty = ""
+    raid.tier       = (tier and tier ~= "") and tier or AutoTierName()
+    raid.difficulty = DiffFromInstance()
     raid.lootLog    = {}
     GL.LoadRaidRoster()
-    local tierStr = (tier and tier ~= "") and (": " .. tier) or ""
-    GL.Print("Raid gestartet" .. tierStr .. ". " .. #raid.participants .. " Spieler geladen.")
+    GL.Print("Raid gestartet: " .. raid.tier .. ". " .. #raid.participants .. " Spieler geladen.")
+    if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
+end
+
+function GL.CloseRaid()
+    local raid = GuildLootDB.currentRaid
+    if not raid.active then return end
+    -- Snapshot in History speichern
+    local snapshot = {
+        tier         = raid.tier,
+        difficulty   = raid.difficulty,
+        participants = raid.participants,
+        lootLog      = raid.lootLog,
+        closedAt     = time(),
+    }
+    if not GuildLootDB.raidHistory then GuildLootDB.raidHistory = {} end
+    table.insert(GuildLootDB.raidHistory, snapshot)
+    -- currentRaid zurücksetzen
+    raid.active                  = false
+    raid.tier                    = ""
+    raid.difficulty              = ""
+    raid.participants            = {}
+    raid.absent                  = {}
+    raid.lootLog                 = {}
+    raid.pendingLoot             = {}
+    raid.sessionHidden           = {}
+    raid.sessionChecked          = {}
+    raid.currentKillParticipants = {}
+    if GL.Loot and GL.Loot.ClearCurrentItem then GL.Loot.ClearCurrentItem() end
+    GL.Print("Raid beendet und gespeichert (" .. #snapshot.lootLog .. " Loot-Einträge).")
     if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
 end
 
@@ -305,11 +356,18 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         end
 
     elseif event == "PLAYER_LOGIN" then
-        -- UI initialisieren (wird in UI.lua registriert)
+        -- Auto-Close nach >4h offline
+        local db = GuildLootDB
+        if db.currentRaid.active and db.lastLogout and db.lastLogout > 0 then
+            if (time() - db.lastLogout) > 4 * 3600 then
+                GL.Print("Raid automatisch beendet (>4h offline).")
+                GL.CloseRaid()
+            end
+        end
         if GL.UI and GL.UI.Init then GL.UI.Init() end
 
     elseif event == "PLAYER_LOGOUT" then
-        -- Position speichern (wird in UI.lua behandelt)
+        GuildLootDB.lastLogout = time()
         if GL.UI and GL.UI.SavePosition then GL.UI.SavePosition() end
 
     elseif event == "RAID_ROSTER_UPDATE" or event == "GROUP_ROSTER_UPDATE" then
