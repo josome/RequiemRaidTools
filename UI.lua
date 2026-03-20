@@ -132,6 +132,21 @@ function UI.BuildMainFrame()
         UI.SavePosition()
     end)
     mainFrame:SetToplevel(true)
+    mainFrame:SetResizable(true)
+    mainFrame:SetResizeBounds(480, 340, 1400, 1000)
+
+    -- Resize-Grip (untere rechte Ecke)
+    local resizeGrip = CreateFrame("Button", nil, mainFrame)
+    resizeGrip:SetSize(16, 16)
+    resizeGrip:SetPoint("BOTTOMRIGHT", mainFrame, "BOTTOMRIGHT", -2, 2)
+    resizeGrip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+    resizeGrip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
+    resizeGrip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
+    resizeGrip:SetScript("OnMouseDown", function() mainFrame:StartSizing("BOTTOMRIGHT") end)
+    resizeGrip:SetScript("OnMouseUp", function()
+        mainFrame:StopMovingOrSizing()
+        UI.SavePosition()
+    end)
 
     -- Titelzeile
     mainFrame.TitleText:SetText("GuildLoot v1.0")
@@ -1680,8 +1695,10 @@ end
 
 function UI.SavePosition()
     if not mainFrame then return end
-    local point, _, relPoint, x, y = mainFrame:GetPoint()
-    GuildLootDB.settings.framePos = { point = point, x = x, y = y }
+    local point, _, _, x, y = mainFrame:GetPoint()
+    local w, h = mainFrame:GetSize()
+    GuildLootDB.settings.framePos  = { point = point, x = x, y = y }
+    GuildLootDB.settings.frameSize = { w = w, h = h }
 end
 
 function UI.LoadPosition()
@@ -1694,6 +1711,8 @@ function UI.LoadPosition()
         dockTab:Show()
     else
         -- Position wiederherstellen
+        local sz = GuildLootDB.settings.frameSize
+        if sz then mainFrame:SetSize(sz.w, sz.h) end
         local pos = GuildLootDB.settings.framePos
         if pos then
             mainFrame:ClearAllPoints()
