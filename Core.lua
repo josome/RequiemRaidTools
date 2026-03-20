@@ -20,6 +20,7 @@ local DB_DEFAULTS = {
         pendingLoot     = {},
         sessionHidden   = {},
         sessionChecked  = {},
+        rosterLocked    = false,
     },
     settings = {
         postToChat     = true,
@@ -180,12 +181,14 @@ function GL.SyncRoster()
         AddCurrent(UnitName("player"), true)
     end
 
-    -- Neu beigetreten?
+    -- Neu beigetreten? (nur wenn Roster nicht gesperrt)
     for name, online in pairs(currentMembers) do
         if not GL.TableContains(raid.participants, name) then
-            GL.CreatePlayerRecord(name)
-            table.insert(raid.participants, name)
-            GL.Print(GL.ShortName(name) .. " ist dem Raid beigetreten.")
+            if not raid.rosterLocked then
+                GL.CreatePlayerRecord(name)
+                table.insert(raid.participants, name)
+                GL.Print(GL.ShortName(name) .. " ist dem Raid beigetreten.")
+            end
         end
         -- Reconnect
         if raid.absent[name] and online then
@@ -234,6 +237,7 @@ function GL.ResetRaid()
     raid.lootLog        = {}
     raid.sessionHidden  = {}
     raid.sessionChecked = {}
+    raid.rosterLocked   = false
     if GL.Loot and GL.Loot.ClearCurrentItem then GL.Loot.ClearCurrentItem() end
     GL.Print("Session wurde zurückgesetzt.")
     if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
@@ -315,8 +319,14 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
     elseif event == "ENCOUNTER_END" then
         -- arg: encounterID, encounterName, difficultyID, groupSize, success
         local success = select(5, ...)
-        if success == 1 and GL.IsMasterLooter() then
-            if GL.UI and GL.UI.AutoExpand then GL.UI.AutoExpand() end
+        if success == 1 then
+            -- Roster zum Kill-Zeitpunkt einfrieren
+            GuildLootDB.currentRaid.rosterLocked = false  -- kurz entsperren für LoadRaidRoster
+            GL.LoadRaidRoster()
+            GuildLootDB.currentRaid.rosterLocked = true   -- sperren: keine neuen Mitglieder mehr
+            if GL.IsMasterLooter() then
+                if GL.UI and GL.UI.AutoExpand then GL.UI.AutoExpand() end
+            end
         end
 
     elseif event == "LOOT_OPENED" then
