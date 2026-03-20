@@ -1397,17 +1397,42 @@ function UI.RefreshVerlaufTab()
         selTex:SetColorTexture(1, 0.8, 0, 0.12)
         selTex:SetShown(selectedHistoryIndex == idx)
 
-        -- Tier-Name
+        -- Löschen-Button (×) – verhindert Click-Weitergabe an die Zeile
+        local delBtn = CreateFrame("Button", nil, row)
+        delBtn:SetSize(20, 20)
+        delBtn:SetPoint("TOPRIGHT", row, "TOPRIGHT", -2, -2)
+        delBtn:SetPropagateMouseInput(false)
+        local delLbl = delBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        delLbl:SetAllPoints()
+        delLbl:SetText("|cffff4444×|r")
+        delBtn:SetScript("OnEnter", function() delLbl:SetText("|cffff0000×|r") end)
+        delBtn:SetScript("OnLeave", function() delLbl:SetText("|cffff4444×|r") end)
+        delBtn:SetScript("OnClick", function()
+            table.remove(GuildLootDB.raidHistory, idx)
+            if selectedHistoryIndex == idx then
+                selectedHistoryIndex = nil
+            elseif selectedHistoryIndex and selectedHistoryIndex > idx then
+                selectedHistoryIndex = selectedHistoryIndex - 1
+            end
+            UI.RefreshVerlaufTab()
+            if selectedHistoryIndex then
+                UI.RefreshVerlaufDetail(selectedHistoryIndex)
+            else
+                UI.RefreshVerlaufDetail(nil)
+            end
+        end)
+
+        -- Tier-Name (Platz für × lassen)
         local tierLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         tierLbl:SetPoint("TOPLEFT", row, "TOPLEFT",  4, -4)
-        tierLbl:SetPoint("RIGHT",   row, "RIGHT",   -4,  0)
+        tierLbl:SetPoint("RIGHT",   row, "RIGHT",   -26, 0)
         tierLbl:SetJustifyH("LEFT")
         tierLbl:SetText((snap.tier and snap.tier ~= "") and snap.tier or "|cff888888Unbekannt|r")
 
         -- Datum, Spieler, Loot-Anzahl
         local infoLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         infoLbl:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 4, 4)
-        local diffStr    = snap.difficulty and ("[" .. snap.difficulty .. "] ") or ""
+        local diffStr     = snap.difficulty and ("[" .. snap.difficulty .. "] ") or ""
         local playerCount = snap.participants and #snap.participants or 0
         local lootCount   = snap.lootLog and #snap.lootLog or 0
         local dateStr     = snap.closedAt and date("%d.%m.%Y %H:%M", snap.closedAt) or "?"
