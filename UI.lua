@@ -1347,6 +1347,18 @@ function UI.BuildVerlaufPanel(parent)
     resumeBtn:Hide()
     panel.resumeBtn = resumeBtn
 
+    local deleteBtn = MakeButton(detailFrame, "|cffff4444Löschen|r", 80, 22, function()
+        if selectedHistoryIndex then
+            table.remove(GuildLootDB.raidHistory, selectedHistoryIndex)
+            selectedHistoryIndex = nil
+            UI.RefreshVerlaufTab()
+            UI.RefreshVerlaufDetail(nil)
+        end
+    end)
+    deleteBtn:SetPoint("RIGHT", resumeBtn, "LEFT", -4, 0)
+    deleteBtn:Hide()
+    panel.deleteBtn = deleteBtn
+
     local detailScroll = CreateFrame("ScrollFrame", nil, detailFrame, "UIPanelScrollFrameTemplate")
     detailScroll:SetPoint("TOPLEFT",     panel.detailHeader, "BOTTOMLEFT", 0,   -4)
     detailScroll:SetPoint("BOTTOMRIGHT", detailFrame,        "BOTTOMRIGHT", -22,  4)
@@ -1397,35 +1409,10 @@ function UI.RefreshVerlaufTab()
         selTex:SetColorTexture(1, 0.8, 0, 0.12)
         selTex:SetShown(selectedHistoryIndex == idx)
 
-        -- Löschen-Button (×) – verhindert Click-Weitergabe an die Zeile
-        local delBtn = CreateFrame("Button", nil, row)
-        delBtn:SetSize(20, 20)
-        delBtn:SetPoint("TOPRIGHT", row, "TOPRIGHT", -2, -2)
-        delBtn:SetShown(selectedHistoryIndex == idx)
-        local delLbl = delBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        delLbl:SetAllPoints()
-        delLbl:SetText("|cffff4444×|r")
-        delBtn:SetScript("OnEnter", function() delLbl:SetText("|cffff0000×|r") end)
-        delBtn:SetScript("OnLeave", function() delLbl:SetText("|cffff4444×|r") end)
-        delBtn:SetScript("OnClick", function()
-            table.remove(GuildLootDB.raidHistory, idx)
-            if selectedHistoryIndex == idx then
-                selectedHistoryIndex = nil
-            elseif selectedHistoryIndex and selectedHistoryIndex > idx then
-                selectedHistoryIndex = selectedHistoryIndex - 1
-            end
-            UI.RefreshVerlaufTab()
-            if selectedHistoryIndex then
-                UI.RefreshVerlaufDetail(selectedHistoryIndex)
-            else
-                UI.RefreshVerlaufDetail(nil)
-            end
-        end)
-
-        -- Tier-Name (Platz für × lassen)
+        -- Tier-Name
         local tierLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         tierLbl:SetPoint("TOPLEFT", row, "TOPLEFT",  4, -4)
-        tierLbl:SetPoint("RIGHT",   row, "RIGHT",   -26, 0)
+        tierLbl:SetPoint("RIGHT",   row, "RIGHT",   -4, 0)
         tierLbl:SetJustifyH("LEFT")
         tierLbl:SetText((snap.tier and snap.tier ~= "") and snap.tier or "|cff888888Unbekannt|r")
 
@@ -1482,6 +1469,7 @@ function UI.RefreshVerlaufDetail(idx)
         verlaufPanel.detailHeader:SetText("|cff888888— Raid auswählen —|r")
         verlaufPanel.detailContent:SetHeight(1)
         if verlaufPanel.resumeBtn then verlaufPanel.resumeBtn:Hide() end
+        if verlaufPanel.deleteBtn then verlaufPanel.deleteBtn:Hide() end
         return
     end
 
@@ -1489,6 +1477,7 @@ function UI.RefreshVerlaufDetail(idx)
         verlaufPanel.resumeBtn:Show()
         verlaufPanel.resumeBtn:SetEnabled(not GuildLootDB.currentRaid.active)
     end
+    if verlaufPanel.deleteBtn then verlaufPanel.deleteBtn:Show() end
 
     local diffStr = snap.difficulty and (" [" .. snap.difficulty .. "]") or ""
     local dateStr = snap.closedAt and date("%d.%m.%Y", snap.closedAt) or "?"
