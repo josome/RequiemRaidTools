@@ -16,8 +16,10 @@ local DB_DEFAULTS = {
         difficulty   = "",
         participants = {},
         absent       = {},
-        lootLog      = {},
-        pendingLoot  = {},
+        lootLog         = {},
+        pendingLoot     = {},
+        sessionHidden   = {},
+        sessionChecked  = {},
     },
     settings = {
         postToChat     = true,
@@ -226,7 +228,9 @@ function GL.ResetRaid()
     raid.difficulty   = ""
     raid.participants = {}
     raid.absent       = {}
-    raid.lootLog      = {}
+    raid.lootLog        = {}
+    raid.sessionHidden  = {}
+    raid.sessionChecked = {}
     if GL.Loot and GL.Loot.ClearCurrentItem then GL.Loot.ClearCurrentItem() end
     GL.Print("Session wurde zurückgesetzt.")
     if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end

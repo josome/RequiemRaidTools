@@ -61,7 +61,8 @@ local activeItemCategoryLabel
 local candidateRows = {}
 local rollResultRows = {}
 local sessionLootRows = {}
-local sessionDisplayState = {}   -- [timestamp] = { checked=false, hidden=false }
+local function sessionHidden()  return GuildLootDB.currentRaid.sessionHidden  end
+local function sessionChecked() return GuildLootDB.currentRaid.sessionChecked end
 local countdownLabel
 local resetItemBtn
 local startRollBtn
@@ -524,8 +525,8 @@ function UI.BuildLootPanel(parent)
     local clearSessionBtn = MakeButton(main, "Liste leeren", 90, 18, function()
         local log = GuildLootDB.currentRaid.lootLog
         for _, entry in ipairs(log) do
-            local k = tostring(entry.timestamp) .. entry.player
-            sessionDisplayState[k] = { checked = false, hidden = true }
+            local k = tostring(entry.timestamp) .. (entry.player or "")
+            sessionHidden()[k] = true
         end
         UI.RefreshSessionLoot()
     end)
@@ -807,11 +808,8 @@ function UI.RefreshSessionLoot()
     for i = #log, 1, -1 do
         local entry = log[i]
         local k = tostring(entry.timestamp) .. (entry.player or "")
-        if not sessionDisplayState[k] then
-            sessionDisplayState[k] = { checked = false, hidden = false }
-        end
-        local state = sessionDisplayState[k]
-        if not state.hidden then
+        if not sessionHidden()[k] then
+            local isChecked = sessionChecked()[k] or false
             local row = CreateFrame("Frame", nil, content)
             row:SetPoint("TOPLEFT",  content, "TOPLEFT",  0, yOff)
             row:SetPoint("TOPRIGHT", content, "TOPRIGHT", 0, yOff)
@@ -824,10 +822,10 @@ function UI.RefreshSessionLoot()
             local cb = CreateFrame("CheckButton", nil, row, "UICheckButtonTemplate")
             cb:SetSize(18, 18)
             cb:SetPoint("LEFT", row, "LEFT", 0, 0)
-            cb:SetChecked(state.checked)
+            cb:SetChecked(isChecked)
             cb:SetScript("OnClick", function(self)
-                state.checked = self:GetChecked()
-                local alpha = state.checked and 0.4 or 1
+                sessionChecked()[k] = self:GetChecked()
+                local alpha = sessionChecked()[k] and 0.4 or 1
                 if nameText then nameText:SetAlpha(alpha) end
                 if itemLbl  then itemLbl:SetAlpha(alpha)  end
             end)
@@ -838,7 +836,7 @@ function UI.RefreshSessionLoot()
             xBtn:SetPoint("RIGHT", row, "RIGHT", 0, 0)
             xBtn:SetText("×")
             xBtn:SetScript("OnClick", function()
-                state.hidden = true
+                sessionHidden()[k] = true
                 UI.RefreshSessionLoot()
             end)
 
@@ -863,7 +861,7 @@ function UI.RefreshSessionLoot()
             itemLbl:SetText(entry.item or "?")
 
             -- Ausgegraut wenn bereits abgehakt
-            if state.checked then
+            if isChecked then
                 nameText:SetAlpha(0.4)
                 itemLbl:SetAlpha(0.4)
             end
