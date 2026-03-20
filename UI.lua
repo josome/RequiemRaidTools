@@ -242,16 +242,22 @@ function UI.BuildMainFrame()
     resetRaidBtn:SetSize(60, 22)
     resetRaidBtn:SetPoint("LEFT", closeRaidBtn, "RIGHT", 2, 0)
     resetRaidBtn:SetText("Reset")
+    local resetPending = false
+    local resetTimer   = nil
     resetRaidBtn:SetScript("OnClick", function()
-        if UI._resetConfirmPending then
-            UI._resetConfirmPending = false
+        if resetPending then
+            if resetTimer then resetTimer:Cancel(); resetTimer = nil end
+            resetPending = false
+            resetRaidBtn:SetText("Reset")
             GL.ResetRaid()
-            UI.RefreshSessionBar()
-            UI.Refresh()
         else
-            UI._resetConfirmPending = true
-            GL.Print("Nochmal [Reset] drücken zum Bestätigen.")
-            C_Timer.After(8, function() UI._resetConfirmPending = false end)
+            resetPending = true
+            resetRaidBtn:SetText("|cffff4444Sicher?|r")
+            resetTimer = C_Timer.NewTimer(3, function()
+                resetPending = false
+                resetTimer   = nil
+                resetRaidBtn:SetText("Reset")
+            end)
         end
     end)
     UI.resetRaidBtn = resetRaidBtn
