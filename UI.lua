@@ -483,8 +483,8 @@ function UI.BuildLootPanel(parent)
     end)
     startRollBtn:SetPoint("TOPLEFT", candScroll, "BOTTOMLEFT", 0, -6)
 
-    local cancelPrioBtn = MakeButton(main, "Abbrechen", 90, 24, function()
-        GL.Loot.CancelPrio()
+    local cancelPrioBtn = MakeButton(main, "Roll jetzt", 90, 24, function()
+        GL.Loot.StartRoll()
     end)
     cancelPrioBtn:SetPoint("LEFT", startRollBtn, "RIGHT", 4, 0)
     panel.cancelPrioBtn = cancelPrioBtn

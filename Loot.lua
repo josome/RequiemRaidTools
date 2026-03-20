@@ -147,7 +147,7 @@ function Loot.ActivateItem(link, name, iLevel, equipLoc, quality)
     currentItem.winner     = nil
     currentItem.rollState  = { active=false, players={}, results={}, timer=nil, timeLeft=0 }
 
-    GL.PostToRaid("Loot: " .. link .. " -- Bitte Prio posten: 1=BIS, 2=Upgrade, 3=OS, 4=Fun")
+    GL.PostToRaid("Loot: " .. link .. " -- Bitte Prio posten (" .. prioSecs .. " Sek): 1=BIS, 2=Upgrade, 3=OS, 4=Fun")
 
     -- Prio-Sammel-Timer starten
     local prioSecs = PRIO_SECONDS()
