@@ -40,6 +40,29 @@ local function MakeLabel(parent, text, fs, r, g, b)
     return f
 end
 
+-- Item-Link als Button mit Tooltip beim Hover
+-- leftAnchorFrame: Frame an das LEFT andocken; link: Hyperlink-String; displayText: angezeigter Text
+local function MakeItemLinkBtn(parent, leftAnchorFrame, xOff, link, displayText)
+    local btn = CreateFrame("Button", nil, parent)
+    btn:SetPoint("LEFT",  leftAnchorFrame, "RIGHT", xOff, 0)
+    btn:SetPoint("RIGHT", parent,          "RIGHT", -4,   0)
+    btn:SetHeight(18)
+    local fs = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    fs:SetAllPoints()
+    fs:SetJustifyH("LEFT")
+    fs:SetText(displayText or "?")
+    if link and link ~= "" then
+        btn:EnableMouse(true)
+        btn:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetHyperlink(link)
+            GameTooltip:Show()
+        end)
+        btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    end
+    return btn
+end
+
 -- ============================================================
 -- Haupt-Frame
 -- ============================================================
@@ -1244,10 +1267,7 @@ function UI.RefreshLogTab()
         diffLbl:SetWidth(30)
         diffLbl:SetText(ColorDiff(entry.difficulty))
 
-        local itemLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        itemLbl:SetPoint("LEFT", diffLbl, "RIGHT", 4, 0)
-        itemLbl:SetWidth(240)
-        itemLbl:SetText(entry.item or "?")
+        MakeItemLinkBtn(row, diffLbl, 4, entry.link, entry.item or "?")
 
         row:Show()
         table.insert(logRows, row)
@@ -1475,11 +1495,7 @@ function UI.RefreshVerlaufDetail(idx)
         diffLbl:SetWidth(25)
         diffLbl:SetText(ColorDiff(entry.difficulty))
 
-        local itemLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        itemLbl:SetPoint("LEFT",  diffLbl, "RIGHT", 4, 0)
-        itemLbl:SetPoint("RIGHT", row,     "RIGHT", 0, 0)
-        itemLbl:SetJustifyH("LEFT")
-        itemLbl:SetText(entry.item or "?")
+        MakeItemLinkBtn(row, diffLbl, 4, entry.link, entry.item or "?")
 
         row:Show()
         table.insert(verlaufDetailRows, row)
