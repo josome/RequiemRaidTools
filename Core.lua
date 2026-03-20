@@ -294,6 +294,7 @@ eventFrame:RegisterEvent("CHAT_MSG_PARTY")
 eventFrame:RegisterEvent("CHAT_MSG_PARTY_LEADER")
 eventFrame:RegisterEvent("CHAT_MSG_SYSTEM")
 eventFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
+eventFrame:RegisterEvent("CHAT_MSG_ADDON")
 
 eventFrame:SetScript("OnEvent", function(self, event, ...)
     if event == "ADDON_LOADED" then
@@ -354,6 +355,12 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
     elseif event == "CHAT_MSG_SYSTEM" then
         local msg = ...
         if GL.Loot and GL.Loot.OnSystemMessage then GL.Loot.OnSystemMessage(msg) end
+
+    elseif event == "CHAT_MSG_ADDON" then
+        local prefix, msg, _, sender = ...
+        if prefix == "RLT" and GL.Comm and GL.Comm.OnMessage then
+            GL.Comm.OnMessage(msg, sender)
+        end
 
     elseif event == "GET_ITEM_INFO_RECEIVED" then
         local itemID, success = ...

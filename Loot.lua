@@ -176,6 +176,9 @@ function Loot.ActivateItem(link, name, iLevel, equipLoc, quality)
         end
     end, prioSecs)
 
+    -- Observer informieren
+    if GL.Comm then GL.Comm.SendItemActivate(link, currentItem.category) end
+
     if GL.UI then
         if GL.UI.RefreshCandidates  then GL.UI.RefreshCandidates()  end
         if GL.UI.RefreshRollResults then GL.UI.RefreshRollResults() end
@@ -266,6 +269,7 @@ function Loot.StartRoll()
 
     local playerList = table.concat(rollPlayers, ", ")
     GL.PostToRaid("Bitte /roll eingeben! " .. rollSecs .. " Sekunden: " .. playerList)
+    if GL.Comm then GL.Comm.SendRollStart(rollSecs, rollPlayers) end
 
     -- Countdown in UI
     currentItem.rollState.timer = C_Timer.NewTicker(1, function()
@@ -458,6 +462,9 @@ function Loot.AssignLootConfirm(fullName, diff)
         end
     end
 
+    -- Observer informieren
+    if GL.Comm then GL.Comm.SendAssign(GL.ShortName(fullName), diff, link) end
+
     -- Zustand zurücksetzen
     Loot.ClearCurrentItem()
     if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
@@ -492,6 +499,7 @@ function Loot.CancelPrio()
     if not GL.IsMasterLooter() then return end
     if not currentItem.prioState.active then return end
     Loot.ClearCurrentItem()
+    if GL.Comm then GL.Comm.SendItemClear() end
     GL.Print("Prio-Phase abgebrochen.")
     if GL.UI and GL.UI.RefreshLootTab then GL.UI.RefreshLootTab() end
 end
@@ -509,4 +517,88 @@ function Loot.RemovePendingItem(link)
     if currentItem.link == link then
         Loot.ClearCurrentItem()
     end
+end
+
+-- ============================================================
+-- Observer-Handler (empfangen vom ML via Comm.lua)
+-- ============================================================
+
+--- ML hat ein Item freigegeben → Observer zeigen es an
+function Loot.OnCommItemActivate(link, category)
+    if GL.IsMasterLooter() then return end  -- ML hat bereits lokal verarbeitet
+    local name   = link:match("%[(.-)%]") or "?"
+    local itemID = tonumber(link:match("item:(%d+)")) or 0
+    -- Laufende Timer auf Beobachterseite (falls vorhanden) abbrechen
+    if currentItem.prioState.timer then currentItem.prioState.timer:Cancel() end
+    if currentItem.rollState.timer  then currentItem.rollState.timer:Cancel()  end
+    currentItem.link       = link
+    currentItem.name       = name
+    currentItem.itemID     = itemID
+    currentItem.category   = category
+    currentItem.candidates = {}
+    currentItem.winner     = nil
+    currentItem.prioState  = { active = true,  timeLeft = 0, timer = nil }
+    currentItem.rollState  = { active = false, players  = {}, results = {}, timer = nil, timeLeft = 0 }
+    if GL.UI and GL.UI.RefreshLootTab then GL.UI.RefreshLootTab() end
+end
+
+--- ML hat Item abgebrochen → Observer leeren Anzeige
+function Loot.OnCommItemClear()
+    if GL.IsMasterLooter() then return end
+    if currentItem.prioState.timer then currentItem.prioState.timer:Cancel() end
+    if currentItem.rollState.timer  then currentItem.rollState.timer:Cancel()  end
+    currentItem.link       = nil
+    currentItem.name       = nil
+    currentItem.candidates = {}
+    currentItem.winner     = nil
+    currentItem.prioState  = { active = false, timeLeft = 0, timer = nil }
+    currentItem.rollState  = { active = false, players  = {}, results = {}, timer = nil, timeLeft = 0 }
+    if GL.UI and GL.UI.RefreshLootTab then GL.UI.RefreshLootTab() end
+end
+
+--- ML hat Roll-Phase gestartet → Observer aktivieren Roll-Anzeige
+function Loot.OnCommRollStart(seconds, players)
+    if GL.IsMasterLooter() then return end
+    currentItem.rollState.active   = true
+    currentItem.rollState.results  = {}
+    currentItem.rollState.players  = {}
+    currentItem.rollState.timeLeft = seconds
+    currentItem.prioState.active   = false
+    for _, p in ipairs(players or {}) do
+        currentItem.rollState.players[p] = true
+    end
+    -- Visueller Countdown (ohne Auto-Trigger)
+    if currentItem.rollState.timer then currentItem.rollState.timer:Cancel() end
+    currentItem.rollState.timer = C_Timer.NewTicker(1, function()
+        currentItem.rollState.timeLeft = currentItem.rollState.timeLeft - 1
+        if GL.UI and GL.UI.RefreshCountdown then
+            GL.UI.RefreshCountdown(currentItem.rollState.timeLeft)
+        end
+        if currentItem.rollState.timeLeft <= 0 then
+            currentItem.rollState.timer:Cancel()
+            currentItem.rollState.timer = nil
+        end
+    end, seconds)
+    if GL.UI and GL.UI.RefreshLootTab then GL.UI.RefreshLootTab() end
+end
+
+--- ML hat Loot zugewiesen → Observer aktualisieren Session-Log
+function Loot.OnCommAssign(playerName, diff, link)
+    if GL.IsMasterLooter() then return end
+    if not playerName or playerName == "" then return end
+    -- Vollständigen Namen suchen (Kurzname-Match)
+    local fullName = playerName
+    for _, p in ipairs(GuildLootDB.currentRaid.participants) do
+        if GL.ShortName(p) == playerName or p == playerName then
+            fullName = p; break
+        end
+    end
+    table.insert(GuildLootDB.currentRaid.lootLog, {
+        player     = fullName,
+        item       = link or "",
+        difficulty = diff or "",
+        timestamp  = time(),
+    })
+    Loot.OnCommItemClear()
+    if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
 end

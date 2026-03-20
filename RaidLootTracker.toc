@@ -6,6 +6,7 @@
 
 Util.lua
 Core.lua
+Comm.lua
 Loot.lua
 MinimapButton.lua
 UI.lua
