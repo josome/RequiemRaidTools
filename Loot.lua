@@ -187,24 +187,6 @@ end
 -- Chat-Parsing – Bedarfsmeldungen
 -- ============================================================
 
-local function IsInCurrentGroup(shortName)
-    if IsInRaid() then
-        for i = 1, GetNumGroupMembers() do
-            local n = GetRaidRosterInfo(i)
-            if n and GL.ShortName(n) == shortName then return true end
-        end
-    elseif IsInGroup() then
-        if GL.ShortName(UnitName("player") or "") == shortName then return true end
-        for i = 1, GetNumGroupMembers() - 1 do
-            local n = UnitName("party" .. i)
-            if n and GL.ShortName(n) == shortName then return true end
-        end
-    else
-        if GL.ShortName(UnitName("player") or "") == shortName then return true end
-    end
-    return false
-end
-
 local function IsParticipant(name)
     if not GuildLootDB.currentRaid.active then return false end
     local absent = GuildLootDB.currentRaid.absent
@@ -214,8 +196,7 @@ local function IsParticipant(name)
             return not absent[p]
         end
     end
-    -- Fallback: Spieler ist aktuell in der Gruppe, aber noch nicht in participants
-    return IsInCurrentGroup(short)
+    return false
 end
 
 function Loot.OnChatMessage(msg, sender)
