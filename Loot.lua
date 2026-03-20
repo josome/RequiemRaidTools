@@ -445,6 +445,7 @@ function Loot.AssignLootConfirm(fullName, diff)
     table.insert(GuildLootDB.currentRaid.lootLog, {
         player     = fullName,
         item       = link,
+        link       = link,
         category   = category,
         difficulty = diff,
         timestamp  = ts,
@@ -596,6 +597,7 @@ function Loot.OnCommAssign(playerName, diff, link)
     table.insert(GuildLootDB.currentRaid.lootLog, {
         player     = fullName,
         item       = link or "",
+        link       = link or "",
         difficulty = diff or "",
         timestamp  = time(),
     })

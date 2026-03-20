@@ -1267,7 +1267,7 @@ function UI.RefreshLogTab()
         diffLbl:SetWidth(30)
         diffLbl:SetText(ColorDiff(entry.difficulty))
 
-        MakeItemLinkBtn(row, diffLbl, 4, entry.link, entry.item or "?")
+        MakeItemLinkBtn(row, diffLbl, 4, entry.link or entry.item, entry.item or "?")
 
         row:Show()
         table.insert(logRows, row)
@@ -1520,7 +1520,7 @@ function UI.RefreshVerlaufDetail(idx)
         diffLbl:SetWidth(25)
         diffLbl:SetText(ColorDiff(entry.difficulty))
 
-        MakeItemLinkBtn(row, diffLbl, 4, entry.link, entry.item or "?")
+        MakeItemLinkBtn(row, diffLbl, 4, entry.link or entry.item, entry.item or "?")
 
         row:Show()
         table.insert(verlaufDetailRows, row)
