@@ -1347,17 +1347,43 @@ function UI.BuildVerlaufPanel(parent)
     resumeBtn:Hide()
     panel.resumeBtn = resumeBtn
 
-    local deleteBtn = MakeButton(detailFrame, "|cffff4444Löschen|r", 80, 22, function()
-        if selectedHistoryIndex then
+    local deletePending = false
+    local deleteTimer   = nil
+
+    local deleteBtn = MakeButton(detailFrame, "Löschen", 80, 22, function()
+        if not selectedHistoryIndex then return end
+        if deletePending then
+            -- zweiter Klick → löschen
+            if deleteTimer then deleteTimer:Cancel(); deleteTimer = nil end
+            deletePending = false
+            panel.deleteBtn:SetText("Löschen")
             table.remove(GuildLootDB.raidHistory, selectedHistoryIndex)
             selectedHistoryIndex = nil
             UI.RefreshVerlaufTab()
             UI.RefreshVerlaufDetail(nil)
+        else
+            -- erster Klick → 3-Sekunden-Fenster öffnen
+            deletePending = true
+            panel.deleteBtn:SetText("|cffff4444Sicher?|r")
+            deleteTimer = C_Timer.NewTimer(3, function()
+                deletePending = false
+                deleteTimer   = nil
+                if panel.deleteBtn then
+                    panel.deleteBtn:SetText("Löschen")
+                end
+            end)
         end
     end)
     deleteBtn:SetPoint("RIGHT", resumeBtn, "LEFT", -4, 0)
     deleteBtn:Hide()
     panel.deleteBtn = deleteBtn
+
+    -- Arm-Zustand zurücksetzen wenn Auswahl wechselt
+    panel.resetDeleteArm = function()
+        if deleteTimer then deleteTimer:Cancel(); deleteTimer = nil end
+        deletePending = false
+        deleteBtn:SetText("Löschen")
+    end
 
     local detailScroll = CreateFrame("ScrollFrame", nil, detailFrame, "UIPanelScrollFrameTemplate")
     detailScroll:SetPoint("TOPLEFT",     panel.detailHeader, "BOTTOMLEFT", 0,   -4)
@@ -1468,11 +1494,13 @@ function UI.RefreshVerlaufDetail(idx)
     if not snap then
         verlaufPanel.detailHeader:SetText("|cff888888— Raid auswählen —|r")
         verlaufPanel.detailContent:SetHeight(1)
-        if verlaufPanel.resumeBtn then verlaufPanel.resumeBtn:Hide() end
-        if verlaufPanel.deleteBtn then verlaufPanel.deleteBtn:Hide() end
+        if verlaufPanel.resumeBtn    then verlaufPanel.resumeBtn:Hide() end
+        if verlaufPanel.deleteBtn    then verlaufPanel.deleteBtn:Hide() end
+        if verlaufPanel.resetDeleteArm then verlaufPanel.resetDeleteArm() end
         return
     end
 
+    if verlaufPanel.resetDeleteArm then verlaufPanel.resetDeleteArm() end
     if verlaufPanel.resumeBtn then
         verlaufPanel.resumeBtn:Show()
         verlaufPanel.resumeBtn:SetEnabled(not GuildLootDB.currentRaid.active)
