@@ -1486,6 +1486,8 @@ function UI.RefreshVerlaufTab()
     end
 end
 
+local lastDetailIdx = nil
+
 function UI.RefreshVerlaufDetail(idx)
     if not verlaufPanel or not verlaufPanel.detailContent then return end
 
@@ -1503,10 +1505,15 @@ function UI.RefreshVerlaufDetail(idx)
         if verlaufPanel.resumeBtn    then verlaufPanel.resumeBtn:Hide() end
         if verlaufPanel.deleteBtn    then verlaufPanel.deleteBtn:Hide() end
         if verlaufPanel.resetDeleteArm then verlaufPanel.resetDeleteArm() end
+        lastDetailIdx = nil
         return
     end
 
-    if verlaufPanel.resetDeleteArm then verlaufPanel.resetDeleteArm() end
+    -- Arm nur zurücksetzen wenn Auswahl wechselt, nicht bei jedem Refresh
+    if idx ~= lastDetailIdx and verlaufPanel.resetDeleteArm then
+        verlaufPanel.resetDeleteArm()
+    end
+    lastDetailIdx = idx
     if verlaufPanel.resumeBtn then
         verlaufPanel.resumeBtn:Show()
         verlaufPanel.resumeBtn:SetEnabled(not GuildLootDB.currentRaid.active)
