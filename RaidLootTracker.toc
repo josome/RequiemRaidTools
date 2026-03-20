@@ -1,0 +1,11 @@
+## Interface: 120001
+## Title: RaidLootTracker
+## Notes: Raid-Loot-Tracking fuer Gilden-Offiziere
+## Version: 1.0.0
+## SavedVariables: GuildLootDB
+
+Util.lua
+Core.lua
+Loot.lua
+MinimapButton.lua
+UI.lua
