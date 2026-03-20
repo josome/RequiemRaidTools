@@ -1580,7 +1580,7 @@ function UI.RefreshSessionBar()
         local count   = #raid.participants
         UI.sessionStatusLbl:SetText("|cff00ff00Raid aktiv|r" .. tierStr .. "  |cffffcc00" .. count .. " Spieler|r")
         if UI.tierBox      then UI.tierBox:SetText(raid.tier or "") end
-        if UI.startRaidBtn then UI.startRaidBtn:SetText("Roster neu laden") end
+        if UI.startRaidBtn then UI.startRaidBtn:SetText("Neu laden") end
         if UI.closeRaidBtn then UI.closeRaidBtn:Enable() end
     else
         UI.sessionStatusLbl:SetText("|cff888888Kein Raid aktiv|r")
