@@ -88,15 +88,15 @@ end
 -- ============================================================
 
 function GL.Print(msg)
-    print("|cff00ccff[GuildLoot]|r " .. tostring(msg))
+    print("|cff00ccff[GUILDLOOT]|r " .. tostring(msg))
 end
 
 function GL.PostToRaid(msg)
     if not GuildLootDB.settings.postToChat then return end
     if IsInRaid() then
-        SendChatMessage(msg, "RAID")
+        SendChatMessage("[RLT] " .. msg, "RAID")
     elseif IsInGroup() then
-        SendChatMessage(msg, "PARTY")
+        SendChatMessage("[RLT] " .. msg, "PARTY")
     end
 end
 
