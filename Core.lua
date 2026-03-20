@@ -276,6 +276,41 @@ function GL.CloseRaid()
     if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
 end
 
+function GL.ResumeRaid(idx)
+    local history = GuildLootDB.raidHistory
+    if not history or not history[idx] then
+        GL.Print("Raid nicht gefunden.")
+        return
+    end
+    if GuildLootDB.currentRaid.active then
+        GL.Print("Bitte zuerst den aktuellen Raid beenden (/gl reset oder 'Raid beenden').")
+        return
+    end
+    local snap = history[idx]
+    local raid = GuildLootDB.currentRaid
+    raid.active     = true
+    raid.tier       = snap.tier
+    raid.difficulty = snap.difficulty
+    raid.participants = {}
+    for _, p in ipairs(snap.participants or {}) do
+        table.insert(raid.participants, p)
+        GL.CreatePlayerRecord(p)
+    end
+    raid.lootLog = {}
+    for _, e in ipairs(snap.lootLog or {}) do
+        table.insert(raid.lootLog, e)
+    end
+    raid.absent                  = {}
+    raid.pendingLoot             = {}
+    raid.sessionHidden           = {}
+    raid.sessionChecked          = {}
+    raid.currentKillParticipants = {}
+    table.remove(history, idx)
+    GL.Print("Raid fortgesetzt: " .. (raid.tier ~= "" and raid.tier or "?")
+             .. " (" .. #raid.participants .. " Spieler, " .. #raid.lootLog .. " Loot-Einträge wiederhergestellt).")
+    if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
+end
+
 function GL.ResetRaid()
     local raid = GuildLootDB.currentRaid
     raid.active       = false

@@ -1316,6 +1316,17 @@ function UI.BuildVerlaufPanel(parent)
     panel.detailHeader:SetPoint("TOPLEFT", detailFrame, "TOPLEFT", 6, -6)
     panel.detailHeader:SetText("|cff888888— Raid auswählen —|r")
 
+    local resumeBtn = MakeButton(detailFrame, "Raid fortsetzen", 120, 22, function()
+        if selectedHistoryIndex then
+            GL.ResumeRaid(selectedHistoryIndex)
+            selectedHistoryIndex = nil
+            UI.ShowTab(TAB_LOOT)
+        end
+    end)
+    resumeBtn:SetPoint("TOPRIGHT", detailFrame, "TOPRIGHT", -6, -4)
+    resumeBtn:Hide()
+    panel.resumeBtn = resumeBtn
+
     local detailScroll = CreateFrame("ScrollFrame", nil, detailFrame, "UIPanelScrollFrameTemplate")
     detailScroll:SetPoint("TOPLEFT",     panel.detailHeader, "BOTTOMLEFT", 0,   -4)
     detailScroll:SetPoint("BOTTOMRIGHT", detailFrame,        "BOTTOMRIGHT", -22,  4)
@@ -1425,7 +1436,13 @@ function UI.RefreshVerlaufDetail(idx)
     if not snap then
         verlaufPanel.detailHeader:SetText("|cff888888— Raid auswählen —|r")
         verlaufPanel.detailContent:SetHeight(1)
+        if verlaufPanel.resumeBtn then verlaufPanel.resumeBtn:Hide() end
         return
+    end
+
+    if verlaufPanel.resumeBtn then
+        verlaufPanel.resumeBtn:Show()
+        verlaufPanel.resumeBtn:SetEnabled(not GuildLootDB.currentRaid.active)
     end
 
     local diffStr = snap.difficulty and (" [" .. snap.difficulty .. "]") or ""
