@@ -21,7 +21,7 @@ local btn = CreateFrame("Button", "RaidLootTrackerMinimapButton", Minimap)
 btn:SetSize(32, 32)
 btn:SetFrameStrata("MEDIUM")
 btn:EnableMouse(true)
-btn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+btn:RegisterForClicks("LeftButtonUp")
 btn:RegisterForDrag("LeftButton")
 btn:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
 

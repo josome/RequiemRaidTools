@@ -126,10 +126,6 @@ end
 -- Hilfsfunktionen
 -- ============================================================
 
-function GL.IsOfficer()
-    return UnitIsOfficer and UnitIsOfficer("player") or false
-end
-
 function GL.IsMasterLooter()
     return GuildLootDB and GuildLootDB.settings and GuildLootDB.settings.isMasterLooter == true
 end

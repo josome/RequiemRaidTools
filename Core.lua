@@ -26,7 +26,6 @@ local DB_DEFAULTS = {
     },
     settings = {
         postToChat     = true,
-        chatCommand    = "/gl",
         isMasterLooter = false,
         minQuality     = 4,
         prioSeconds    = 15,
@@ -231,23 +230,11 @@ local function AutoTierName()
     return date("%d.%m.%Y")
 end
 
---- Difficulty-String aus difficultyID
-local function DiffFromInstance()
-    local _, instanceType, difficultyID = GetInstanceInfo()
-    if instanceType == "raid" or instanceType == "party" then
-        if difficultyID == 14 or difficultyID == 1  then return "N" end
-        if difficultyID == 15 or difficultyID == 2  then return "H" end
-        if difficultyID == 16 or difficultyID == 8  then return "M" end
-        if difficultyID == 17                        then return "N" end
-    end
-    return ""
-end
-
 function GL.StartRaid(tier)
     local raid      = GuildLootDB.currentRaid
     raid.active     = true
     raid.tier       = (tier and tier ~= "") and tier or AutoTierName()
-    raid.difficulty = DiffFromInstance()
+    raid.difficulty = GL.DetectDifficulty() or ""
     raid.lootLog    = {}
     GL.LoadRaidRoster()
     GL.Print("Raid gestartet: " .. raid.tier .. ". " .. #raid.participants .. " Spieler geladen.")
