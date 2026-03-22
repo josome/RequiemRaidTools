@@ -40,12 +40,35 @@ local function ROLL_SECONDS() return GuildLootDB.settings.rollSeconds or 15 end
 -- Item das noch auf GetItemInfo wartet
 local pendingActivation = nil   -- itemLink
 
+-- Items aus OnLootOpened die noch auf GetItemInfo warten
+local deferredPendingItems = {}
+
 -- ============================================================
 -- Zugriffs-Helfer
 -- ============================================================
 
 function Loot.GetPendingLoot()  return pendingLoot()  end
 function Loot.GetCurrentItem()  return currentItem  end
+
+-- Prüft Loot-Filter und fügt Item ggf. in pendingLoot ein
+function Loot.TryAddPendingItem(item, equipLoc)
+    local s = GuildLootDB.settings
+    local category = GL.GetItemCategory(item.itemID, equipLoc, item.quality)
+
+    -- Filter: nicht-ausrüstbare Items (Handwerksmaterialien, Reagenzien, etc.)
+    if s.filterNonEquip then
+        local isEquip = equipLoc ~= "" and equipLoc ~= "INVTYPE_NON_EQUIP_IGNORE"
+        -- Ausnahme: Class-Tokens haben equipLoc="" sind aber "setItems"
+        if not isEquip and category ~= "setItems" then return end
+    end
+
+    -- Filter: Kategorie-Filter
+    local fc = s.filterCategories
+    if fc and fc[category] == false then return end
+
+    item.category = category
+    table.insert(pendingLoot(), item)
+end
 
 -- ============================================================
 -- Loot-Erkennung (LOOT_OPENED)
@@ -75,13 +98,13 @@ function Loot.OnLootOpened()
 
     if #newItems > 0 then
         for _, item in ipairs(newItems) do
-            -- Kategorie ermitteln (GetItemInfo kann nil zurückgeben → deferred)
-            local _, _, q, _, _, itemType, itemSubType, _, equipLoc, _, _, classID, subclassID =
-                GetItemInfo(item.link)
+            -- Kategorie ermitteln + Filter prüfen (GetItemInfo kann nil → deferred)
+            local _, _, _, _, _, _, _, _, equipLoc = GetItemInfo(item.link)
             if equipLoc ~= nil then
-                item.category = GL.GetItemCategory(item.itemID, equipLoc, item.quality)
+                Loot.TryAddPendingItem(item, equipLoc)
+            else
+                table.insert(deferredPendingItems, item)
             end
-            table.insert(pendingLoot(), item)
         end
         if GL.UI and GL.UI.RefreshLootTab then GL.UI.RefreshLootTab() end
     end
@@ -123,16 +146,35 @@ function Loot.ReleaseItem(itemLink)
 end
 
 function Loot.OnItemInfoReceived(itemID)
-    if not pendingActivation then return end
-    local storedID = tonumber(pendingActivation:match("item:(%d+)"))
-    if storedID ~= itemID then return end
+    -- Handle pendingActivation (ReleaseItem deferred)
+    if pendingActivation then
+        local storedID = tonumber(pendingActivation:match("item:(%d+)"))
+        if storedID == itemID then
+            local name, link, quality, iLevel, _, _, _, _, equipLoc = GetItemInfo(pendingActivation)
+            if name then
+                local savedLink = pendingActivation
+                pendingActivation = nil
+                Loot.ActivateItem(savedLink, name, iLevel, equipLoc, quality)
+            end
+        end
+    end
 
-    local name, link, quality, iLevel, _, _, _, _, equipLoc = GetItemInfo(pendingActivation)
-    if not name then return end
-
-    local savedLink = pendingActivation
-    pendingActivation = nil
-    Loot.ActivateItem(savedLink, name, iLevel, equipLoc, quality)
+    -- Handle deferred pending items (OnLootOpened)
+    local refreshNeeded = false
+    for i = #deferredPendingItems, 1, -1 do
+        local di = deferredPendingItems[i]
+        if di.itemID == itemID then
+            local _, _, _, _, _, _, _, _, equipLoc = GetItemInfo(di.link)
+            if equipLoc ~= nil then
+                Loot.TryAddPendingItem(di, equipLoc)
+                table.remove(deferredPendingItems, i)
+                refreshNeeded = true
+            end
+        end
+    end
+    if refreshNeeded and GL.UI and GL.UI.RefreshLootTab then
+        GL.UI.RefreshLootTab()
+    end
 end
 
 function Loot.ActivateItem(link, name, iLevel, equipLoc, quality)

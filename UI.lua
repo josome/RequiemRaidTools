@@ -73,7 +73,7 @@ local dockTab          -- schmaler Streifen am linken Rand (angedockter Zustand)
 local activeTab = TAB_LOOT
 
 -- Panels
-local lootPanel, spielerPanel, logPanel, verlaufPanel
+local lootPanel, spielerPanel, logPanel, verlaufPanel, settingsPanel
 local verlaufRows, verlaufDetailRows = {}, {}
 local selectedHistoryIndex = nil
 -- Tabs
@@ -151,10 +151,35 @@ function UI.BuildMainFrame()
     -- Titelzeile
     mainFrame.TitleText:SetText("GuildLoot v1.0")
 
-    -- ML-Checkbox (oben rechts in Titelleiste)
+    -- Settings-Button (⚙) rechts neben ML-Checkbox
+    local settingsBtn = CreateFrame("Button", nil, mainFrame)
+    settingsBtn:SetSize(22, 18)
+    settingsBtn:SetPoint("RIGHT", mainFrame.CloseButton, "LEFT", -4, 0)
+    local settingsIcon = settingsBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    settingsIcon:SetAllPoints()
+    settingsIcon:SetText("|cffaaaaaa⚙|r")
+    settingsIcon:SetJustifyH("CENTER")
+    settingsBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+        GameTooltip:SetText("Einstellungen", 1, 1, 1)
+        GameTooltip:Show()
+    end)
+    settingsBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    settingsBtn:SetScript("OnClick", function()
+        if settingsPanel then
+            if settingsPanel:IsShown() then
+                settingsPanel:Hide()
+            else
+                settingsPanel:Show()
+            end
+        end
+    end)
+    UI.settingsBtn = settingsBtn
+
+    -- ML-Checkbox (oben rechts in Titelleiste, links neben Settings-Button)
     local mlCheck = CreateFrame("CheckButton", "GuildLootMLCheck", mainFrame, "UICheckButtonTemplate")
     mlCheck:SetSize(20, 20)
-    mlCheck:SetPoint("RIGHT", mainFrame.CloseButton, "LEFT", -4, 0)
+    mlCheck:SetPoint("RIGHT", settingsBtn, "LEFT", -8, 0)
     mlCheck.text:SetText("ML")
     mlCheck.text:SetTextColor(1, 0.8, 0)
     mlCheck.text:ClearAllPoints()
@@ -306,6 +331,13 @@ function UI.BuildMainFrame()
     logPanel     = UI.BuildLogPanel(contentFrame)
     verlaufPanel = UI.BuildVerlaufPanel(contentFrame)
 
+    -- Settings-Overlay (über allen anderen Panels, initial versteckt)
+    settingsPanel = UI.BuildSettingsPanel(mainFrame)
+    settingsPanel:SetPoint("TOPLEFT",     mainFrame, "TOPLEFT",     4, -52)
+    settingsPanel:SetPoint("BOTTOMRIGHT", mainFrame, "BOTTOMRIGHT", -4, 42)
+    settingsPanel:SetFrameStrata("DIALOG")
+    settingsPanel:Hide()
+
     UI.ShowTab(TAB_LOOT)
 end
 
@@ -362,6 +394,254 @@ function UI.BuildDockTab()
 
     dockTab:Hide()
     UI.dockTab = dockTab
+end
+
+-- ============================================================
+-- Settings-Overlay
+-- ============================================================
+
+function UI.BuildSettingsPanel(parent)
+    local panel = CreateFrame("Frame", "GuildLootSettingsPanel", parent, "BackdropTemplate")
+    panel:SetBackdrop({
+        bgFile   = "Interface\\DialogFrame\\UI-DialogBox-Background",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        edgeSize = 8,
+        insets   = { left = 4, right = 4, top = 4, bottom = 4 },
+    })
+
+    local y = -12  -- laufende Y-Position
+
+    local function SectionHeader(label)
+        local lbl = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        lbl:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
+        lbl:SetText("|cffffcc00" .. label .. "|r")
+        y = y - 18
+        local div = panel:CreateTexture(nil, "BACKGROUND")
+        div:SetColorTexture(0.5, 0.5, 0.5, 0.5)
+        div:SetHeight(1)
+        div:SetPoint("TOPLEFT",  panel, "TOPLEFT",  12, y)
+        div:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -12, y)
+        y = y - 8
+        return lbl
+    end
+
+    local function MakeCheck(labelText, key, subtable)
+        local cb = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
+        cb:SetSize(20, 20)
+        cb:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
+        cb.text:SetText(labelText)
+        cb.text:ClearAllPoints()
+        cb.text:SetPoint("LEFT", cb, "RIGHT", 2, 0)
+        local function getVal()
+            if subtable then
+                return GuildLootDB.settings[subtable] and GuildLootDB.settings[subtable][key]
+            end
+            return GuildLootDB.settings[key]
+        end
+        cb:SetChecked(getVal() ~= false)
+        cb:SetScript("OnClick", function(self)
+            if subtable then
+                GuildLootDB.settings[subtable][key] = self:GetChecked()
+            else
+                GuildLootDB.settings[key] = self:GetChecked()
+            end
+        end)
+        y = y - 24
+        return cb
+    end
+
+    local function MakeDD(labelText, settingKey, opts, labels, xAnchor, xOff)
+        local lbl = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        if xAnchor then
+            lbl:SetPoint("LEFT", xAnchor, "RIGHT", xOff or 8, 0)
+        else
+            lbl:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
+        end
+        lbl:SetText(labelText)
+        local dd = CreateFrame("Frame", "GuildLootSettingsDD_" .. settingKey, panel, "UIDropDownMenuTemplate")
+        UIDropDownMenu_SetWidth(dd, 80)
+        local curVal = GuildLootDB.settings[settingKey]
+        local curLabel = tostring(curVal)
+        for i, v in ipairs(opts) do
+            if v == curVal then curLabel = (labels and labels[i]) or tostring(v); break end
+        end
+        UIDropDownMenu_SetText(dd, curLabel)
+        dd:SetPoint("LEFT", lbl, "RIGHT", -8, 0)
+        UIDropDownMenu_Initialize(dd, function()
+            for i, v in ipairs(opts) do
+                local info = UIDropDownMenu_CreateInfo()
+                info.text = (labels and labels[i]) or tostring(v)
+                info.notCheckable = true
+                info.func = function()
+                    GuildLootDB.settings[settingKey] = v
+                    UIDropDownMenu_SetText(dd, (labels and labels[i]) or tostring(v))
+                    CloseDropDownMenus()
+                end
+                UIDropDownMenu_AddButton(info)
+            end
+        end)
+        return dd, lbl
+    end
+
+    local function MakeDiffBox(diff, anchor, yOff)
+        local s = GuildLootDB.settings.difficultyRanges[diff]
+        local lbl = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        lbl:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, yOff or -4)
+        local diffLabel = { N="|cff1eff00Normal|r", H="|cff0070ddHeroisch|r", M="|cffff8000Mythisch|r" }
+        lbl:SetText(diffLabel[diff] or diff)
+
+        local function MakeEB(val, xAnchorFrame, xOff2, dbKey)
+            local eb = CreateFrame("EditBox", nil, panel, "InputBoxTemplate")
+            eb:SetSize(44, 20)
+            eb:SetPoint("LEFT", xAnchorFrame, "RIGHT", xOff2, 0)
+            eb:SetAutoFocus(false)
+            eb:SetMaxLetters(4)
+            eb:SetNumeric(true)
+            eb:SetText(tostring(val))
+            eb:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
+            eb:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+            eb:SetScript("OnEditFocusLost", function(self)
+                local n = tonumber(self:GetText())
+                if n then GuildLootDB.settings.difficultyRanges[diff][dbKey] = n end
+            end)
+            return eb
+        end
+        local ebMin = MakeEB(s.min, lbl, 6, "min")
+        local dash  = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        dash:SetPoint("LEFT", ebMin, "RIGHT", 4, 0)
+        dash:SetText("–")
+        MakeEB(s.max, dash, 4, "max")
+        return lbl
+    end
+
+    -- ── Sektion 1: Loot-Filter ────────────────────────────────
+    SectionHeader("Loot-Filter")
+
+    -- Min. Qualität Dropdown
+    local qualLbl = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    qualLbl:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
+    qualLbl:SetText("Min. Qualität:")
+    local qualDD = CreateFrame("Frame", "GuildLootSettingsDD_minQuality", panel, "UIDropDownMenuTemplate")
+    UIDropDownMenu_SetWidth(qualDD, 80)
+    qualDD:SetPoint("LEFT", qualLbl, "RIGHT", -8, 0)
+    local qualOpts   = { 3, 4, 5 }
+    local qualLabels = { "|cff0070ddSelten|r", "|cffa335eeEpisch|r", "|cffff8000Legendär|r" }
+    local function qualLabel(v)
+        for i, q in ipairs(qualOpts) do if q == v then return qualLabels[i] end end
+        return tostring(v)
+    end
+    UIDropDownMenu_SetText(qualDD, qualLabel(GuildLootDB.settings.minQuality or 4))
+    UIDropDownMenu_Initialize(qualDD, function()
+        for i, v in ipairs(qualOpts) do
+            local info = UIDropDownMenu_CreateInfo()
+            info.text = qualLabels[i]
+            info.notCheckable = true
+            info.func = function()
+                GuildLootDB.settings.minQuality = v
+                UIDropDownMenu_SetText(qualDD, qualLabels[i])
+                CloseDropDownMenus()
+            end
+            UIDropDownMenu_AddButton(info)
+        end
+    end)
+    y = y - 30
+
+    MakeCheck("Nicht-ausrüstbare Items ausblenden (Handwerk, Reagenzien)", "filterNonEquip")
+
+    local catLbl = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    catLbl:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
+    catLbl:SetText("|cff888888Kategorien zeigen:|r")
+    y = y - 22
+
+    -- Kategorie-Checkboxen in 2×2 Grid
+    local function MakeCatCheck(labelText, key, col)
+        local cb = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
+        cb:SetSize(18, 18)
+        local xOff = (col == 1) and 20 or 200
+        cb:SetPoint("TOPLEFT", panel, "TOPLEFT", xOff, y)
+        cb.text:SetText(labelText)
+        cb.text:ClearAllPoints()
+        cb.text:SetPoint("LEFT", cb, "RIGHT", 2, 0)
+        local s = GuildLootDB.settings
+        cb:SetChecked((s.filterCategories and s.filterCategories[key]) ~= false)
+        cb:SetScript("OnClick", function(self)
+            if not GuildLootDB.settings.filterCategories then
+                GuildLootDB.settings.filterCategories = {}
+            end
+            GuildLootDB.settings.filterCategories[key] = self:GetChecked()
+        end)
+        return cb
+    end
+    MakeCatCheck("Waffen",    "weapons",  1)
+    MakeCatCheck("Schmuck",   "trinket",  2)
+    y = y - 24
+    MakeCatCheck("Set-Items", "setItems", 1)
+    MakeCatCheck("Sonstiges", "other",    2)
+    y = y - 14
+
+    -- ── Sektion 2: Timer ──────────────────────────────────────
+    SectionHeader("Timer")
+
+    local timerLbl = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    timerLbl:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
+    timerLbl:SetText("|cff888888Prio-Phase:|r")
+
+    local ddPrio = CreateFrame("Frame", "GuildLootSettingsDD_prioSeconds", panel, "UIDropDownMenuTemplate")
+    UIDropDownMenu_SetWidth(ddPrio, 60)
+    UIDropDownMenu_SetText(ddPrio, (GuildLootDB.settings.prioSeconds or 15) .. "s")
+    ddPrio:SetPoint("LEFT", timerLbl, "RIGHT", -8, 0)
+    UIDropDownMenu_Initialize(ddPrio, function()
+        for _, s in ipairs({10,15,20,30,45,60}) do
+            local info = UIDropDownMenu_CreateInfo()
+            info.text = s .. "s"
+            info.notCheckable = true
+            info.func = function()
+                GuildLootDB.settings.prioSeconds = s
+                UIDropDownMenu_SetText(ddPrio, s .. "s")
+                CloseDropDownMenus()
+            end
+            UIDropDownMenu_AddButton(info)
+        end
+    end)
+
+    local rollLbl = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    rollLbl:SetPoint("LEFT", ddPrio, "RIGHT", 12, 0)
+    rollLbl:SetText("|cff888888Roll-Phase:|r")
+
+    local ddRoll = CreateFrame("Frame", "GuildLootSettingsDD_rollSeconds", panel, "UIDropDownMenuTemplate")
+    UIDropDownMenu_SetWidth(ddRoll, 60)
+    UIDropDownMenu_SetText(ddRoll, (GuildLootDB.settings.rollSeconds or 15) .. "s")
+    ddRoll:SetPoint("LEFT", rollLbl, "RIGHT", -8, 0)
+    UIDropDownMenu_Initialize(ddRoll, function()
+        for _, s in ipairs({10,15,20,30}) do
+            local info = UIDropDownMenu_CreateInfo()
+            info.text = s .. "s"
+            info.notCheckable = true
+            info.func = function()
+                GuildLootDB.settings.rollSeconds = s
+                UIDropDownMenu_SetText(ddRoll, s .. "s")
+                CloseDropDownMenus()
+            end
+            UIDropDownMenu_AddButton(info)
+        end
+    end)
+    y = y - 30
+
+    -- ── Sektion 3: Allgemein ──────────────────────────────────
+    SectionHeader("Allgemein")
+
+    MakeCheck("In Raid-Chat posten", "postToChat")
+
+    local diffTitleLbl = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    diffTitleLbl:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
+    diffTitleLbl:SetText("|cff888888Schwierigkeitsstufen (Item-Level):|r")
+    y = y - 8
+
+    local nRow = MakeDiffBox("N", panel, -4)
+    local hRow = MakeDiffBox("H", nRow,  -4)
+    MakeDiffBox("M", hRow, -4)
+
+    return panel
 end
 
 function UI.RefreshDockTab()
@@ -482,43 +762,12 @@ function UI.BuildLootPanel(parent)
     main:SetPoint("TOPLEFT",     panel,   "TOPLEFT",   4,  -2)
     main:SetPoint("BOTTOMRIGHT", sidebar, "BOTTOMLEFT", -6,  4)
 
-    -- Timer-Dropdowns
-    local function MakeTimerDD(par, label, key, opts, anchor, xOff)
-        local lbl = par:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        lbl:SetPoint("LEFT", anchor, "RIGHT", xOff, 0)
-        lbl:SetText(label)
-        local dd = CreateFrame("Frame", "GuildLootDD_"..key, par, "UIDropDownMenuTemplate")
-        UIDropDownMenu_SetWidth(dd, 55)
-        UIDropDownMenu_SetText(dd, (GuildLootDB.settings[key] or 15).."s")
-        dd:SetPoint("LEFT", lbl, "RIGHT", -8, 0)
-        UIDropDownMenu_Initialize(dd, function()
-            for _, s in ipairs(opts) do
-                local info = UIDropDownMenu_CreateInfo()
-                info.text = s.."s"
-                info.notCheckable = true
-                info.func = function()
-                    GuildLootDB.settings[key] = s
-                    UIDropDownMenu_SetText(dd, s.."s")
-                    CloseDropDownMenus()
-                end
-                UIDropDownMenu_AddButton(info)
-            end
-        end)
-        return dd
-    end
-
-    local timerLbl = main:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    timerLbl:SetPoint("TOPLEFT", main, "TOPLEFT", 0, -4)
-    timerLbl:SetText("|cff888888Zeiten:|r")
-    local ddPrio = MakeTimerDD(main, "Prio", "prioSeconds", {10,15,20,30,45,60}, timerLbl, 4)
-    local ddRoll = MakeTimerDD(main, "Roll", "rollSeconds", {10,15,20,30}, ddPrio, 4)
-
     -- Aktives Item
     local divA = main:CreateTexture(nil, "BACKGROUND")
     divA:SetColorTexture(0.3, 0.3, 0.3, 1)
     divA:SetHeight(1)
-    divA:SetPoint("TOPLEFT",  main, "TOPLEFT",  0, -30)
-    divA:SetPoint("TOPRIGHT", main, "TOPRIGHT", 0, -30)
+    divA:SetPoint("TOPLEFT",  main, "TOPLEFT",  0, -4)
+    divA:SetPoint("TOPRIGHT", main, "TOPRIGHT", 0, -4)
 
     activeItemLabel = main:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     activeItemLabel:SetPoint("TOPLEFT", divA, "BOTTOMLEFT", 0, -4)

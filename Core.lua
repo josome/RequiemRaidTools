@@ -39,6 +39,13 @@ local DB_DEFAULTS = {
         framePos     = nil,
         minimized    = true,
         minimapAngle = 45,
+        filterNonEquip   = true,
+        filterCategories = {
+            weapons  = true,
+            trinket  = true,
+            setItems = true,
+            other    = true,
+        },
     },
 }
 
