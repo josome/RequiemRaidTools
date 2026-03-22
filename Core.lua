@@ -26,6 +26,7 @@ local DB_DEFAULTS = {
     },
     settings = {
         postToChat     = true,
+        chatChannel    = "AUTO",   -- "AUTO", "RAID", "PARTY", "OFF"
         isMasterLooter = false,
         minQuality     = 4,
         prioSeconds    = 15,
@@ -98,12 +99,21 @@ function GL.Print(msg)
 end
 
 function GL.PostToRaid(msg)
-    if not GuildLootDB.settings.postToChat then return end
-    if IsInRaid() then
-        SendChatMessage("[RLT] " .. msg, "RAID")
-    elseif IsInGroup() then
-        SendChatMessage("[RLT] " .. msg, "PARTY")
+    local s  = GuildLootDB.settings
+    local ch = s.chatChannel or "AUTO"
+    -- Backward-compat: altes postToChat=false verhält sich wie "OFF"
+    if ch == "OFF" or (ch == "AUTO" and s.postToChat == false) then return end
+    local channel
+    if ch == "RAID" then
+        channel = "RAID"
+    elseif ch == "PARTY" then
+        channel = "PARTY"
+    else   -- AUTO
+        if     IsInRaid()  then channel = "RAID"
+        elseif IsInGroup() then channel = "PARTY"
+        else return end
     end
+    SendChatMessage("[RLT] " .. msg, channel)
 end
 
 -- ============================================================

@@ -151,14 +151,16 @@ function UI.BuildMainFrame()
     -- Titelzeile
     mainFrame.TitleText:SetText("GuildLoot v1.0")
 
-    -- Settings-Button (⚙) rechts neben ML-Checkbox
+    -- Settings-Button (Zahnrad-Icon) rechts neben ML-Checkbox
     local settingsBtn = CreateFrame("Button", nil, mainFrame)
-    settingsBtn:SetSize(22, 18)
+    settingsBtn:SetSize(20, 20)
     settingsBtn:SetPoint("RIGHT", mainFrame.CloseButton, "LEFT", -4, 0)
-    local settingsIcon = settingsBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    settingsIcon:SetAllPoints()
-    settingsIcon:SetText("|cffaaaaaa⚙|r")
-    settingsIcon:SetJustifyH("CENTER")
+    settingsBtn:SetNormalTexture("Interface\\Icons\\Trade_Engineering")
+    local nt = settingsBtn:GetNormalTexture()
+    nt:SetDesaturated(true)
+    nt:SetVertexColor(0.65, 0.65, 0.65)
+    nt:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    settingsBtn:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
     settingsBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
         GameTooltip:SetText("Einstellungen", 1, 1, 1)
@@ -630,7 +632,37 @@ function UI.BuildSettingsPanel(parent)
     -- ── Sektion 3: Allgemein ──────────────────────────────────
     SectionHeader("Allgemein")
 
-    MakeCheck("In Raid-Chat posten", "postToChat")
+    -- Chat-Kanal Dropdown
+    local chatLbl = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    chatLbl:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
+    chatLbl:SetText("|cff888888Chat-Kanal:|r")
+
+    local chatOpts   = { "AUTO",         "RAID",       "PARTY",        "OFF" }
+    local chatLabels = { "Automatisch",  "Raid-Chat",  "Gruppen-Chat", "Aus" }
+    local function getChatLabel(v)
+        for i, c in ipairs(chatOpts) do if c == v then return chatLabels[i] end end
+        return "Automatisch"
+    end
+    local ddChat = CreateFrame("Frame", "GuildLootSettingsDD_chatChannel", panel, "UIDropDownMenuTemplate")
+    UIDropDownMenu_SetWidth(ddChat, 100)
+    ddChat:SetPoint("LEFT", chatLbl, "RIGHT", -8, 0)
+    UIDropDownMenu_SetText(ddChat, getChatLabel(GuildLootDB.settings.chatChannel or "AUTO"))
+    UIDropDownMenu_Initialize(ddChat, function()
+        for i, v in ipairs(chatOpts) do
+            local info = UIDropDownMenu_CreateInfo()
+            info.text = chatLabels[i]
+            info.notCheckable = true
+            info.func = function()
+                GuildLootDB.settings.chatChannel = v
+                -- postToChat für Backward-Compat mitführen
+                GuildLootDB.settings.postToChat = (v ~= "OFF")
+                UIDropDownMenu_SetText(ddChat, chatLabels[i])
+                CloseDropDownMenus()
+            end
+            UIDropDownMenu_AddButton(info)
+        end
+    end)
+    y = y - 30
 
     local diffTitleLbl = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     diffTitleLbl:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
