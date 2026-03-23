@@ -11,7 +11,7 @@ local UI = GL.UI
 -- ============================================================
 
 local FRAME_W, FRAME_H = 720, 560
-local SIDEBAR_W = 210
+local SIDEBAR_W = 240
 local TAB_LOOT, TAB_SPIELER, TAB_LOG, TAB_RAID = 1, 2, 3, 4
 local DIFF_COLORS = { N = "|cff1eff00", H = "|cff0070dd", M = "|cffff8000" }
 
@@ -174,6 +174,11 @@ function UI.BuildMainFrame()
     end)
     UI.settingsBtn = settingsBtn
 
+    -- Settings-Panel schließen wenn Hauptfenster versteckt wird
+    mainFrame:SetScript("OnHide", function()
+        if settingsPanel then settingsPanel:Hide() end
+    end)
+
     -- ML-Checkbox (oben rechts in Titelleiste, links neben Settings-Button)
     local mlCheck = CreateFrame("CheckButton", "GuildLootMLCheck", mainFrame, "UICheckButtonTemplate")
     mlCheck:SetSize(20, 20)
@@ -193,7 +198,7 @@ function UI.BuildMainFrame()
     -- Andocken-Button (Pfeil links)
     local minBtn = CreateFrame("Button", nil, mainFrame, "UIPanelButtonTemplate")
     minBtn:SetSize(32, 18)
-    minBtn:SetPoint("TOPLEFT", mainFrame, "TOPLEFT", 4, -5)
+    minBtn:SetPoint("TOPLEFT", mainFrame, "TOPLEFT", 4, -2)
     minBtn:SetText("«")
     minBtn:SetScript("OnClick", UI.ToggleMinimize)
     minBtn:SetScript("OnEnter", function(self)
@@ -410,37 +415,6 @@ function UI.BuildSettingsPanel(parent)
         return dd, lbl
     end
 
-    local function MakeDiffBox(diff, anchor, yOff)
-        local s = GuildLootDB.settings.difficultyRanges[diff]
-        local lbl = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        lbl:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, yOff or -4)
-        local diffLabel = { N="|cff1eff00Normal|r", H="|cff0070ddHeroisch|r", M="|cffff8000Mythisch|r" }
-        lbl:SetText(diffLabel[diff] or diff)
-
-        local function MakeEB(val, xAnchorFrame, xOff2, dbKey)
-            local eb = CreateFrame("EditBox", nil, panel, "InputBoxTemplate")
-            eb:SetSize(44, 20)
-            eb:SetPoint("LEFT", xAnchorFrame, "RIGHT", xOff2, 0)
-            eb:SetAutoFocus(false)
-            eb:SetMaxLetters(4)
-            eb:SetNumeric(true)
-            eb:SetText(tostring(val))
-            eb:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
-            eb:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
-            eb:SetScript("OnEditFocusLost", function(self)
-                local n = tonumber(self:GetText())
-                if n then GuildLootDB.settings.difficultyRanges[diff][dbKey] = n end
-            end)
-            return eb
-        end
-        local ebMin = MakeEB(s.min, lbl, 6, "min")
-        local dash  = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        dash:SetPoint("LEFT", ebMin, "RIGHT", 4, 0)
-        dash:SetText("–")
-        MakeEB(s.max, dash, 4, "max")
-        return lbl
-    end
-
     -- ── Sektion 1: Loot-Filter ────────────────────────────────
     SectionHeader("Loot-Filter")
 
@@ -473,7 +447,7 @@ function UI.BuildSettingsPanel(parent)
     end)
     y = y - 30
 
-    MakeCheck("Nicht-ausrüstbare Items ausblenden (Handwerk, Reagenzien)", "filterNonEquip")
+    MakeCheck("Nicht-ausrüstbare Items ausblenden", "filterNonEquip")
 
     local catLbl = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     catLbl:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
@@ -563,8 +537,8 @@ function UI.BuildSettingsPanel(parent)
     chatLbl:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
     chatLbl:SetText("|cff888888Chat-Kanal:|r")
 
-    local chatOpts   = { "AUTO",         "RAID",       "PARTY",        "OFF" }
-    local chatLabels = { "Automatisch",  "Raid-Chat",  "Gruppen-Chat", "Aus" }
+    local chatOpts   = { "AUTO",        "RAID",       "INSTANCE_CHAT",   "PARTY",        "OFF" }
+    local chatLabels = { "Automatisch", "Raid-Chat",  "Instanz-Chat",    "Gruppen-Chat", "Aus" }
     local function getChatLabel(v)
         for i, c in ipairs(chatOpts) do if c == v then return chatLabels[i] end end
         return "Automatisch"
@@ -590,16 +564,7 @@ function UI.BuildSettingsPanel(parent)
     end)
     y = y - 30
 
-    MakeCheck("Item-Start als Raid-Warnung ankündigen (Raid Leader / Assistent)", "raidWarnItem")
-
-    local diffTitleLbl = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    diffTitleLbl:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
-    diffTitleLbl:SetText("|cff888888Schwierigkeitsstufen (Item-Level):|r")
-    y = y - 8
-
-    local nRow = MakeDiffBox("N", diffTitleLbl, -4)
-    local hRow = MakeDiffBox("H", nRow,  -4)
-    MakeDiffBox("M", hRow, -4)
+    MakeCheck("Item-Start als Raid-Warnung ankündigen", "raidWarnItem")
 
     return panel
 end
@@ -750,6 +715,7 @@ function UI.BuildLootPanel(parent)
     local iconTex = activeItemIcon:CreateTexture(nil, "ARTWORK")
     iconTex:SetAllPoints()
     iconTex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    activeItemIcon:EnableMouse(true)
     activeItemIcon:SetScript("OnEnter", function(self)
         local ci = GL.Loot.GetCurrentItem()
         if ci and ci.link then
@@ -759,7 +725,6 @@ function UI.BuildLootPanel(parent)
         end
     end)
     activeItemIcon:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    activeItemIcon:Hide()
     panel.activeItemIcon    = activeItemIcon
     panel.activeItemIconTex = iconTex
 
@@ -769,8 +734,25 @@ function UI.BuildLootPanel(parent)
     activeItemLabel:SetJustifyH("LEFT")
     activeItemLabel:SetText("Kein aktives Item")
 
+    -- Tooltip-Hover über aktives Item Label
+    local activeItemHover = CreateFrame("Frame", nil, main)
+    activeItemHover:SetPoint("LEFT",  activeItemIcon, "RIGHT", 6, 0)
+    activeItemHover:SetPoint("RIGHT", main, "RIGHT", -110, 0)
+    activeItemHover:SetPoint("TOP",    activeItemIcon, "TOP",    0, 0)
+    activeItemHover:SetPoint("BOTTOM", activeItemIcon, "BOTTOM", 0, 0)
+    activeItemHover:EnableMouse(true)
+    activeItemHover:SetScript("OnEnter", function(self)
+        local ci = GL.Loot.GetCurrentItem()
+        if ci and ci.link then
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetHyperlink(ci.link)
+            GameTooltip:Show()
+        end
+    end)
+    activeItemHover:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
     activeItemCategoryLabel = main:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    activeItemCategoryLabel:SetPoint("LEFT", activeItemLabel, "RIGHT", 4, 0)
+    activeItemCategoryLabel:SetPoint("TOPLEFT", activeItemLabel, "BOTTOMLEFT", 0, -2)
     activeItemCategoryLabel:SetTextColor(0.7, 0.7, 0.7)
 
     resetItemBtn = MakeButton(main, "Zurücksetzen", 100, 22, function()
@@ -781,7 +763,7 @@ function UI.BuildLootPanel(parent)
 
     -- Kandidaten
     local candLabel = main:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    candLabel:SetPoint("TOPLEFT", activeItemLabel, "BOTTOMLEFT", 0, -10)
+    candLabel:SetPoint("TOPLEFT", activeItemCategoryLabel, "BOTTOMLEFT", 0, -6)
     candLabel:SetText("|cffffcc00Bedarfsmeldungen:|r")
 
     local candScroll = CreateFrame("ScrollFrame", nil, main, "UIPanelScrollFrameTemplate")
@@ -792,7 +774,10 @@ function UI.BuildLootPanel(parent)
     candContent:SetSize(candScroll:GetWidth(), 1)
     candScroll:SetScrollChild(candContent)
     panel.candContent = candContent
+    panel.candLabel   = candLabel
     panel.candScroll  = candScroll
+    candLabel:Hide()
+    candScroll:Hide()
 
     -- Buttons: Roll-Aktion + Abbrechen + Countdown
     startRollBtn = MakeButton(main, "Roll freigeben", 130, 24, function()
@@ -877,39 +862,63 @@ function UI.RefreshLootTab()
     local pf = lootPanel.pendingContent
     pf:SetWidth(SIDEBAR_W - 26)  -- feste Breite (Sidebar minus Scrollbar)
     local yOff = -2
-    local ROW_H = 26
+    local ROW_H = 30
     for i, item in ipairs(pl) do
         local row = CreateFrame("Frame", nil, pf)
         row:SetPoint("TOPLEFT",  pf, "TOPLEFT",  0, yOff)
         row:SetPoint("TOPRIGHT", pf, "TOPRIGHT", 0, yOff)
         row:SetHeight(ROW_H)
 
-        -- Freigeben-Button (links)
+        -- « Auswahl-Button (links)
         local releaseBtn = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
-        releaseBtn:SetSize(80, 22)
+        releaseBtn:SetSize(22, 22)
         releaseBtn:SetPoint("LEFT", row, "LEFT", 0, 0)
-        releaseBtn:SetText("Freigeben")
+        releaseBtn:SetText("«")
         releaseBtn:SetScript("OnClick", function()
             GL.Loot.ReleaseItem(item.link)
         end)
+        releaseBtn:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetText("Item auswählen", 1, 1, 1)
+            GameTooltip:Show()
+        end)
+        releaseBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
         if not GL.IsMasterLooter() then releaseBtn:Disable() end
 
         -- X-Button (rechts) – Item aus Liste entfernen
         local removeBtn = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
         removeBtn:SetSize(22, 22)
         removeBtn:SetPoint("RIGHT", row, "RIGHT", 0, 0)
-        removeBtn:SetText("X")
+        removeBtn:SetText("×")
         removeBtn:SetScript("OnClick", function()
             GL.Loot.RemovePendingItem(item.link)
             UI.RefreshLootTab()
         end)
         if not GL.IsMasterLooter() then removeBtn:Disable() end
 
-        -- Item-Link Text (klickbar, Tooltip on hover)
-        local linkBtn = CreateFrame("Button", nil, row)
-        linkBtn:SetPoint("LEFT",  releaseBtn, "RIGHT", 6, 0)
-        linkBtn:SetPoint("RIGHT", removeBtn,  "LEFT", -4, 0)
+        -- Item-Icon
+        local pendingIcon = CreateFrame("Frame", nil, row)
+        pendingIcon:SetSize(24, 24)
+        pendingIcon:SetPoint("LEFT", releaseBtn, "RIGHT", 4, 0)
+        local pendingIconTex = pendingIcon:CreateTexture(nil, "ARTWORK")
+        pendingIconTex:SetAllPoints()
+        pendingIconTex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        local pIcon = select(10, GetItemInfo(item.link))
+        if pIcon then pendingIconTex:SetTexture(pIcon) end
+        pendingIcon:EnableMouse(true)
+        pendingIcon:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetHyperlink(item.link)
+            GameTooltip:Show()
+        end)
+        pendingIcon:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+        -- Item-Link Text mit Tooltip-Hover
+        local linkBtn = CreateFrame("Frame", nil, row)
+        linkBtn:SetPoint("LEFT",  pendingIcon, "RIGHT", 4, 0)
+        linkBtn:SetPoint("RIGHT", removeBtn,   "LEFT", -4, 0)
         linkBtn:SetHeight(ROW_H)
+        linkBtn:EnableMouse(true)
 
         local linkLbl = linkBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         linkLbl:SetAllPoints()
@@ -922,9 +931,6 @@ function UI.RefreshLootTab()
             GameTooltip:Show()
         end)
         linkBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-        linkBtn:SetScript("OnClick", function()
-            if GL.IsMasterLooter() then GL.Loot.ReleaseItem(item.link) end
-        end)
 
         row:Show()
         table.insert(pendingButtons, row)
@@ -941,18 +947,19 @@ function UI.RefreshLootTab()
         local catNames = { weapons="Waffe", trinket="Trinket", setItems="Set/Token", other="Sonstiges" }
         activeItemCategoryLabel:SetText("[" .. (catNames[ci.category] or "?") .. "]")
         resetItemBtn:SetEnabled(GL.IsMasterLooter())
-        if lootPanel.activeItemIcon then
+        if lootPanel.activeItemIconTex then
             local icon = select(10, GetItemInfo(ci.link))
-            if icon then
-                lootPanel.activeItemIconTex:SetTexture(icon)
-                lootPanel.activeItemIcon:Show()
-            end
+            lootPanel.activeItemIconTex:SetTexture(icon or "Interface\\Icons\\INV_Misc_QuestionMark")
         end
+        if lootPanel.candLabel  then lootPanel.candLabel:Show()  end
+        if lootPanel.candScroll then lootPanel.candScroll:Show() end
     else
         activeItemLabel:SetText("|cff888888Kein aktives Item|r")
         activeItemCategoryLabel:SetText("")
         resetItemBtn:SetEnabled(false)
-        if lootPanel.activeItemIcon then lootPanel.activeItemIcon:Hide() end
+        if lootPanel.activeItemIconTex then lootPanel.activeItemIconTex:SetTexture(nil) end
+        if lootPanel.candLabel         then lootPanel.candLabel:Hide()                  end
+        if lootPanel.candScroll        then lootPanel.candScroll:Hide()                 end
     end
 
     UI.RefreshCandidates()
@@ -1124,7 +1131,7 @@ function UI.RefreshSessionLoot()
     sessionLootRows = {}
 
     local log = GuildLootDB.currentRaid.lootLog
-    local ROW_H = 22
+    local ROW_H = 26
     local yOff  = 0
     local shown = 0
     -- Neueste zuerst
@@ -1139,18 +1146,24 @@ function UI.RefreshSessionLoot()
             row:SetHeight(ROW_H)
 
             -- Upvalues für Closure vorab deklarieren
-            local nameText, itemLbl
+            local nameText, itemLbl, iconFrame
 
             -- Checkbox (links)
             local cb = CreateFrame("CheckButton", nil, row, "UICheckButtonTemplate")
             cb:SetSize(18, 18)
             cb:SetPoint("LEFT", row, "LEFT", 0, 0)
+
+            -- Item-Icon
+            iconFrame = CreateFrame("Frame", nil, row)
+            iconFrame:SetSize(24, 24)
+            iconFrame:SetPoint("LEFT", cb, "RIGHT", 2, 0)
             cb:SetChecked(isChecked)
             cb:SetScript("OnClick", function(self)
                 sessionChecked()[k] = self:GetChecked()
                 local alpha = sessionChecked()[k] and 0.4 or 1
-                if nameText then nameText:SetAlpha(alpha) end
-                if itemLbl  then itemLbl:SetAlpha(alpha)  end
+                if nameText  then nameText:SetAlpha(alpha)  end
+                if itemLbl   then itemLbl:SetAlpha(alpha)   end
+                if iconFrame then iconFrame:SetAlpha(alpha) end
             end)
 
             -- X-Button (rechts)
@@ -1165,7 +1178,7 @@ function UI.RefreshSessionLoot()
 
             -- Spieler
             nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-            nameText:SetPoint("LEFT", cb, "RIGHT", 2, 0)
+            nameText:SetPoint("LEFT", iconFrame, "RIGHT", 4, 0)
             nameText:SetWidth(100)
             nameText:SetJustifyH("LEFT")
             nameText:SetText("|cffffcc00" .. GL.ShortName(entry.player or "?") .. "|r")
@@ -1176,17 +1189,46 @@ function UI.RefreshSessionLoot()
             diffLbl:SetWidth(20)
             diffLbl:SetText(ColorDiff(entry.difficulty))
 
+            -- Icon-Textur
+            local iconTex = iconFrame:CreateTexture(nil, "ARTWORK")
+            iconTex:SetAllPoints()
+            iconTex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+            local icon = select(10, GetItemInfo(entry.item or ""))
+            if icon then iconTex:SetTexture(icon) end
+            iconFrame:SetScript("OnEnter", function(self)
+                if entry.item then
+                    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                    GameTooltip:SetHyperlink(entry.item)
+                    GameTooltip:Show()
+                end
+            end)
+            iconFrame:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
             -- Item-Link
             itemLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-            itemLbl:SetPoint("LEFT",  diffLbl, "RIGHT",  2,  0)
+            itemLbl:SetPoint("LEFT",  diffLbl, "RIGHT",  4,  0)
             itemLbl:SetPoint("RIGHT", xBtn,    "LEFT",  -4,  0)
             itemLbl:SetJustifyH("LEFT")
             itemLbl:SetText(entry.item or "?")
+
+            -- Transparenter Hover-Frame über dem Item-Text für Tooltip
+            local itemHover = CreateFrame("Frame", nil, row)
+            itemHover:SetAllPoints(itemLbl)
+            itemHover:EnableMouse(true)
+            itemHover:SetScript("OnEnter", function(self)
+                if entry.item then
+                    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                    GameTooltip:SetHyperlink(entry.item)
+                    GameTooltip:Show()
+                end
+            end)
+            itemHover:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
             -- Ausgegraut wenn bereits abgehakt
             if isChecked then
                 nameText:SetAlpha(0.4)
                 itemLbl:SetAlpha(0.4)
+                iconFrame:SetAlpha(0.4)
             end
 
             row:Show()

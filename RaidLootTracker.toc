@@ -10,3 +10,4 @@ Comm.lua
 Loot.lua
 MinimapButton.lua
 UI.lua
+Test.lua

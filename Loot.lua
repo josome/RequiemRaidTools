@@ -450,7 +450,7 @@ function Loot.AssignLoot(recipientShortName)
     if not fullName then fullName = recipientShortName end
 
     -- Difficulty ermitteln
-    local diff = GL.DetectDifficulty(currentItem.itemLevel)
+    local diff = GL.DetectDifficulty()
     if not diff then
         -- UI zeigt Popup → wird in UI.lua behandelt
         -- AssignLootConfirm wird danach aufgerufen

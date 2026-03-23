@@ -31,11 +31,6 @@ local DB_DEFAULTS = {
         minQuality     = 4,
         prioSeconds    = 15,
         rollSeconds    = 15,
-        difficultyRanges = {
-            N = { min = 593, max = 606 },
-            H = { min = 607, max = 619 },
-            M = { min = 620, max = 639 },
-        },
         framePos     = nil,
         minimized    = true,
         minimapAngle = 45,
@@ -111,8 +106,9 @@ function GL.PostToRaid(msg)
     elseif ch == "PARTY" then
         channel = "PARTY"
     else   -- AUTO
-        if     IsInRaid()  then channel = "RAID"
-        elseif IsInGroup() then channel = "PARTY"
+        if     IsInRaid()                                    then channel = "RAID"
+        elseif IsInGroup(LE_PARTY_CATEGORY_INSTANCE)         then channel = "INSTANCE_CHAT"
+        elseif IsInGroup()                                   then channel = "PARTY"
         else return end
     end
     SendChatMessage("[RLT] " .. msg, channel)
@@ -517,7 +513,14 @@ SlashCmdList["RAIDLOOTTRACKER"] = function(input)
         GL.Print("Master Looter: " .. (settings.isMasterLooter and "|cff00ff00AN|r" or "|cffff4444AUS|r"))
         if GL.UI and GL.UI.RefreshMLButton then GL.UI.RefreshMLButton() end
 
+    elseif cmd == "test" then
+        if GL.Test and GL.Test.AddPendingItem then
+            GL.Test.AddPendingItem()
+        else
+            GL.Print("Testmodus nicht geladen.")
+        end
+
     else
-        GL.Print("Befehle: /rlt | /rlt start [tier] | /rlt history [Name] | /rlt reset | /rlt ml")
+        GL.Print("Befehle: /rlt | /rlt start [tier] | /rlt history [Name] | /rlt reset | /rlt ml | /rlt test")
     end
 end

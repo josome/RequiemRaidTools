@@ -83,8 +83,7 @@ end
 --- 1. Primär: GetInstanceInfo() difficultyID (zuverlässig wenn in Instanz)
 --- 2. Fallback: Item-Level-Ranges
 --- @return string|nil  "N"|"H"|"M" oder nil
-function GL.DetectDifficulty(itemLevel)
-    -- Primär: Instanz-Schwierigkeit direkt auslesen
+function GL.DetectDifficulty()
     local _, instanceType, difficultyID = GetInstanceInfo()
     if instanceType == "raid" or instanceType == "party" then
         if difficultyID == 14 or difficultyID == 1  then return "N" end
@@ -92,16 +91,6 @@ function GL.DetectDifficulty(itemLevel)
         if difficultyID == 16 or difficultyID == 8  then return "M" end
         if difficultyID == 17                        then return "N" end  -- LFR
     end
-
-    -- Fallback: Item-Level-Ranges
-    if not itemLevel then return nil end
-    local ranges = GuildLootDB and GuildLootDB.settings and GuildLootDB.settings.difficultyRanges
-    if not ranges then return nil end
-
-    if itemLevel >= ranges.N.min and itemLevel <= ranges.N.max then return "N" end
-    if itemLevel >= ranges.H.min and itemLevel <= ranges.H.max then return "H" end
-    if itemLevel >= ranges.M.min and itemLevel <= ranges.M.max then return "M" end
-
     return nil
 end
 
