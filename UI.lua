@@ -255,11 +255,10 @@ function UI.BuildMainFrame()
     logPanel     = UI.BuildLogPanel(contentFrame)
     raidPanel = UI.BuildRaidPanel(contentFrame)
 
-    -- Settings-Panel: klappt rechts neben dem Hauptfenster aus
+    -- Settings-Panel: überlagert den Content-Bereich (vollständig opak)
     settingsPanel = UI.BuildSettingsPanel(mainFrame)
-    settingsPanel:SetWidth(320)
-    settingsPanel:SetPoint("TOPLEFT",    mainFrame, "TOPRIGHT",    4,  0)
-    settingsPanel:SetPoint("BOTTOMLEFT", mainFrame, "BOTTOMRIGHT", 4,  0)
+    settingsPanel:SetPoint("TOPLEFT",     mainFrame, "TOPLEFT",     4, -52)
+    settingsPanel:SetPoint("BOTTOMRIGHT", mainFrame, "BOTTOMRIGHT", -4, 42)
     settingsPanel:SetFrameStrata("DIALOG")
     settingsPanel:Hide()
 
@@ -328,7 +327,7 @@ end
 function UI.BuildSettingsPanel(parent)
     local panel = CreateFrame("Frame", "GuildLootSettingsPanel", parent, "BackdropTemplate")
     panel:SetBackdrop({
-        bgFile   = "Interface\\DialogFrame\\UI-DialogBox-Background",
+        bgFile   = "Interface\\Buttons\\WHITE8x8",
         edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
         edgeSize = 8,
         insets   = { left = 4, right = 4, top = 4, bottom = 4 },
@@ -596,7 +595,7 @@ function UI.BuildSettingsPanel(parent)
     diffTitleLbl:SetText("|cff888888Schwierigkeitsstufen (Item-Level):|r")
     y = y - 8
 
-    local nRow = MakeDiffBox("N", panel, -4)
+    local nRow = MakeDiffBox("N", diffTitleLbl, -4)
     local hRow = MakeDiffBox("H", nRow,  -4)
     MakeDiffBox("M", hRow, -4)
 
