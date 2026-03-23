@@ -255,10 +255,12 @@ function UI.BuildMainFrame()
     logPanel     = UI.BuildLogPanel(contentFrame)
     raidPanel = UI.BuildRaidPanel(contentFrame)
 
-    -- Settings-Panel: überlagert den Content-Bereich (vollständig opak)
-    settingsPanel = UI.BuildSettingsPanel(mainFrame)
-    settingsPanel:SetPoint("TOPLEFT",     mainFrame, "TOPLEFT",     4, -52)
-    settingsPanel:SetPoint("BOTTOMRIGHT", mainFrame, "BOTTOMRIGHT", -4, 42)
+    -- Settings-Panel: klappt rechts neben dem Hauptfenster aus
+    settingsPanel = UI.BuildSettingsPanel(UIParent)
+    settingsPanel:SetWidth(320)
+    settingsPanel:SetPoint("TOPLEFT",    mainFrame, "TOPRIGHT",    4, 0)
+    settingsPanel:SetPoint("BOTTOMLEFT", mainFrame, "BOTTOMRIGHT", 4, 0)
+    settingsPanel:SetClampedToScreen(true)
     settingsPanel:SetFrameStrata("DIALOG")
     settingsPanel:Hide()
 
