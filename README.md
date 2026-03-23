@@ -45,11 +45,11 @@ Ein World of Warcraft Addon für Gilden-Offiziere und Raid-Leader zur strukturie
 
 | Befehl | Beschreibung |
 |--------|-------------|
-| `/gl` | Fenster öffnen/schließen |
-| `/gl start [Name]` | Raid starten (optional mit Tier-Name) |
-| `/gl reset` | Raid zurücksetzen (zweifache Bestätigung) |
-| `/gl history [Spieler]` | Loot-Historie eines Spielers anzeigen |
-| `/gl ml` | Master Looter Modus umschalten |
+| `/rlt` | Fenster öffnen/schließen |
+| `/rlt start [Name]` | Raid starten (optional mit Tier-Name) |
+| `/rlt reset` | Raid zurücksetzen (zweifache Bestätigung) |
+| `/rlt history [Spieler]` | Loot-Historie eines Spielers anzeigen |
+| `/rlt ml` | Master Looter Modus umschalten |
 
 ---
 
@@ -67,7 +67,7 @@ Ein World of Warcraft Addon für Gilden-Offiziere und Raid-Leader zur strukturie
 
 ## Voraussetzungen
 
-- Der verteilende Spieler muss den **Master Looter**-Modus aktivieren (Checkbox oben rechts im Fenster oder `/gl ml`)
+- Der verteilende Spieler muss den **Master Looter**-Modus aktivieren (Checkbox oben rechts im Fenster oder `/rlt ml`)
 - Alle Raid-Mitglieder mit installiertem Addon erhalten automatisch Live-Updates
 - Funktioniert in Raid-, Gruppen- und Solo-Umgebung (Solo = Testmodus)
 
@@ -77,7 +77,7 @@ Ein World of Warcraft Addon für Gilden-Offiziere und Raid-Leader zur strukturie
 
 1. Ordner `RaidLootTracker` in `World of Warcraft/_retail_/Interface/AddOns/` kopieren
 2. WoW neu starten oder `/reload` eingeben
-3. Minimap-Button oder `/gl` zum Öffnen
+3. Minimap-Button oder `/rlt` zum Öffnen
 
 ---
 

@@ -301,7 +301,7 @@ function GL.ResumeRaid(idx)
         return
     end
     if GuildLootDB.currentRaid.active then
-        GL.Print("Bitte zuerst den aktuellen Raid beenden (/gl reset oder 'Raid beenden').")
+        GL.Print("Bitte zuerst den aktuellen Raid beenden (/rlt reset oder 'Raid beenden').")
         return
     end
     local snap = history[idx]
@@ -405,7 +405,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         local addonName = ...
         if addonName == "RaidLootTracker" then
             GL.InitDB()
-            GL.Print("Geladen. /gl für das Hauptfenster.")
+            GL.Print("Geladen. /rlt für das Hauptfenster.")
         end
 
     elseif event == "PLAYER_LOGIN" then
@@ -485,8 +485,9 @@ end)
 -- Slash-Commands
 -- ============================================================
 
-SLASH_GUILDLOOT1 = "/gl"
-SlashCmdList["GUILDLOOT"] = function(input)
+SLASH_RAIDLOOTTRACKER1 = "/rlt"
+SLASH_RAIDLOOTTRACKER2 = "/raidloottracker"
+SlashCmdList["RAIDLOOTTRACKER"] = function(input)
     local cmd, arg = input:match("^(%S*)%s*(.*)")
     cmd = cmd:lower()
 
@@ -506,7 +507,7 @@ SlashCmdList["GUILDLOOT"] = function(input)
             GL.ResetRaid()
         else
             GL._resetPending = true
-            GL.Print("Raid-Session zurücksetzen? Nochmal /gl reset eingeben zum Bestätigen.")
+            GL.Print("Raid-Session zurücksetzen? Nochmal /rlt reset eingeben zum Bestätigen.")
             C_Timer.After(10, function() GL._resetPending = false end)
         end
 
@@ -517,6 +518,6 @@ SlashCmdList["GUILDLOOT"] = function(input)
         if GL.UI and GL.UI.RefreshMLButton then GL.UI.RefreshMLButton() end
 
     else
-        GL.Print("Befehle: /gl | /gl start [tier] | /gl history [Name] | /gl reset | /gl ml")
+        GL.Print("Befehle: /rlt | /rlt start [tier] | /rlt history [Name] | /rlt reset | /rlt ml")
     end
 end
