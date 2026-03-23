@@ -39,6 +39,8 @@ local DB_DEFAULTS = {
         framePos     = nil,
         minimized    = true,
         minimapAngle = 45,
+        lastTab      = nil,
+        raidWarnItem = true,
         filterNonEquip   = true,
         filterCategories = {
             weapons  = true,
@@ -114,6 +116,18 @@ function GL.PostToRaid(msg)
         else return end
     end
     SendChatMessage("[RLT] " .. msg, channel)
+end
+
+function GL.PostRaidWarn(msg)
+    if not GuildLootDB.settings.raidWarnItem then
+        GL.PostToRaid(msg)
+        return
+    end
+    if UnitIsGroupLeader("player") or UnitIsGroupAssistant("player") then
+        SendChatMessage("[RLT] " .. msg, "RAID_WARNING")
+    else
+        GL.PostToRaid(msg)
+    end
 end
 
 -- ============================================================

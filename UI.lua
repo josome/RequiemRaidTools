@@ -12,7 +12,7 @@ local UI = GL.UI
 
 local FRAME_W, FRAME_H = 720, 560
 local SIDEBAR_W = 210
-local TAB_LOOT, TAB_SPIELER, TAB_LOG, TAB_VERLAUF = 1, 2, 3, 4
+local TAB_LOOT, TAB_SPIELER, TAB_LOG, TAB_RAID = 1, 2, 3, 4
 local DIFF_COLORS = { N = "|cff1eff00", H = "|cff0070dd", M = "|cffff8000" }
 
 -- ============================================================
@@ -73,7 +73,7 @@ local dockTab          -- schmaler Streifen am linken Rand (angedockter Zustand)
 local activeTab = TAB_LOOT
 
 -- Panels
-local lootPanel, spielerPanel, logPanel, verlaufPanel, settingsPanel
+local lootPanel, spielerPanel, logPanel, raidPanel, settingsPanel
 local verlaufRows, verlaufDetailRows = {}, {}
 local selectedHistoryIndex = nil
 -- Tabs
@@ -155,12 +155,8 @@ function UI.BuildMainFrame()
     local settingsBtn = CreateFrame("Button", nil, mainFrame)
     settingsBtn:SetSize(20, 20)
     settingsBtn:SetPoint("RIGHT", mainFrame.CloseButton, "LEFT", -4, 0)
-    settingsBtn:SetNormalTexture("Interface\\Icons\\Trade_Engineering")
-    local nt = settingsBtn:GetNormalTexture()
-    nt:SetDesaturated(true)
-    nt:SetVertexColor(0.65, 0.65, 0.65)
-    nt:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-    settingsBtn:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+    settingsBtn:SetNormalTexture("Interface\\Buttons\\UI-OptionsButton")
+    settingsBtn:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Round", "ADD")
     settingsBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
         GameTooltip:SetText("Einstellungen", 1, 1, 1)
@@ -222,87 +218,13 @@ function UI.BuildMainFrame()
     sessionBar:SetHeight(34)
     UI.sessionBar = sessionBar
 
-    -- Status-Label (links)
+    -- Status-Label (volle Breite)
     local statusLbl = sessionBar:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    statusLbl:SetPoint("LEFT", sessionBar, "LEFT", 8, 0)
-    statusLbl:SetWidth(200)
+    statusLbl:SetPoint("LEFT",  sessionBar, "LEFT",   8, 0)
+    statusLbl:SetPoint("RIGHT", sessionBar, "RIGHT", -8, 0)
     statusLbl:SetJustifyH("LEFT")
     statusLbl:SetText("|cff888888Kein Raid aktiv|r")
     UI.sessionStatusLbl = statusLbl
-
-    -- Tier-Eingabe
-    local tierBox = CreateFrame("EditBox", "GuildLootTierBox", sessionBar, "InputBoxTemplate")
-    tierBox:SetSize(140, 20)
-    tierBox:SetPoint("LEFT", statusLbl, "RIGHT", 6, 0)
-    tierBox:SetAutoFocus(false)
-    tierBox:SetMaxLetters(48)
-    tierBox:SetText(GuildLootDB.currentRaid.tier or "")
-    tierBox:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
-    tierBox:SetScript("OnEnterPressed", function(self)
-        self:ClearFocus()
-        GL.StartRaid(self:GetText() ~= "" and self:GetText() or nil)
-        UI.RefreshSessionBar()
-    end)
-    -- Auto-befüllen wenn Feld leer und Fokus erhalten
-    tierBox:SetScript("OnEditFocusGained", function(self)
-        if self:GetText() == "" then
-            local name, iType = GetInstanceInfo()
-            if iType == "raid" or iType == "party" then
-                self:SetText(name .. " (" .. date("%d.%m.%Y") .. ")")
-                self:HighlightText()
-            end
-        end
-    end)
-    UI.tierBox = tierBox
-
-    -- [Raid starten]-Button
-    local startRaidBtn = CreateFrame("Button", nil, sessionBar, "UIPanelButtonTemplate")
-    startRaidBtn:SetSize(90, 22)
-    startRaidBtn:SetPoint("LEFT", tierBox, "RIGHT", 4, 0)
-    startRaidBtn:SetText("Raid starten")
-    startRaidBtn:SetScript("OnClick", function()
-        local tier = tierBox:GetText()
-        GL.StartRaid(tier ~= "" and tier or nil)
-        UI.RefreshSessionBar()
-        UI.Refresh()
-    end)
-    UI.startRaidBtn = startRaidBtn
-
-    -- [Raid beenden]-Button
-    local closeRaidBtn = CreateFrame("Button", nil, sessionBar, "UIPanelButtonTemplate")
-    closeRaidBtn:SetSize(90, 22)
-    closeRaidBtn:SetPoint("LEFT", startRaidBtn, "RIGHT", 2, 0)
-    closeRaidBtn:SetText("Raid beenden")
-    closeRaidBtn:SetScript("OnClick", function()
-        GL.CloseRaid()
-        UI.RefreshSessionBar()
-    end)
-    UI.closeRaidBtn = closeRaidBtn
-
-    -- [Reset]-Button
-    local resetRaidBtn = CreateFrame("Button", nil, sessionBar, "UIPanelButtonTemplate")
-    resetRaidBtn:SetSize(60, 22)
-    resetRaidBtn:SetPoint("LEFT", closeRaidBtn, "RIGHT", 2, 0)
-    resetRaidBtn:SetText("Reset")
-    local resetPending = false
-    local resetTimer   = nil
-    resetRaidBtn:SetScript("OnClick", function()
-        if resetPending then
-            if resetTimer then resetTimer:Cancel(); resetTimer = nil end
-            resetPending = false
-            resetRaidBtn:SetText("Reset")
-            GL.ResetRaid()
-        else
-            resetPending = true
-            resetRaidBtn:SetText("|cffff4444Sicher?|r")
-            resetTimer = C_Timer.NewTimer(3, function()
-                resetPending = false
-                resetTimer   = nil
-                resetRaidBtn:SetText("Reset")
-            end)
-        end
-    end)
-    UI.resetRaidBtn = resetRaidBtn
 
     -- Content-Frame (unterhalb der Tabs, oberhalb der Session-Leiste)
     contentFrame = CreateFrame("Frame", nil, mainFrame)
@@ -310,7 +232,7 @@ function UI.BuildMainFrame()
     contentFrame:SetPoint("BOTTOMRIGHT", mainFrame, "BOTTOMRIGHT", -4, 42)
 
     -- Tab-Buttons oben im Content-Bereich
-    local tabNames = { "Loot", "Spieler", "Log", "Verlauf" }
+    local tabNames = { "Loot", "Spieler", "Log", "Raid" }
     for i, name in ipairs(tabNames) do
         local tb = CreateFrame("Button", "GuildLootTab" .. i, mainFrame, "UIPanelButtonTemplate")
         tb:SetSize(80, 22)
@@ -331,16 +253,17 @@ function UI.BuildMainFrame()
     lootPanel    = UI.BuildLootPanel(contentFrame)
     spielerPanel = UI.BuildSpielerPanel(contentFrame)
     logPanel     = UI.BuildLogPanel(contentFrame)
-    verlaufPanel = UI.BuildVerlaufPanel(contentFrame)
+    raidPanel = UI.BuildRaidPanel(contentFrame)
 
-    -- Settings-Overlay (über allen anderen Panels, initial versteckt)
+    -- Settings-Panel: klappt rechts neben dem Hauptfenster aus
     settingsPanel = UI.BuildSettingsPanel(mainFrame)
-    settingsPanel:SetPoint("TOPLEFT",     mainFrame, "TOPLEFT",     4, -52)
-    settingsPanel:SetPoint("BOTTOMRIGHT", mainFrame, "BOTTOMRIGHT", -4, 42)
+    settingsPanel:SetWidth(320)
+    settingsPanel:SetPoint("TOPLEFT",    mainFrame, "TOPRIGHT",    4,  0)
+    settingsPanel:SetPoint("BOTTOMLEFT", mainFrame, "BOTTOMRIGHT", 4,  0)
     settingsPanel:SetFrameStrata("DIALOG")
     settingsPanel:Hide()
 
-    UI.ShowTab(TAB_LOOT)
+    UI.ShowStartupTab()
 end
 
 -- ============================================================
@@ -410,6 +333,7 @@ function UI.BuildSettingsPanel(parent)
         edgeSize = 8,
         insets   = { left = 4, right = 4, top = 4, bottom = 4 },
     })
+    panel:SetBackdropColor(0.05, 0.05, 0.08, 1)
 
     local y = -12  -- laufende Y-Position
 
@@ -589,7 +513,7 @@ function UI.BuildSettingsPanel(parent)
     timerLbl:SetText("|cff888888Prio-Phase:|r")
 
     local ddPrio = CreateFrame("Frame", "GuildLootSettingsDD_prioSeconds", panel, "UIDropDownMenuTemplate")
-    UIDropDownMenu_SetWidth(ddPrio, 60)
+    UIDropDownMenu_SetWidth(ddPrio, 80)
     UIDropDownMenu_SetText(ddPrio, (GuildLootDB.settings.prioSeconds or 15) .. "s")
     ddPrio:SetPoint("LEFT", timerLbl, "RIGHT", -8, 0)
     UIDropDownMenu_Initialize(ddPrio, function()
@@ -605,13 +529,14 @@ function UI.BuildSettingsPanel(parent)
             UIDropDownMenu_AddButton(info)
         end
     end)
+    y = y - 28
 
     local rollLbl = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    rollLbl:SetPoint("LEFT", ddPrio, "RIGHT", 12, 0)
+    rollLbl:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
     rollLbl:SetText("|cff888888Roll-Phase:|r")
 
     local ddRoll = CreateFrame("Frame", "GuildLootSettingsDD_rollSeconds", panel, "UIDropDownMenuTemplate")
-    UIDropDownMenu_SetWidth(ddRoll, 60)
+    UIDropDownMenu_SetWidth(ddRoll, 80)
     UIDropDownMenu_SetText(ddRoll, (GuildLootDB.settings.rollSeconds or 15) .. "s")
     ddRoll:SetPoint("LEFT", rollLbl, "RIGHT", -8, 0)
     UIDropDownMenu_Initialize(ddRoll, function()
@@ -627,7 +552,7 @@ function UI.BuildSettingsPanel(parent)
             UIDropDownMenu_AddButton(info)
         end
     end)
-    y = y - 30
+    y = y - 28
 
     -- ── Sektion 3: Allgemein ──────────────────────────────────
     SectionHeader("Allgemein")
@@ -663,6 +588,8 @@ function UI.BuildSettingsPanel(parent)
         end
     end)
     y = y - 30
+
+    MakeCheck("Item-Start als Raid-Warnung ankündigen (Raid Leader / Assistent)", "raidWarnItem")
 
     local diffTitleLbl = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     diffTitleLbl:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
@@ -724,12 +651,27 @@ end
 -- Tabs
 -- ============================================================
 
+function UI.ShowStartupTab()
+    local raid = GuildLootDB.currentRaid
+    if not raid.active then
+        UI.ShowTab(TAB_RAID)
+    else
+        local last = GuildLootDB.settings.lastTab
+        if last and last >= TAB_LOOT and last <= TAB_RAID then
+            UI.ShowTab(last)
+        else
+            UI.ShowTab(TAB_LOOT)
+        end
+    end
+end
+
 function UI.ShowTab(tabID)
+    GuildLootDB.settings.lastTab = tabID
     activeTab = tabID
     lootPanel:Hide()
     spielerPanel:Hide()
     logPanel:Hide()
-    if verlaufPanel then verlaufPanel:Hide() end
+    if raidPanel then raidPanel:Hide() end
 
     for i, tb in ipairs(tabButtons) do
         if i == tabID then
@@ -750,9 +692,9 @@ function UI.ShowTab(tabID)
     elseif tabID == TAB_LOG then
         logPanel:Show()
         UI.RefreshLogTab()
-    elseif tabID == TAB_VERLAUF then
-        if verlaufPanel then verlaufPanel:Show() end
-        UI.RefreshVerlaufTab()
+    elseif tabID == TAB_RAID then
+        if raidPanel then raidPanel:Show() end
+        UI.RefreshRaidTab()
     end
 end
 
@@ -801,8 +743,27 @@ function UI.BuildLootPanel(parent)
     divA:SetPoint("TOPLEFT",  main, "TOPLEFT",  0, -4)
     divA:SetPoint("TOPRIGHT", main, "TOPRIGHT", 0, -4)
 
+    local activeItemIcon = CreateFrame("Frame", nil, main)
+    activeItemIcon:SetSize(32, 32)
+    activeItemIcon:SetPoint("TOPLEFT", divA, "BOTTOMLEFT", 4, -4)
+    local iconTex = activeItemIcon:CreateTexture(nil, "ARTWORK")
+    iconTex:SetAllPoints()
+    iconTex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    activeItemIcon:SetScript("OnEnter", function(self)
+        local ci = GL.Loot.GetCurrentItem()
+        if ci and ci.link then
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetHyperlink(ci.link)
+            GameTooltip:Show()
+        end
+    end)
+    activeItemIcon:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    activeItemIcon:Hide()
+    panel.activeItemIcon    = activeItemIcon
+    panel.activeItemIconTex = iconTex
+
     activeItemLabel = main:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    activeItemLabel:SetPoint("TOPLEFT", divA, "BOTTOMLEFT", 0, -4)
+    activeItemLabel:SetPoint("LEFT",  activeItemIcon, "RIGHT", 6, 0)
     activeItemLabel:SetPoint("RIGHT", main, "RIGHT", -110, 0)
     activeItemLabel:SetJustifyH("LEFT")
     activeItemLabel:SetText("Kein aktives Item")
@@ -979,10 +940,18 @@ function UI.RefreshLootTab()
         local catNames = { weapons="Waffe", trinket="Trinket", setItems="Set/Token", other="Sonstiges" }
         activeItemCategoryLabel:SetText("[" .. (catNames[ci.category] or "?") .. "]")
         resetItemBtn:SetEnabled(GL.IsMasterLooter())
+        if lootPanel.activeItemIcon then
+            local icon = select(10, GetItemInfo(ci.link))
+            if icon then
+                lootPanel.activeItemIconTex:SetTexture(icon)
+                lootPanel.activeItemIcon:Show()
+            end
+        end
     else
         activeItemLabel:SetText("|cff888888Kein aktives Item|r")
         activeItemCategoryLabel:SetText("")
         resetItemBtn:SetEnabled(false)
+        if lootPanel.activeItemIcon then lootPanel.activeItemIcon:Hide() end
     end
 
     UI.RefreshCandidates()
@@ -1480,12 +1449,6 @@ function UI.BuildLogPanel(parent)
     panel:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", 0, 0)
     panel:Hide()
 
-    -- Export-Button oben rechts
-    local exportBtn = MakeButton(panel, "Export JSON", 100, 22, function()
-        UI.ShowExportPopup()
-    end)
-    exportBtn:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -4, -4)
-
     local scroll = CreateFrame("ScrollFrame", nil, panel, "UIPanelScrollFrameTemplate")
     scroll:SetPoint("TOPLEFT",     panel, "TOPLEFT",  4,  -4)
     scroll:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -26, 4)
@@ -1587,16 +1550,95 @@ function UI.RefreshLogTab()
 end
 
 -- ============================================================
--- Verlauf-Panel (Raid-History)
+-- Raid-Panel (Raid-History + Steuerung)
 -- ============================================================
 
-function UI.BuildVerlaufPanel(parent)
+function UI.BuildRaidPanel(parent)
     local panel = CreateFrame("Frame", nil, parent)
     panel:SetPoint("TOPLEFT",     parent, "TOPLEFT",     0, 0)
     panel:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", 0, 0)
     panel:Hide()
 
     local LIST_W = 240
+
+    -- Steuerleiste oben: Raid-Steuerung
+    local controlStrip = CreateFrame("Frame", nil, panel)
+    controlStrip:SetPoint("TOPLEFT",  panel, "TOPLEFT",  2, -2)
+    controlStrip:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -2, -2)
+    controlStrip:SetHeight(30)
+
+    -- Tier-Eingabe im controlStrip
+    local tierBox = CreateFrame("EditBox", "GuildLootTierBox", controlStrip, "InputBoxTemplate")
+    tierBox:SetSize(160, 20)
+    tierBox:SetPoint("LEFT", controlStrip, "LEFT", 4, 0)
+    tierBox:SetAutoFocus(false)
+    tierBox:SetMaxLetters(48)
+    tierBox:SetText(GuildLootDB.currentRaid.tier or "")
+    tierBox:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+    tierBox:SetScript("OnEnterPressed", function(self)
+        self:ClearFocus()
+        GL.StartRaid(self:GetText() ~= "" and self:GetText() or nil)
+        UI.RefreshSessionBar()
+    end)
+    tierBox:SetScript("OnEditFocusGained", function(self)
+        if self:GetText() == "" then
+            local name, iType = GetInstanceInfo()
+            if iType == "raid" or iType == "party" then
+                self:SetText(name .. " (" .. date("%d.%m.%Y") .. ")")
+                self:HighlightText()
+            end
+        end
+    end)
+    UI.tierBox = tierBox
+
+    -- [Raid starten]-Button
+    local startRaidBtn = CreateFrame("Button", nil, controlStrip, "UIPanelButtonTemplate")
+    startRaidBtn:SetSize(90, 22)
+    startRaidBtn:SetPoint("LEFT", tierBox, "RIGHT", 4, 0)
+    startRaidBtn:SetText("Raid starten")
+    startRaidBtn:SetScript("OnClick", function()
+        local tier = tierBox:GetText()
+        GL.StartRaid(tier ~= "" and tier or nil)
+        UI.RefreshSessionBar()
+        UI.Refresh()
+    end)
+    UI.startRaidBtn = startRaidBtn
+
+    -- [Raid beenden]-Button
+    local closeRaidBtn = CreateFrame("Button", nil, controlStrip, "UIPanelButtonTemplate")
+    closeRaidBtn:SetSize(90, 22)
+    closeRaidBtn:SetPoint("LEFT", startRaidBtn, "RIGHT", 2, 0)
+    closeRaidBtn:SetText("Raid beenden")
+    closeRaidBtn:SetScript("OnClick", function()
+        GL.CloseRaid()
+        UI.RefreshSessionBar()
+    end)
+    UI.closeRaidBtn = closeRaidBtn
+
+    -- [Reset]-Button
+    local resetRaidBtn = CreateFrame("Button", nil, controlStrip, "UIPanelButtonTemplate")
+    resetRaidBtn:SetSize(60, 22)
+    resetRaidBtn:SetPoint("LEFT", closeRaidBtn, "RIGHT", 2, 0)
+    resetRaidBtn:SetText("Reset")
+    local resetPending = false
+    local resetTimer   = nil
+    resetRaidBtn:SetScript("OnClick", function()
+        if resetPending then
+            if resetTimer then resetTimer:Cancel(); resetTimer = nil end
+            resetPending = false
+            resetRaidBtn:SetText("Reset")
+            GL.ResetRaid()
+        else
+            resetPending = true
+            resetRaidBtn:SetText("|cffff4444Sicher?|r")
+            resetTimer = C_Timer.NewTimer(3, function()
+                resetPending = false
+                resetTimer   = nil
+                resetRaidBtn:SetText("Reset")
+            end)
+        end
+    end)
+    UI.resetRaidBtn = resetRaidBtn
 
     -- Linke Spalte: Raid-Liste
     local listFrame = CreateFrame("Frame", nil, panel, "BackdropTemplate")
@@ -1606,8 +1648,8 @@ function UI.BuildVerlaufPanel(parent)
         edgeSize = 6,
         insets   = { left = 2, right = 2, top = 2, bottom = 2 },
     })
-    listFrame:SetPoint("TOPLEFT",    panel, "TOPLEFT",    2, -2)
-    listFrame:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT", 2,  2)
+    listFrame:SetPoint("TOPLEFT",    controlStrip, "BOTTOMLEFT",  0, -2)
+    listFrame:SetPoint("BOTTOMLEFT", panel,        "BOTTOMLEFT",  2,  2)
     listFrame:SetWidth(LIST_W)
 
     local listHeader = listFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -1661,8 +1703,8 @@ function UI.BuildVerlaufPanel(parent)
             panel.deleteBtn:SetText("Löschen")
             table.remove(GuildLootDB.raidHistory, selectedHistoryIndex)
             selectedHistoryIndex = nil
-            UI.RefreshVerlaufTab()
-            UI.RefreshVerlaufDetail(nil)
+            UI.RefreshRaidTab()
+            UI.RefreshRaidDetail(nil)
         else
             -- erster Klick → 3-Sekunden-Fenster öffnen
             deletePending = true
@@ -1679,6 +1721,13 @@ function UI.BuildVerlaufPanel(parent)
     deleteBtn:SetPoint("RIGHT", resumeBtn, "LEFT", -4, 0)
     deleteBtn:Hide()
     panel.deleteBtn = deleteBtn
+
+    local exportBtn = MakeButton(detailFrame, "Export JSON", 100, 22, function()
+        UI.ShowExportPopup()
+    end)
+    exportBtn:SetPoint("RIGHT", deleteBtn, "LEFT", -4, 0)
+    exportBtn:Hide()
+    panel.exportBtn = exportBtn
 
     -- Arm-Zustand zurücksetzen wenn Auswahl wechselt
     panel.resetDeleteArm = function()
@@ -1699,20 +1748,63 @@ function UI.BuildVerlaufPanel(parent)
     return panel
 end
 
-function UI.RefreshVerlaufTab()
-    if activeTab ~= TAB_VERLAUF then return end
-    if not verlaufPanel or not verlaufPanel.listContent then return end
+function UI.RefreshRaidTab()
+    if activeTab ~= TAB_RAID then return end
+    if not raidPanel or not raidPanel.listContent then return end
 
-    local sw = verlaufPanel.listScroll and verlaufPanel.listScroll:GetWidth() or 0
-    if sw > 10 then verlaufPanel.listContent:SetWidth(sw) end
+    local sw = raidPanel.listScroll and raidPanel.listScroll:GetWidth() or 0
+    if sw > 10 then raidPanel.listContent:SetWidth(sw) end
 
     for _, r in ipairs(verlaufRows) do r:Hide() end
     verlaufRows = {}
 
     local history = GuildLootDB.raidHistory or {}
-    local content = verlaufPanel.listContent
+    local content = raidPanel.listContent
     local yOff    = 0
     local ROW_H   = 40
+
+    -- Aktiver Raid ganz oben (idx = 0 als Sentinel)
+    local raid = GuildLootDB.currentRaid
+    if raid.active then
+        local row = CreateFrame("Button", nil, content)
+        row:SetPoint("TOPLEFT",  content, "TOPLEFT",  0, yOff)
+        row:SetPoint("TOPRIGHT", content, "TOPRIGHT", 0, yOff)
+        row:SetHeight(ROW_H)
+
+        local activeBg = row:CreateTexture(nil, "BACKGROUND")
+        activeBg:SetAllPoints()
+        activeBg:SetColorTexture(0, 0.8, 0, 0.07)
+
+        local selTex = row:CreateTexture(nil, "BACKGROUND")
+        selTex:SetAllPoints()
+        selTex:SetColorTexture(1, 0.8, 0, 0.12)
+        selTex:SetShown(selectedHistoryIndex == 0)
+
+        local tierLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        tierLbl:SetPoint("TOPLEFT", row, "TOPLEFT", 4, -4)
+        tierLbl:SetPoint("RIGHT",   row, "RIGHT",  -4, 0)
+        tierLbl:SetJustifyH("LEFT")
+        tierLbl:SetText("|cff00ff00▶ |r" .. ((raid.tier and raid.tier ~= "") and raid.tier or "|cff888888Unbekannt|r"))
+
+        local infoLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        infoLbl:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 4, 4)
+        local diffStr     = raid.difficulty and ("[" .. raid.difficulty .. "] ") or ""
+        local playerCount = raid.participants and #raid.participants or 0
+        local lootCount   = raid.lootLog and #raid.lootLog or 0
+        infoLbl:SetText("|cff00ff00Aktiv|r  |cff888888" .. diffStr .. playerCount .. " Spieler, " .. lootCount .. " Loot|r")
+
+        row:SetScript("OnClick", function()
+            selectedHistoryIndex = 0
+            UI.RefreshRaidTab()
+            UI.RefreshRaidDetail(0)
+        end)
+        row:SetScript("OnEnter", function(self) self:SetAlpha(0.8) end)
+        row:SetScript("OnLeave", function(self) self:SetAlpha(1)   end)
+
+        row:Show()
+        table.insert(verlaufRows, row)
+        yOff = yOff - ROW_H - 1
+    end
 
     -- Neueste zuerst
     for i = #history, 1, -1 do
@@ -1756,8 +1848,8 @@ function UI.RefreshVerlaufTab()
 
         row:SetScript("OnClick", function()
             selectedHistoryIndex = idx
-            UI.RefreshVerlaufTab()
-            UI.RefreshVerlaufDetail(idx)
+            UI.RefreshRaidTab()
+            UI.RefreshRaidDetail(idx)
         end)
         row:SetScript("OnEnter", function(self) self:SetAlpha(0.8) end)
         row:SetScript("OnLeave", function(self) self:SetAlpha(1)   end)
@@ -1778,50 +1870,99 @@ function UI.RefreshVerlaufTab()
     content:SetHeight(math.max(1, -yOff))
 
     if selectedHistoryIndex then
-        UI.RefreshVerlaufDetail(selectedHistoryIndex)
+        UI.RefreshRaidDetail(selectedHistoryIndex)
     end
 end
 
 local lastDetailIdx = nil
 
-function UI.RefreshVerlaufDetail(idx)
-    if not verlaufPanel or not verlaufPanel.detailContent then return end
+function UI.RefreshRaidDetail(idx)
+    if not raidPanel or not raidPanel.detailContent then return end
 
-    local sw = verlaufPanel.detailScroll and verlaufPanel.detailScroll:GetWidth() or 0
-    if sw > 10 then verlaufPanel.detailContent:SetWidth(sw) end
+    local sw = raidPanel.detailScroll and raidPanel.detailScroll:GetWidth() or 0
+    if sw > 10 then raidPanel.detailContent:SetWidth(sw) end
 
     for _, r in ipairs(verlaufDetailRows) do r:Hide() end
     verlaufDetailRows = {}
 
+    -- Sonderfall: aktiver Raid (idx == 0)
+    if idx == 0 then
+        local raid = GuildLootDB.currentRaid
+        if not raid.active then
+            selectedHistoryIndex = nil  -- Auswahl zurücksetzen
+            idx = nil  -- Raid inzwischen beendet → "nichts ausgewählt" zeigen
+        else
+            if idx ~= lastDetailIdx and raidPanel.resetDeleteArm then
+                raidPanel.resetDeleteArm()
+            end
+            lastDetailIdx = 0
+            if raidPanel.resumeBtn then raidPanel.resumeBtn:Hide() end  -- schon aktiv
+            if raidPanel.deleteBtn then raidPanel.deleteBtn:Hide() end  -- aktiven Raid nicht löschbar
+            if raidPanel.exportBtn then raidPanel.exportBtn:Show() end
+            local diffStr = raid.difficulty and (" [" .. raid.difficulty .. "]") or ""
+            raidPanel.detailHeader:SetText("|cff00ff00● Aktiv|r  " .. (raid.tier or "?") .. diffStr)
+            local log     = raid.lootLog or {}
+            local content = raidPanel.detailContent
+            local yOff    = 0
+            for i = #log, 1, -1 do
+                local entry = log[i]
+                local row = CreateFrame("Frame", nil, content)
+                row:SetSize(content:GetWidth() - 20, 20)
+                row:SetPoint("TOPLEFT", content, "TOPLEFT", 0, yOff)
+                local ts = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+                ts:SetPoint("LEFT", row, "LEFT", 4, 0)
+                ts:SetWidth(80)
+                ts:SetText(GL.FormatTimestamp(entry.timestamp))
+                ts:SetTextColor(0.6, 0.6, 0.6)
+                local playerLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+                playerLbl:SetPoint("LEFT", ts, "RIGHT", 4, 0)
+                playerLbl:SetWidth(110)
+                playerLbl:SetText(GL.ShortName(entry.player or "?"))
+                local diffLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+                diffLbl:SetPoint("LEFT", playerLbl, "RIGHT", 4, 0)
+                diffLbl:SetWidth(25)
+                diffLbl:SetText(ColorDiff(entry.difficulty))
+                MakeItemLinkBtn(row, diffLbl, 4, entry.link or entry.item, entry.item or "?")
+                row:Show()
+                table.insert(verlaufDetailRows, row)
+                yOff = yOff - 22
+            end
+            raidPanel.detailContent:SetHeight(math.max(1, -yOff))
+            return
+        end
+    end
+
     local history = GuildLootDB.raidHistory or {}
     local snap    = history[idx]
     if not snap then
-        verlaufPanel.detailHeader:SetText("|cff888888— Raid auswählen —|r")
-        verlaufPanel.detailContent:SetHeight(1)
-        if verlaufPanel.resumeBtn    then verlaufPanel.resumeBtn:Hide() end
-        if verlaufPanel.deleteBtn    then verlaufPanel.deleteBtn:Hide() end
-        if verlaufPanel.resetDeleteArm then verlaufPanel.resetDeleteArm() end
+        raidPanel.detailHeader:SetText("|cff888888— Raid auswählen —|r")
+        raidPanel.detailContent:SetHeight(1)
+        if raidPanel.resumeBtn    then raidPanel.resumeBtn:Hide() end
+        if raidPanel.deleteBtn    then raidPanel.deleteBtn:Hide() end
+        if raidPanel.exportBtn    then raidPanel.exportBtn:Hide() end
+        if raidPanel.resetDeleteArm then raidPanel.resetDeleteArm() end
         lastDetailIdx = nil
         return
     end
 
     -- Arm nur zurücksetzen wenn Auswahl wechselt, nicht bei jedem Refresh
-    if idx ~= lastDetailIdx and verlaufPanel.resetDeleteArm then
-        verlaufPanel.resetDeleteArm()
+    if idx ~= lastDetailIdx and raidPanel.resetDeleteArm then
+        raidPanel.resetDeleteArm()
     end
     lastDetailIdx = idx
-    if verlaufPanel.resumeBtn then
-        verlaufPanel.resumeBtn:Show()
-        verlaufPanel.resumeBtn:SetEnabled(not GuildLootDB.currentRaid.active)
+    if raidPanel.resumeBtn then
+        raidPanel.resumeBtn:Show()
+        raidPanel.resumeBtn:SetEnabled(not GuildLootDB.currentRaid.active)
     end
-    if verlaufPanel.deleteBtn then verlaufPanel.deleteBtn:Show() end
+    if raidPanel.deleteBtn then raidPanel.deleteBtn:Show() end
+    if raidPanel.exportBtn then raidPanel.exportBtn:Show() end
 
     local diffStr = snap.difficulty and (" [" .. snap.difficulty .. "]") or ""
     local dateStr = snap.closedAt and date("%d.%m.%Y", snap.closedAt) or "?"
-    verlaufPanel.detailHeader:SetText((snap.tier or "?") .. diffStr .. "  |cff888888" .. dateStr .. "|r")
+    raidPanel.detailHeader:SetText((snap.tier or "?") .. diffStr .. "  |cff888888" .. dateStr .. "|r")
 
     local log     = snap.lootLog or {}
-    local content = verlaufPanel.detailContent
+    local content = raidPanel.detailContent
     local yOff    = 0
 
     for i = #log, 1, -1 do
@@ -1896,7 +2037,7 @@ function UI.Refresh()
     if activeTab == TAB_LOOT    then UI.RefreshLootTab()    end
     if activeTab == TAB_SPIELER then UI.RefreshSpielerTab() end
     if activeTab == TAB_LOG     then UI.RefreshLogTab()     end
-    if activeTab == TAB_VERLAUF then UI.RefreshVerlaufTab() end
+    if activeTab == TAB_RAID then UI.RefreshRaidTab() end
 end
 
 function UI.RefreshMLButton()
