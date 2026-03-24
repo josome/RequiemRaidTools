@@ -157,7 +157,7 @@ function UI.BuildMainFrame()
     end)
 
     -- Titelzeile
-    mainFrame.TitleText:SetText("RaidLootTracker v1.0")
+    mainFrame.TitleText:SetText("RaidLootTracker v1.2")
 
     -- Settings-Button (Zahnrad-Icon) rechts neben ML-Checkbox
     local settingsBtn = CreateFrame("Button", nil, mainFrame)

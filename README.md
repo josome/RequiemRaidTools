@@ -50,6 +50,7 @@ Ein World of Warcraft Addon für Gilden-Offiziere und Raid-Leader zur strukturie
 | `/rlt reset` | Raid zurücksetzen (zweifache Bestätigung) |
 | `/rlt history [Spieler]` | Loot-Historie eines Spielers anzeigen |
 | `/rlt ml` | Master Looter Modus umschalten |
+| `/rlt test` | Test-Item aus dem Inventar in Pending-Loot einfügen (nur Ausrüstung) |
 
 ---
 
@@ -59,7 +60,7 @@ Ein World of Warcraft Addon für Gilden-Offiziere und Raid-Leader zur strukturie
 - **Item-Kategorien**: Welche Kategorien im Loot-Tab angezeigt werden
 - **Nicht ausrüstbare Items ausblenden** (Handwerk, Reagenzien)
 - **Item-Level-Grenzen** pro Schwierigkeitsgrad (N/H/M) – manuell anpassbar für jede Season
-- **Chat-Kanal**: Automatisch / Raid / Gruppe / Aus
+- **Chat-Kanal**: Automatisch / Raid / Instanz-Chat / Gruppe / Aus
 - **Item-Ankündigung als Raid-Warnung** (falls Raid-Leader oder Assistent)
 - **Prio- und Roll-Timer**: 10 / 15 / 20 / 30 / 45 / 60 Sekunden
 
