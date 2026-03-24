@@ -5,7 +5,7 @@ GuildLoot = GuildLoot or {}
 local GL = GuildLoot
 GL.Test = GL.Test or {}
 
--- Fügt ein zufälliges episches Item aus dem Inventar in Pending-Loot ein,
+-- Fügt ein zufälliges episches Ausrüstungs-Item aus dem Inventar in Pending-Loot ein,
 -- damit der komplette Loot-Flow (Prio → Roll → Vergabe) getestet werden kann.
 function GL.Test.AddPendingItem()
     if not GuildLootDB.currentRaid.active then
@@ -19,7 +19,8 @@ function GL.Test.AddPendingItem()
             local link = C_Container.GetContainerItemLink(bag, slot)
             if link then
                 local name, _, rarity, _, _, _, _, _, equipLoc = GetItemInfo(link)
-                if rarity and rarity >= 4 then
+                local isEquip = equipLoc and equipLoc ~= "" and equipLoc ~= "INVTYPE_NON_EQUIP_IGNORE"
+                if rarity and rarity >= 4 and isEquip then
                     table.insert(epicItems, { link = link, name = name, equipLoc = equipLoc })
                 end
             end
