@@ -129,6 +129,10 @@ function UI.BuildMainFrame()
     mainFrame:SetScript("OnDragStart", mainFrame.StartMoving)
     mainFrame:SetScript("OnDragStop", function(self)
         self:StopMovingOrSizing()
+        local x = self:GetLeft()
+        local y = self:GetTop() - UIParent:GetTop()
+        self:ClearAllPoints()
+        self:SetPoint("TOPLEFT", UIParent, "TOPLEFT", x, y)
         UI.SavePosition()
     end)
     mainFrame:SetToplevel(true)
@@ -145,6 +149,10 @@ function UI.BuildMainFrame()
     resizeGrip:SetScript("OnMouseDown", function() mainFrame:StartSizing("BOTTOMRIGHT") end)
     resizeGrip:SetScript("OnMouseUp", function()
         mainFrame:StopMovingOrSizing()
+        local x = mainFrame:GetLeft()
+        local y = mainFrame:GetTop() - UIParent:GetTop()
+        mainFrame:ClearAllPoints()
+        mainFrame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", x, y)
         UI.SavePosition()
     end)
 
@@ -2165,9 +2173,10 @@ end
 
 function UI.SavePosition()
     if not mainFrame then return end
-    local point, _, _, x, y = mainFrame:GetPoint()
+    local x = mainFrame:GetLeft()
+    local y = mainFrame:GetTop() - UIParent:GetTop()
     local w, h = mainFrame:GetSize()
-    GuildLootDB.settings.framePos  = { point = point, x = x, y = y }
+    GuildLootDB.settings.framePos  = { x = x, y = y }
     GuildLootDB.settings.frameSize = { w = w, h = h }
 end
 
@@ -2186,7 +2195,7 @@ function UI.LoadPosition()
         local pos = GuildLootDB.settings.framePos
         if pos then
             mainFrame:ClearAllPoints()
-            mainFrame:SetPoint(pos.point or "CENTER", UIParent, pos.point or "CENTER", pos.x or 0, pos.y or 0)
+            mainFrame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", pos.x or 0, pos.y or 0)
         end
     end
 end
