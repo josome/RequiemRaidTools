@@ -192,6 +192,7 @@ function UI.BuildMainFrame()
     mlCheck:SetScript("OnClick", function(self)
         GuildLootDB.settings.isMasterLooter = self:GetChecked()
         GL.Print("Master Looter: " .. (GuildLootDB.settings.isMasterLooter and "|cff00ff00AN|r" or "|cffff4444AUS|r"))
+        if UI.RefreshLootTab then UI.RefreshLootTab() end
     end)
     UI.mlCheck = mlCheck
 
