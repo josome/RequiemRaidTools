@@ -133,7 +133,7 @@ function UI.BuildMainFrame()
     end)
     mainFrame:SetToplevel(true)
     mainFrame:SetResizable(true)
-    mainFrame:SetResizeBounds(480, 340, 1400, 1000)
+    mainFrame:SetResizeBounds(480, 500, 1400, 1000)
 
     -- Resize-Grip (untere rechte Ecke)
     local resizeGrip = CreateFrame("Button", nil, mainFrame)
@@ -149,7 +149,7 @@ function UI.BuildMainFrame()
     end)
 
     -- Titelzeile
-    mainFrame.TitleText:SetText("GuildLoot v1.0")
+    mainFrame.TitleText:SetText("RaidLootTracker v1.0")
 
     -- Settings-Button (Zahnrad-Icon) rechts neben ML-Checkbox
     local settingsBtn = CreateFrame("Button", nil, mainFrame)
@@ -691,7 +691,9 @@ function UI.BuildLootPanel(parent)
     pendingScroll:SetPoint("TOPLEFT",     pendingLabel, "BOTTOMLEFT", 0, -2)
     pendingScroll:SetPoint("BOTTOMRIGHT", sidebar,      "BOTTOMRIGHT", -22, 4)
     local pendingContent = CreateFrame("Frame", nil, pendingScroll)
-    pendingContent:SetSize(pendingScroll:GetWidth(), 1)
+    pendingContent:SetPoint("TOPLEFT",  pendingScroll)
+    pendingContent:SetPoint("TOPRIGHT", pendingScroll)
+    pendingContent:SetHeight(1)
     pendingScroll:SetScrollChild(pendingContent)
     panel.pendingFrame   = sidebar       -- für Höhenanpassung (nicht mehr nötig)
     panel.pendingContent = pendingContent
@@ -771,7 +773,9 @@ function UI.BuildLootPanel(parent)
     candScroll:SetPoint("TOPRIGHT", main,      "TOPRIGHT",  -22, 0)
     candScroll:SetHeight(90)
     local candContent = CreateFrame("Frame", nil, candScroll)
-    candContent:SetSize(candScroll:GetWidth(), 1)
+    candContent:SetPoint("TOPLEFT",  candScroll)
+    candContent:SetPoint("TOPRIGHT", candScroll)
+    candContent:SetHeight(1)
     candScroll:SetScrollChild(candContent)
     panel.candContent = candContent
     panel.candLabel   = candLabel
@@ -802,11 +806,13 @@ function UI.BuildLootPanel(parent)
     resultLabel:SetText("|cffffcc00Ergebnisse:|r")
 
     local resultScroll = CreateFrame("ScrollFrame", nil, main, "UIPanelScrollFrameTemplate")
-    resultScroll:SetPoint("TOPLEFT",  resultLabel, "BOTTOMLEFT", 0, -2)
-    resultScroll:SetPoint("TOPRIGHT", main,        "TOPRIGHT",  -22, 0)
-    resultScroll:SetHeight(130)
+    resultScroll:SetPoint("TOPLEFT",     resultLabel, "BOTTOMLEFT",  0,   -2)
+    resultScroll:SetPoint("TOPRIGHT",    main,        "TOPRIGHT",   -22,   0)
+    resultScroll:SetPoint("BOTTOMRIGHT", main,        "BOTTOMRIGHT", -22, 100)
     local resultContent = CreateFrame("Frame", nil, resultScroll)
-    resultContent:SetSize(resultScroll:GetWidth(), 1)
+    resultContent:SetPoint("TOPLEFT",  resultScroll)
+    resultContent:SetPoint("TOPRIGHT", resultScroll)
+    resultContent:SetHeight(1)
     resultScroll:SetScrollChild(resultContent)
     panel.resultContent = resultContent
     panel.resultScroll  = resultScroll
@@ -837,7 +843,9 @@ function UI.BuildLootPanel(parent)
     sessionScroll:SetPoint("TOPLEFT",     sessionLabel, "BOTTOMLEFT", 0, -2)
     sessionScroll:SetPoint("BOTTOMRIGHT", main,         "BOTTOMRIGHT", -22, 4)
     local sessionContent = CreateFrame("Frame", nil, sessionScroll)
-    sessionContent:SetSize(sessionScroll:GetWidth(), 1)
+    sessionContent:SetPoint("TOPLEFT",  sessionScroll)
+    sessionContent:SetPoint("TOPRIGHT", sessionScroll)
+    sessionContent:SetHeight(1)
     sessionScroll:SetScrollChild(sessionContent)
     panel.sessionContent = sessionContent
     panel.sessionScroll  = sessionScroll
@@ -993,9 +1001,6 @@ function UI.RefreshCandidates()
     local ci = GL.Loot.GetCurrentItem()
     local content = lootPanel and lootPanel.candContent
     if not content then return end
-    local sw = lootPanel.candScroll and lootPanel.candScroll:GetWidth() or 0
-    if sw > 10 then content:SetWidth(sw) end
-
     -- Alte Rows entfernen
     for _, r in ipairs(candidateRows) do r:Hide() end
     candidateRows = {}
@@ -1010,8 +1015,9 @@ function UI.RefreshCandidates()
     local yOff = 0
     for _, entry in ipairs(sorted) do
         local row = CreateFrame("Frame", nil, content)
-        row:SetSize(content:GetWidth(), 20)
         row:SetPoint("TOPLEFT", content, "TOPLEFT", 0, yOff)
+        row:SetPoint("RIGHT",   content, "RIGHT",    0, 0)
+        row:SetHeight(20)
 
         local nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         nameText:SetPoint("LEFT", row, "LEFT", 4, 0)
@@ -1033,9 +1039,6 @@ function UI.RefreshRollResults()
     local ci      = GL.Loot.GetCurrentItem()
     local content = lootPanel and lootPanel.resultContent
     if not content then return end
-    local sw = lootPanel.resultScroll and lootPanel.resultScroll:GetWidth() or 0
-    if sw > 10 then content:SetWidth(sw) end
-
     for _, r in ipairs(rollResultRows) do r:Hide() end
     rollResultRows = {}
 
@@ -1066,8 +1069,9 @@ function UI.RefreshRollResults()
     for i, entry in ipairs(sorted) do
         local isWinner = entry.name == ci.winner
         local row = CreateFrame("Frame", nil, content)
-        row:SetSize(content:GetWidth() - 30, 24)
         row:SetPoint("TOPLEFT", content, "TOPLEFT", 0, yOff)
+        row:SetPoint("RIGHT",   content, "RIGHT",  -30, 0)
+        row:SetHeight(24)
 
         -- Hervorhebung Gewinner
         if isWinner then

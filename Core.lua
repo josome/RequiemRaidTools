@@ -92,7 +92,7 @@ end
 -- ============================================================
 
 function GL.Print(msg)
-    print("|cff00ccff[GUILDLOOT]|r " .. tostring(msg))
+    print("|cff00ccff[RLT]|r " .. tostring(msg))
 end
 
 function GL.PostToRaid(msg)
@@ -105,6 +105,8 @@ function GL.PostToRaid(msg)
         channel = "RAID"
     elseif ch == "PARTY" then
         channel = "PARTY"
+    elseif ch == "INSTANCE_CHAT" then
+        channel = "INSTANCE_CHAT"
     else   -- AUTO
         if     IsInRaid()                                    then channel = "RAID"
         elseif IsInGroup(LE_PARTY_CATEGORY_INSTANCE)         then channel = "INSTANCE_CHAT"
@@ -392,6 +394,8 @@ eventFrame:RegisterEvent("CHAT_MSG_RAID")
 eventFrame:RegisterEvent("CHAT_MSG_RAID_LEADER")
 eventFrame:RegisterEvent("CHAT_MSG_PARTY")
 eventFrame:RegisterEvent("CHAT_MSG_PARTY_LEADER")
+eventFrame:RegisterEvent("CHAT_MSG_INSTANCE_CHAT")
+eventFrame:RegisterEvent("CHAT_MSG_INSTANCE_CHAT_LEADER")
 eventFrame:RegisterEvent("CHAT_MSG_SYSTEM")
 eventFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
 eventFrame:RegisterEvent("CHAT_MSG_ADDON")
@@ -455,7 +459,8 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         if GL.Loot and GL.Loot.OnLootClosed then GL.Loot.OnLootClosed() end
 
     elseif event == "CHAT_MSG_RAID" or event == "CHAT_MSG_RAID_LEADER"
-        or event == "CHAT_MSG_PARTY" or event == "CHAT_MSG_PARTY_LEADER" then
+        or event == "CHAT_MSG_PARTY" or event == "CHAT_MSG_PARTY_LEADER"
+        or event == "CHAT_MSG_INSTANCE_CHAT" or event == "CHAT_MSG_INSTANCE_CHAT_LEADER" then
         local msg, sender = ...
         if GL.Loot and GL.Loot.OnChatMessage then GL.Loot.OnChatMessage(msg, sender) end
 
