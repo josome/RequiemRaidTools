@@ -271,7 +271,12 @@ function Loot.OnChatMessage(msg, sender)
     -- Kandidaten registrieren (Override erlaubt)
     currentItem.candidates[sender] = { prio = prio }
 
-    if GL.UI and GL.UI.RefreshCandidates then GL.UI.RefreshCandidates() end
+    -- RefreshLootTab statt nur RefreshCandidates: aktualisiert auch Button-States (hasCands)
+    if GL.UI and GL.UI.RefreshLootTab then
+        GL.UI.RefreshLootTab()
+    elseif GL.UI and GL.UI.RefreshCandidates then
+        GL.UI.RefreshCandidates()
+    end
 end
 
 -- ============================================================
