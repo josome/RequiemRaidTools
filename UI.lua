@@ -1666,8 +1666,14 @@ function UI.BuildRaidPanel(parent)
     startRaidBtn:SetPoint("LEFT", tierBox, "RIGHT", 4, 0)
     startRaidBtn:SetText("Raid starten")
     startRaidBtn:SetScript("OnClick", function()
-        local tier = tierBox:GetText()
-        GL.StartRaid(tier ~= "" and tier or nil)
+        if GuildLootDB.currentRaid.active then
+            -- Raid läuft bereits → nur Roster neu laden
+            GL.LoadRaidRoster()
+            GL.Print("Roster neu geladen: " .. #GuildLootDB.currentRaid.participants .. " Spieler.")
+        else
+            local tier = tierBox:GetText()
+            GL.StartRaid(tier ~= "" and tier or nil)
+        end
         UI.RefreshSessionBar()
         UI.Refresh()
     end)
