@@ -258,7 +258,7 @@ function UI.BuildMainFrame()
         if i == 1 then
             tb:SetPoint("TOPLEFT", mainFrame, "BOTTOMLEFT", 11, 2)
         else
-            tb:SetPoint("LEFT", tabButtons[i - 1], "RIGHT", -15, 0)
+            tb:SetPoint("LEFT", tabButtons[i - 1], "RIGHT", 4, 0)
         end
         tb:SetScript("OnClick", function(self)
             UI.ShowTab(self:GetID())
