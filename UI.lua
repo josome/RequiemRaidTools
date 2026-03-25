@@ -300,9 +300,21 @@ function UI.BuildDockTab()
         insets   = { left = 2, right = 2, top = 2, bottom = 2 },
     })
     dockTab:SetSize(22, 110)
-    dockTab:SetPoint("LEFT", UIParent, "LEFT", 0, 0)
+    local savedY = (GuildLootDB.settings and GuildLootDB.settings.dockTabY) or 0
+    dockTab:SetPoint("LEFT", UIParent, "LEFT", 0, savedY)
     dockTab:SetFrameStrata("HIGH")
-    dockTab:SetMovable(false)
+    dockTab:SetMovable(true)
+    dockTab:EnableMouse(true)
+    dockTab:RegisterForDrag("LeftButton")
+    dockTab:SetScript("OnDragStart", function(self) self:StartMoving() end)
+    dockTab:SetScript("OnDragStop", function(self)
+        self:StopMovingOrSizing()
+        -- Nur Y-Position behalten, X immer am linken Rand
+        local _, _, _, _, y = self:GetPoint()
+        self:ClearAllPoints()
+        self:SetPoint("LEFT", UIParent, "LEFT", 0, y)
+        GuildLootDB.settings.dockTabY = y
+    end)
     dockTab:SetScript("OnClick", UI.Undock)
     dockTab:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
