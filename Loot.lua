@@ -76,29 +76,39 @@ end
 
 function Loot.OnLootOpened()
     local minQ = GuildLootDB.settings.minQuality or 4
-    local newItems = {}
 
+    -- Alle qualifizierten Items aus dem Loot-Fenster sammeln
+    local lootItems = {}
     for slot = 1, GetNumLootItems() do
-        local icon, name, quantity, currencyID, quality, locked, isQuestItem = GetLootSlotInfo(slot)
+        local _, name, _, _, quality, _, isQuestItem = GetLootSlotInfo(slot)
         if quality and quality >= minQ and not isQuestItem then
             local link = GetLootSlotLink(slot)
             if link then
                 local itemID = tonumber(link:match("item:(%d+)"))
-                -- Nur hinzufügen wenn nicht bereits in pendingLoot
-                local alreadyIn = false
-                for _, p in ipairs(pendingLoot()) do
-                    if p.link == link then alreadyIn = true; break end
-                end
-                if not alreadyIn then
-                    table.insert(newItems, { link = link, name = name or "?", itemID = itemID, quality = quality })
-                end
+                table.insert(lootItems, { link = link, name = name or "?", itemID = itemID, quality = quality })
             end
         end
     end
 
-    if #newItems > 0 then
-        for _, item in ipairs(newItems) do
-            -- Kategorie ermitteln + Filter prüfen (GetItemInfo kann nil → deferred)
+    -- Wie oft ist jeder Link bereits in pendingLoot?
+    local pendingCounts = {}
+    for _, p in ipairs(pendingLoot()) do
+        pendingCounts[p.link] = (pendingCounts[p.link] or 0) + 1
+    end
+
+    -- Nur Items hinzufügen die noch nicht (oder nicht oft genug) in pendingLoot sind
+    -- → erlaubt mehrfache Drops desselben Items
+    local lootCounts = {}
+    local toAdd = {}
+    for _, item in ipairs(lootItems) do
+        lootCounts[item.link] = (lootCounts[item.link] or 0) + 1
+        if lootCounts[item.link] > (pendingCounts[item.link] or 0) then
+            table.insert(toAdd, item)
+        end
+    end
+
+    if #toAdd > 0 then
+        for _, item in ipairs(toAdd) do
             local _, _, _, _, _, _, _, _, equipLoc = GetItemInfo(item.link)
             if equipLoc ~= nil then
                 Loot.TryAddPendingItem(item, equipLoc)

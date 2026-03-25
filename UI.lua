@@ -240,22 +240,25 @@ function UI.BuildMainFrame()
     statusLbl:SetText("|cff888888Kein Raid aktiv|r")
     UI.sessionStatusLbl = statusLbl
 
-    -- Content-Frame (unterhalb der Tabs, oberhalb der Session-Leiste)
+    -- Content-Frame (unterhalb der Titelleiste, oberhalb der Session-Leiste)
     contentFrame = CreateFrame("Frame", nil, mainFrame)
-    contentFrame:SetPoint("TOPLEFT",     mainFrame, "TOPLEFT",     4, -52)
+    contentFrame:SetPoint("TOPLEFT",     mainFrame, "TOPLEFT",     4, -26)
     contentFrame:SetPoint("BOTTOMRIGHT", mainFrame, "BOTTOMRIGHT", -4, 42)
 
-    -- Tab-Buttons oben im Content-Bereich
+    -- Tab-Buttons am unteren Rand des Frames (WoW-native Stil wie CharacterFrame)
     local tabNames = { "Loot", "Spieler", "Log", "Raid" }
     for i, name in ipairs(tabNames) do
-        local tb = CreateFrame("Button", "GuildLootTab" .. i, mainFrame, "UIPanelButtonTemplate")
-        tb:SetSize(80, 22)
+        local tb = CreateFrame("Button", "GuildLootMainFrameTab" .. i, mainFrame, "CharacterFrameTabTemplate")
+        tb:SetScript("OnLoad", nil)
+        tb:SetScript("OnShow", nil)
+        tb:SetFrameStrata("FULLSCREEN")
         tb:SetText(name)
+        PanelTemplates_TabResize(tb, 0)
         tb:SetID(i)
         if i == 1 then
-            tb:SetPoint("TOPLEFT", mainFrame, "TOPLEFT", 8, -26)
+            tb:SetPoint("TOPLEFT", mainFrame, "BOTTOMLEFT", 11, 2)
         else
-            tb:SetPoint("LEFT", tabButtons[i - 1], "RIGHT", 2, 0)
+            tb:SetPoint("LEFT", tabButtons[i - 1], "RIGHT", -7, 0)
         end
         tb:SetScript("OnClick", function(self)
             UI.ShowTab(self:GetID())
@@ -650,11 +653,9 @@ function UI.ShowTab(tabID)
 
     for i, tb in ipairs(tabButtons) do
         if i == tabID then
-            tb:SetAlpha(1.0)
-            tb:LockHighlight()
+            PanelTemplates_SelectTab(tb)
         else
-            tb:SetAlpha(0.55)
-            tb:UnlockHighlight()
+            PanelTemplates_DeselectTab(tb)
         end
     end
 

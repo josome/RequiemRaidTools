@@ -253,7 +253,27 @@ local function AutoTierName()
 end
 
 function GL.StartRaid(tier)
-    local raid      = GuildLootDB.currentRaid
+    local raid = GuildLootDB.currentRaid
+
+    if raid.active then
+        -- Noch nicht verteilte Items in den lootLog des laufenden Raids sichern
+        local ts = time()
+        for _, item in ipairs(raid.pendingLoot or {}) do
+            table.insert(raid.lootLog, {
+                player     = "",
+                item       = item.link,
+                link       = item.link,
+                category   = item.category,
+                difficulty = raid.difficulty,
+                timestamp  = ts,
+                pending    = true,
+            })
+        end
+        GL.CloseRaid()
+    else
+        raid.pendingLoot = {}
+    end
+
     raid.active     = true
     raid.tier       = (tier and tier ~= "") and tier or AutoTierName()
     raid.difficulty = GL.DetectDifficulty() or ""
@@ -389,6 +409,7 @@ eventFrame:RegisterEvent("RAID_ROSTER_UPDATE")
 eventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
 eventFrame:RegisterEvent("ENCOUNTER_END")
 eventFrame:RegisterEvent("LOOT_OPENED")
+eventFrame:RegisterEvent("LOOT_SLOT_CHANGED")
 eventFrame:RegisterEvent("LOOT_CLOSED")
 eventFrame:RegisterEvent("CHAT_MSG_RAID")
 eventFrame:RegisterEvent("CHAT_MSG_RAID_LEADER")
@@ -453,6 +474,11 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         end
 
     elseif event == "LOOT_OPENED" then
+        if GL.Loot and GL.Loot.OnLootOpened then GL.Loot.OnLootOpened() end
+
+    elseif event == "LOOT_SLOT_CHANGED" then
+        -- In Group Loot kommen Items asynchron nach LOOT_OPENED
+        -- OnLootOpened erneut aufrufen – Dedup verhindert doppelte Einträge
         if GL.Loot and GL.Loot.OnLootOpened then GL.Loot.OnLootOpened() end
 
     elseif event == "LOOT_CLOSED" then
