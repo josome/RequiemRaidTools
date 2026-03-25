@@ -9,7 +9,7 @@ GL.Test = GL.Test or {}
 -- damit der komplette Loot-Flow (Prio → Roll → Vergabe) getestet werden kann.
 function GL.Test.AddPendingItem()
     if not GuildLootDB.currentRaid.active then
-        GL.Print("Kein aktiver Raid. Zuerst /rlt start.")
+        GL.Print("No active raid. Use /rlt start first.")
         return
     end
 
@@ -28,7 +28,7 @@ function GL.Test.AddPendingItem()
     end
 
     if #epicItems == 0 then
-        GL.Print("Keine epischen Items im Inventar gefunden.")
+        GL.Print("No epic items found in inventory.")
         return
     end
 
@@ -53,6 +53,6 @@ function GL.Test.AddPendingItem()
     end
 
     GL.Loot.TryAddPendingItem(item, chosen.equipLoc or "")
-    GL.Print("Test-Loot hinzugefügt: " .. chosen.link)
+    GL.Print("Test loot added: " .. chosen.link)
     if GL.UI and GL.UI.RefreshLootTab then GL.UI.RefreshLootTab() end
 end

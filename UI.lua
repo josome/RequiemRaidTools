@@ -167,7 +167,7 @@ function UI.BuildMainFrame()
     settingsBtn:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Round", "ADD")
     settingsBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-        GameTooltip:SetText("Einstellungen", 1, 1, 1)
+        GameTooltip:SetText("Settings", 1, 1, 1)
         GameTooltip:Show()
     end)
     settingsBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -199,7 +199,7 @@ function UI.BuildMainFrame()
     mlCheck:SetChecked(GuildLootDB.settings.isMasterLooter)
     mlCheck:SetScript("OnClick", function(self)
         GuildLootDB.settings.isMasterLooter = self:GetChecked()
-        GL.Print("Master Looter: " .. (GuildLootDB.settings.isMasterLooter and "|cff00ff00AN|r" or "|cffff4444AUS|r"))
+        GL.Print("Master Looter: " .. (GuildLootDB.settings.isMasterLooter and "|cff00ff00ON|r" or "|cffff4444OFF|r"))
         if UI.RefreshLootTab then UI.RefreshLootTab() end
     end)
     UI.mlCheck = mlCheck
@@ -212,8 +212,8 @@ function UI.BuildMainFrame()
     minBtn:SetScript("OnClick", UI.ToggleMinimize)
     minBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetText("Andocken", 1, 1, 1)
-        GameTooltip:AddLine("Fenster als Tab an den linken Rand andocken", 0.7, 0.7, 0.7, true)
+        GameTooltip:SetText("Dock", 1, 1, 1)
+        GameTooltip:AddLine("Dock the window as a tab on the left edge", 0.7, 0.7, 0.7, true)
         GameTooltip:Show()
     end)
     minBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -237,7 +237,7 @@ function UI.BuildMainFrame()
     statusLbl:SetPoint("LEFT",  sessionBar, "LEFT",   8, 0)
     statusLbl:SetPoint("RIGHT", sessionBar, "RIGHT", -8, 0)
     statusLbl:SetJustifyH("LEFT")
-    statusLbl:SetText("|cff888888Kein Raid aktiv|r")
+    statusLbl:SetText("|cff888888No active raid|r")
     UI.sessionStatusLbl = statusLbl
 
     -- Content-Frame (unterhalb der Titelleiste, oberhalb der Session-Leiste)
@@ -246,7 +246,7 @@ function UI.BuildMainFrame()
     contentFrame:SetPoint("BOTTOMRIGHT", mainFrame, "BOTTOMRIGHT", -4, 42)
 
     -- Tab-Buttons am unteren Rand des Frames (WoW-native Stil wie CharacterFrame)
-    local tabNames = { "Loot", "Spieler", "Log", "Raid" }
+    local tabNames = { "Loot", "Players", "Log", "Raid" }
     for i, name in ipairs(tabNames) do
         local tb = CreateFrame("Button", "GuildLootMainFrameTab" .. i, mainFrame, "CharacterFrameTabTemplate")
         tb:SetScript("OnLoad", nil)
@@ -440,17 +440,17 @@ function UI.BuildSettingsPanel(parent)
     end
 
     -- ── Sektion 1: Loot-Filter ────────────────────────────────
-    SectionHeader("Loot-Filter")
+    SectionHeader("Loot Filter")
 
     -- Min. Qualität Dropdown
     local qualLbl = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     qualLbl:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
-    qualLbl:SetText("Min. Qualität:")
+    qualLbl:SetText("Min. Quality:")
     local qualDD = CreateFrame("Frame", "GuildLootSettingsDD_minQuality", panel, "UIDropDownMenuTemplate")
     UIDropDownMenu_SetWidth(qualDD, 80)
     qualDD:SetPoint("LEFT", qualLbl, "RIGHT", -8, 0)
     local qualOpts   = { 3, 4, 5 }
-    local qualLabels = { "|cff0070ddSelten|r", "|cffa335eeEpisch|r", "|cffff8000Legendär|r" }
+    local qualLabels = { "|cff0070ddRare|r", "|cffa335eeEpic|r", "|cffff8000Legendary|r" }
     local function qualLabel(v)
         for i, q in ipairs(qualOpts) do if q == v then return qualLabels[i] end end
         return tostring(v)
@@ -471,11 +471,11 @@ function UI.BuildSettingsPanel(parent)
     end)
     y = y - 30
 
-    MakeCheck("Nicht-ausrüstbare Items ausblenden", "filterNonEquip")
+    MakeCheck("Hide non-equippable items", "filterNonEquip")
 
     local catLbl = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     catLbl:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
-    catLbl:SetText("|cff888888Kategorien zeigen:|r")
+    catLbl:SetText("|cff888888Show categories:|r")
     y = y - 22
 
     -- Kategorie-Checkboxen in 2×2 Grid
@@ -497,19 +497,19 @@ function UI.BuildSettingsPanel(parent)
         end)
         return cb
     end
-    MakeCatCheck("Waffen",    "weapons",  1)
-    MakeCatCheck("Schmuck",   "trinket",  2)
+    MakeCatCheck("Weapons",   "weapons",  1)
+    MakeCatCheck("Trinkets",  "trinket",  2)
     y = y - 24
-    MakeCatCheck("Set-Items", "setItems", 1)
-    MakeCatCheck("Sonstiges", "other",    2)
+    MakeCatCheck("Set Items", "setItems", 1)
+    MakeCatCheck("Other",     "other",    2)
     y = y - 14
 
     -- ── Sektion 2: Timer ──────────────────────────────────────
-    SectionHeader("Timer")
+    SectionHeader("Timers")
 
     local timerLbl = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     timerLbl:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
-    timerLbl:SetText("|cff888888Prio-Phase:|r")
+    timerLbl:SetText("|cff888888Prio Phase:|r")
 
     local ddPrio = CreateFrame("Frame", "GuildLootSettingsDD_prioSeconds", panel, "UIDropDownMenuTemplate")
     UIDropDownMenu_SetWidth(ddPrio, 80)
@@ -532,7 +532,7 @@ function UI.BuildSettingsPanel(parent)
 
     local rollLbl = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     rollLbl:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
-    rollLbl:SetText("|cff888888Roll-Phase:|r")
+    rollLbl:SetText("|cff888888Roll Phase:|r")
 
     local ddRoll = CreateFrame("Frame", "GuildLootSettingsDD_rollSeconds", panel, "UIDropDownMenuTemplate")
     UIDropDownMenu_SetWidth(ddRoll, 80)
@@ -554,18 +554,18 @@ function UI.BuildSettingsPanel(parent)
     y = y - 28
 
     -- ── Sektion 3: Allgemein ──────────────────────────────────
-    SectionHeader("Allgemein")
+    SectionHeader("General")
 
     -- Chat-Kanal Dropdown
     local chatLbl = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     chatLbl:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
-    chatLbl:SetText("|cff888888Chat-Kanal:|r")
+    chatLbl:SetText("|cff888888Chat Channel:|r")
 
     local chatOpts   = { "AUTO",        "RAID",       "INSTANCE_CHAT",   "PARTY",        "OFF" }
-    local chatLabels = { "Automatisch", "Raid-Chat",  "Instanz-Chat",    "Gruppen-Chat", "Aus" }
+    local chatLabels = { "Automatic",   "Raid Chat",  "Instance Chat",   "Group Chat",   "Off" }
     local function getChatLabel(v)
         for i, c in ipairs(chatOpts) do if c == v then return chatLabels[i] end end
-        return "Automatisch"
+        return "Automatic"
     end
     local ddChat = CreateFrame("Frame", "GuildLootSettingsDD_chatChannel", panel, "UIDropDownMenuTemplate")
     UIDropDownMenu_SetWidth(ddChat, 100)
@@ -588,7 +588,7 @@ function UI.BuildSettingsPanel(parent)
     end)
     y = y - 30
 
-    MakeCheck("Item-Start als Raid-Warnung ankündigen", "raidWarnItem")
+    MakeCheck("Announce item start as raid warning", "raidWarnItem")
 
     return panel
 end
@@ -756,7 +756,7 @@ function UI.BuildLootPanel(parent)
     activeItemLabel:SetPoint("LEFT",  activeItemIcon, "RIGHT", 6, 0)
     activeItemLabel:SetPoint("RIGHT", main, "RIGHT", -110, 0)
     activeItemLabel:SetJustifyH("LEFT")
-    activeItemLabel:SetText("Kein aktives Item")
+    activeItemLabel:SetText("No active item")
 
     -- Tooltip-Hover über aktives Item Label
     local activeItemHover = CreateFrame("Frame", nil, main)
@@ -779,7 +779,7 @@ function UI.BuildLootPanel(parent)
     activeItemCategoryLabel:SetPoint("TOPLEFT", activeItemLabel, "BOTTOMLEFT", 0, -2)
     activeItemCategoryLabel:SetTextColor(0.7, 0.7, 0.7)
 
-    resetItemBtn = MakeButton(main, "Zurücksetzen", 100, 22, function()
+    resetItemBtn = MakeButton(main, "Reset", 100, 22, function()
         GL.Loot.ResetCurrentItem()
     end)
     resetItemBtn:SetPoint("RIGHT", main, "RIGHT", 0, 0)
@@ -788,7 +788,7 @@ function UI.BuildLootPanel(parent)
     -- Kandidaten
     local candLabel = main:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     candLabel:SetPoint("TOPLEFT", activeItemCategoryLabel, "BOTTOMLEFT", 0, -6)
-    candLabel:SetText("|cffffcc00Bedarfsmeldungen:|r")
+    candLabel:SetText("|cffffcc00Prio Submissions:|r")
 
     local candScroll = CreateFrame("ScrollFrame", nil, main, "UIPanelScrollFrameTemplate")
     candScroll:SetPoint("TOPLEFT",  candLabel, "BOTTOMLEFT", 0, -2)
@@ -806,12 +806,12 @@ function UI.BuildLootPanel(parent)
     candScroll:Hide()
 
     -- Buttons: Roll-Aktion + Abbrechen + Countdown
-    startRollBtn = MakeButton(main, "Roll freigeben", 130, 24, function()
+    startRollBtn = MakeButton(main, "Release Roll", 130, 24, function()
         GL.Loot.StartRoll()
     end)
     startRollBtn:SetPoint("TOPLEFT", candScroll, "BOTTOMLEFT", 0, -6)
 
-    local cancelPrioBtn = MakeButton(main, "Roll jetzt", 90, 24, function()
+    local cancelPrioBtn = MakeButton(main, "Roll Now", 90, 24, function()
         GL.Loot.StartRoll()
     end)
     cancelPrioBtn:SetPoint("LEFT", startRollBtn, "RIGHT", 4, 0)
@@ -825,7 +825,7 @@ function UI.BuildLootPanel(parent)
     -- Ergebnisse
     local resultLabel = main:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     resultLabel:SetPoint("TOPLEFT", startRollBtn, "BOTTOMLEFT", 0, -8)
-    resultLabel:SetText("|cffffcc00Ergebnisse:|r")
+    resultLabel:SetText("|cffffcc00Results:|r")
 
     local resultScroll = CreateFrame("ScrollFrame", nil, main, "UIPanelScrollFrameTemplate")
     resultScroll:SetPoint("TOPLEFT",     resultLabel, "BOTTOMLEFT",  0,   -2)
@@ -848,9 +848,9 @@ function UI.BuildLootPanel(parent)
 
     local sessionLabel = main:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     sessionLabel:SetPoint("TOPLEFT", divS, "BOTTOMLEFT", 0, -4)
-    sessionLabel:SetText("|cffffcc00Session-Loot:|r")
+    sessionLabel:SetText("|cffffcc00Session Loot:|r")
 
-    local clearSessionBtn = MakeButton(main, "Liste leeren", 90, 18, function()
+    local clearSessionBtn = MakeButton(main, "Clear List", 90, 18, function()
         local log = GuildLootDB.currentRaid.lootLog
         for _, entry in ipairs(log) do
             local k = tostring(entry.timestamp) .. (entry.player or "")
@@ -974,7 +974,7 @@ function UI.RefreshLootTab()
     -- Aktives Item
     if ci.link then
         activeItemLabel:SetText(ci.link)
-        local catNames = { weapons="Waffe", trinket="Trinket", setItems="Set/Token", other="Sonstiges" }
+        local catNames = { weapons="Weapon", trinket="Trinket", setItems="Set/Token", other="Other" }
         activeItemCategoryLabel:SetText("[" .. (catNames[ci.category] or "?") .. "]")
         resetItemBtn:SetEnabled(GL.IsMasterLooter())
         if lootPanel.activeItemIconTex then
@@ -984,7 +984,7 @@ function UI.RefreshLootTab()
         if lootPanel.candLabel  then lootPanel.candLabel:Show()  end
         if lootPanel.candScroll then lootPanel.candScroll:Show() end
     else
-        activeItemLabel:SetText("|cff888888Kein aktives Item|r")
+        activeItemLabel:SetText("|cff888888No active item|r")
         activeItemCategoryLabel:SetText("")
         resetItemBtn:SetEnabled(false)
         if lootPanel.activeItemIconTex then lootPanel.activeItemIconTex:SetTexture(nil) end
@@ -1005,15 +1005,15 @@ function UI.RefreshLootTab()
     local isML       = GL.IsMasterLooter()
 
     if rollActive then
-        startRollBtn:SetText("Auswerten")
+        startRollBtn:SetText("Evaluate")
         startRollBtn:SetScript("OnClick", function() GL.Loot.FinalizeRoll() end)
         startRollBtn:SetEnabled(isML)
     elseif prioActive then
-        startRollBtn:SetText("Roll starten")
+        startRollBtn:SetText("Start Roll")
         startRollBtn:SetScript("OnClick", function() GL.Loot.StartRoll() end)
         startRollBtn:SetEnabled(isML and hasCands)
     else
-        startRollBtn:SetText("Roll freigeben")
+        startRollBtn:SetText("Release Roll")
         startRollBtn:SetScript("OnClick", function() GL.Loot.StartRoll() end)
         startRollBtn:SetEnabled(isML and hasItem and hasCands)
     end
@@ -1134,7 +1134,7 @@ function UI.RefreshRollResults()
         end
 
         -- Zuweisen-Button
-        local assignBtn = MakeButton(row, "Zuweisen", 80, 20, function()
+        local assignBtn = MakeButton(row, "Assign", 80, 20, function()
             GL.Loot.AssignLoot(entry.name)
         end)
         assignBtn:SetPoint("RIGHT", row, "RIGHT", 0, 0)
@@ -1267,7 +1267,7 @@ function UI.RefreshSessionLoot()
     if shown == 0 then
         local empty = content:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         empty:SetPoint("TOPLEFT", content, "TOPLEFT", 4, -4)
-        empty:SetText("|cff888888Noch kein Loot verteilt.|r")
+        empty:SetText("|cff888888No loot distributed yet.|r")
         table.insert(sessionLootRows, empty)
         yOff = -20
     end
@@ -1280,10 +1280,10 @@ function UI.RefreshCountdown(secs)
     local ci = GL.Loot.GetCurrentItem()
     if ci.rollState.active and secs and secs > 0 then
         countdownLabel:SetTextColor(1, 0.5, 0)
-        countdownLabel:SetText("Roll: noch " .. secs .. " Sek.")
+        countdownLabel:SetText("Roll: " .. secs .. " sec left")
     elseif ci.prioState and ci.prioState.active and ci.prioState.timeLeft > 0 then
         countdownLabel:SetTextColor(0.4, 1, 0.4)
-        countdownLabel:SetText("Prio: noch " .. ci.prioState.timeLeft .. " Sek.")
+        countdownLabel:SetText("Prio: " .. ci.prioState.timeLeft .. " sec left")
     else
         countdownLabel:SetText("")
     end
@@ -1304,7 +1304,7 @@ function UI.BuildSpielerPanel(parent)
     panel:Hide()
 
     -- Header
-    local headers = { "Raider", "Loot", "Set", "Waffe", "Trinket", "Rest", "SetBonus" }
+    local headers = { "Raider", "Loot", "Set", "Weapon", "Trinket", "Other", "Set Bonus" }
     local colW    = { 140, 30, 40, 50, 50, 30, 70 }
     local xOff = 4
     for i, h in ipairs(headers) do
@@ -1549,7 +1549,7 @@ function UI.ShowExportPopup()
 
         local title = exportPopup:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         title:SetPoint("TOP", exportPopup, "TOP", 0, -8)
-        title:SetText("JSON Export – Strg+A dann Strg+C zum Kopieren")
+        title:SetText("JSON Export – Ctrl+A then Ctrl+C to copy")
 
         local eb = CreateFrame("EditBox", nil, exportPopup, "InputBoxTemplate")
         eb:SetPoint("TOPLEFT",     exportPopup, "TOPLEFT",   10, -30)
@@ -1611,7 +1611,7 @@ function UI.RefreshLogTab()
     if #log == 0 then
         local empty = content:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         empty:SetPoint("TOPLEFT", content, "TOPLEFT", 8, -8)
-        empty:SetText("|cff888888Keine Loot-Vergaben in dieser Session.|r")
+        empty:SetText("|cff888888No loot assigned this session.|r")
         table.insert(logRows, empty)
     end
 
@@ -1664,12 +1664,12 @@ function UI.BuildRaidPanel(parent)
     local startRaidBtn = CreateFrame("Button", nil, controlStrip, "UIPanelButtonTemplate")
     startRaidBtn:SetSize(90, 22)
     startRaidBtn:SetPoint("LEFT", tierBox, "RIGHT", 4, 0)
-    startRaidBtn:SetText("Raid starten")
+    startRaidBtn:SetText("Start Raid")
     startRaidBtn:SetScript("OnClick", function()
         if GuildLootDB.currentRaid.active then
             -- Raid läuft bereits → nur Roster neu laden
             GL.LoadRaidRoster()
-            GL.Print("Roster neu geladen: " .. #GuildLootDB.currentRaid.participants .. " Spieler.")
+            GL.Print("Roster reloaded: " .. #GuildLootDB.currentRaid.participants .. " players.")
         else
             local tier = tierBox:GetText()
             GL.StartRaid(tier ~= "" and tier or nil)
@@ -1683,7 +1683,7 @@ function UI.BuildRaidPanel(parent)
     local closeRaidBtn = CreateFrame("Button", nil, controlStrip, "UIPanelButtonTemplate")
     closeRaidBtn:SetSize(90, 22)
     closeRaidBtn:SetPoint("LEFT", startRaidBtn, "RIGHT", 2, 0)
-    closeRaidBtn:SetText("Raid beenden")
+    closeRaidBtn:SetText("End Raid")
     closeRaidBtn:SetScript("OnClick", function()
         GL.CloseRaid()
         UI.RefreshSessionBar()
@@ -1705,7 +1705,7 @@ function UI.BuildRaidPanel(parent)
             GL.ResetRaid()
         else
             resetPending = true
-            resetRaidBtn:SetText("|cffff4444Sicher?|r")
+            resetRaidBtn:SetText("|cffff4444Sure?|r")
             resetTimer = C_Timer.NewTimer(3, function()
                 resetPending = false
                 resetTimer   = nil
@@ -1729,7 +1729,7 @@ function UI.BuildRaidPanel(parent)
 
     local listHeader = listFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     listHeader:SetPoint("TOPLEFT", listFrame, "TOPLEFT", 6, -6)
-    listHeader:SetText("|cffffcc00Vergangene Raids:|r")
+    listHeader:SetText("|cffffcc00Past Raids:|r")
 
     local listScroll = CreateFrame("ScrollFrame", nil, listFrame, "UIPanelScrollFrameTemplate")
     listScroll:SetPoint("TOPLEFT",     listHeader, "BOTTOMLEFT", 0,   -2)
@@ -1753,9 +1753,9 @@ function UI.BuildRaidPanel(parent)
 
     panel.detailHeader = detailFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     panel.detailHeader:SetPoint("TOPLEFT", detailFrame, "TOPLEFT", 6, -6)
-    panel.detailHeader:SetText("|cff888888— Raid auswählen —|r")
+    panel.detailHeader:SetText("|cff888888— Select a raid —|r")
 
-    local resumeBtn = MakeButton(detailFrame, "Raid fortsetzen", 120, 22, function()
+    local resumeBtn = MakeButton(detailFrame, "Resume Raid", 120, 22, function()
         if selectedHistoryIndex then
             GL.ResumeRaid(selectedHistoryIndex)
             selectedHistoryIndex = nil
@@ -1769,13 +1769,13 @@ function UI.BuildRaidPanel(parent)
     local deletePending = false
     local deleteTimer   = nil
 
-    local deleteBtn = MakeButton(detailFrame, "Löschen", 80, 22, function()
+    local deleteBtn = MakeButton(detailFrame, "Delete", 80, 22, function()
         if not selectedHistoryIndex then return end
         if deletePending then
             -- zweiter Klick → löschen
             if deleteTimer then deleteTimer:Cancel(); deleteTimer = nil end
             deletePending = false
-            panel.deleteBtn:SetText("Löschen")
+            panel.deleteBtn:SetText("Delete")
             table.remove(GuildLootDB.raidHistory, selectedHistoryIndex)
             selectedHistoryIndex = nil
             UI.RefreshRaidTab()
@@ -1783,12 +1783,12 @@ function UI.BuildRaidPanel(parent)
         else
             -- erster Klick → 3-Sekunden-Fenster öffnen
             deletePending = true
-            panel.deleteBtn:SetText("|cffff4444Sicher?|r")
+            panel.deleteBtn:SetText("|cffff4444Sure?|r")
             deleteTimer = C_Timer.NewTimer(3, function()
                 deletePending = false
                 deleteTimer   = nil
                 if panel.deleteBtn then
-                    panel.deleteBtn:SetText("Löschen")
+                    panel.deleteBtn:SetText("Delete")
                 end
             end)
         end
@@ -1808,7 +1808,7 @@ function UI.BuildRaidPanel(parent)
     panel.resetDeleteArm = function()
         if deleteTimer then deleteTimer:Cancel(); deleteTimer = nil end
         deletePending = false
-        deleteBtn:SetText("Löschen")
+        deleteBtn:SetText("Delete")
     end
 
     local detailScroll = CreateFrame("ScrollFrame", nil, detailFrame, "UIPanelScrollFrameTemplate")
@@ -1859,14 +1859,14 @@ function UI.RefreshRaidTab()
         tierLbl:SetPoint("TOPLEFT", row, "TOPLEFT", 4, -4)
         tierLbl:SetPoint("RIGHT",   row, "RIGHT",  -4, 0)
         tierLbl:SetJustifyH("LEFT")
-        tierLbl:SetText("|cff00ff00▶ |r" .. ((raid.tier and raid.tier ~= "") and raid.tier or "|cff888888Unbekannt|r"))
+        tierLbl:SetText("|cff00ff00▶ |r" .. ((raid.tier and raid.tier ~= "") and raid.tier or "|cff888888Unknown|r"))
 
         local infoLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         infoLbl:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 4, 4)
         local diffStr     = raid.difficulty and ("[" .. raid.difficulty .. "] ") or ""
         local playerCount = raid.participants and #raid.participants or 0
         local lootCount   = raid.lootLog and #raid.lootLog or 0
-        infoLbl:SetText("|cff00ff00Aktiv|r  |cff888888" .. diffStr .. playerCount .. " Spieler, " .. lootCount .. " Loot|r")
+        infoLbl:SetText("|cff00ff00Active|r  |cff888888" .. diffStr .. playerCount .. " players, " .. lootCount .. " loot|r")
 
         row:SetScript("OnClick", function()
             selectedHistoryIndex = 0
@@ -1909,7 +1909,7 @@ function UI.RefreshRaidTab()
         tierLbl:SetPoint("TOPLEFT", row, "TOPLEFT",  4, -4)
         tierLbl:SetPoint("RIGHT",   row, "RIGHT",   -4, 0)
         tierLbl:SetJustifyH("LEFT")
-        tierLbl:SetText((snap.tier and snap.tier ~= "") and snap.tier or "|cff888888Unbekannt|r")
+        tierLbl:SetText((snap.tier and snap.tier ~= "") and snap.tier or "|cff888888Unknown|r")
 
         -- Datum, Spieler, Loot-Anzahl
         local infoLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -1919,7 +1919,7 @@ function UI.RefreshRaidTab()
         local lootCount   = snap.lootLog and #snap.lootLog or 0
         local dateStr     = snap.closedAt and date("%d.%m.%Y %H:%M", snap.closedAt) or "?"
         infoLbl:SetText("|cff888888" .. diffStr .. dateStr
-                        .. "  " .. playerCount .. " Spieler, " .. lootCount .. " Loot|r")
+                        .. "  " .. playerCount .. " players, " .. lootCount .. " loot|r")
 
         row:SetScript("OnClick", function()
             selectedHistoryIndex = idx
@@ -1937,7 +1937,7 @@ function UI.RefreshRaidTab()
     if #history == 0 then
         local empty = content:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         empty:SetPoint("TOPLEFT", content, "TOPLEFT", 6, -8)
-        empty:SetText("|cff888888Keine abgeschlossenen Raids gespeichert.|r")
+        empty:SetText("|cff888888No completed raids saved.|r")
         table.insert(verlaufRows, empty)
         yOff = -20
     end
@@ -1975,7 +1975,7 @@ function UI.RefreshRaidDetail(idx)
             if raidPanel.deleteBtn then raidPanel.deleteBtn:Hide() end  -- aktiven Raid nicht löschbar
             if raidPanel.exportBtn then raidPanel.exportBtn:Show() end
             local diffStr = raid.difficulty and (" [" .. raid.difficulty .. "]") or ""
-            raidPanel.detailHeader:SetText("|cff00ff00● Aktiv|r  " .. (raid.tier or "?") .. diffStr)
+            raidPanel.detailHeader:SetText("|cff00ff00● Active|r  " .. (raid.tier or "?") .. diffStr)
             local log     = raid.lootLog or {}
             local content = raidPanel.detailContent
             local yOff    = 0
@@ -2010,7 +2010,7 @@ function UI.RefreshRaidDetail(idx)
     local history = GuildLootDB.raidHistory or {}
     local snap    = history[idx]
     if not snap then
-        raidPanel.detailHeader:SetText("|cff888888— Raid auswählen —|r")
+        raidPanel.detailHeader:SetText("|cff888888— Select a raid —|r")
         raidPanel.detailContent:SetHeight(1)
         if raidPanel.resumeBtn    then raidPanel.resumeBtn:Hide() end
         if raidPanel.deleteBtn    then raidPanel.deleteBtn:Hide() end
@@ -2072,7 +2072,7 @@ function UI.RefreshRaidDetail(idx)
     if #log == 0 then
         local empty = content:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         empty:SetPoint("TOPLEFT", content, "TOPLEFT", 6, -8)
-        empty:SetText("|cff888888Keine Loot-Vergaben in diesem Raid.|r")
+        empty:SetText("|cff888888No loot assigned in this raid.|r")
         table.insert(verlaufDetailRows, empty)
         yOff = -20
     end
@@ -2090,13 +2090,13 @@ function UI.RefreshSessionBar()
     if raid.active then
         local tierStr = (raid.tier and raid.tier ~= "") and (" – " .. raid.tier) or ""
         local count   = #raid.participants
-        UI.sessionStatusLbl:SetText("|cff00ff00Raid aktiv|r" .. tierStr .. "  |cffffcc00" .. count .. " Spieler|r")
+        UI.sessionStatusLbl:SetText("|cff00ff00Raid active|r" .. tierStr .. "  |cffffcc00" .. count .. " players|r")
         if UI.tierBox      then UI.tierBox:SetText(raid.tier or "") end
-        if UI.startRaidBtn then UI.startRaidBtn:SetText("Neu laden") end
+        if UI.startRaidBtn then UI.startRaidBtn:SetText("Reload Roster") end
         if UI.closeRaidBtn then UI.closeRaidBtn:Enable() end
     else
-        UI.sessionStatusLbl:SetText("|cff888888Kein Raid aktiv|r")
-        if UI.startRaidBtn then UI.startRaidBtn:SetText("Raid starten") end
+        UI.sessionStatusLbl:SetText("|cff888888No active raid|r")
+        if UI.startRaidBtn then UI.startRaidBtn:SetText("Start Raid") end
         if UI.closeRaidBtn then UI.closeRaidBtn:Disable() end
     end
     UI.RefreshDockTab()
