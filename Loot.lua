@@ -131,11 +131,11 @@ end
 
 function Loot.ReleaseItem(itemLink)
     if not GL.IsMasterLooter() then
-        GL.Print("|cffff4444Freigabe fehlgeschlagen:|r ML-Checkbox nicht aktiviert.")
+        GL.Print("|cffff4444Release failed:|r ML checkbox not enabled.")
         return
     end
     if not GuildLootDB.currentRaid.active then
-        GL.Print("|cffff4444Freigabe fehlgeschlagen:|r Kein aktiver Raid. Erst 'Raid starten' drücken.")
+        GL.Print("|cffff4444Release failed:|r No active raid. Press 'Start Raid' first.")
         return
     end
 
@@ -210,7 +210,7 @@ function Loot.ActivateItem(link, name, iLevel, equipLoc, quality)
 
     -- Prio-Sammel-Timer starten
     local prioSecs = PRIO_SECONDS()
-    GL.PostRaidWarn("Loot: " .. link .. " -- Bitte Prio posten (" .. prioSecs .. " Sek): 1=BIS, 2=Upgrade, 3=OS, 4=Fun")
+    GL.PostRaidWarn("Loot: " .. link .. " -- Post your prio (" .. prioSecs .. " sec): 1=BIS, 2=Upgrade, 3=OS, 4=Fun")
     currentItem.prioState.active   = true
     currentItem.prioState.timeLeft = prioSecs
     currentItem.prioState.timer = C_Timer.NewTicker(1, function()
@@ -271,7 +271,12 @@ function Loot.OnChatMessage(msg, sender)
     -- Kandidaten registrieren (Override erlaubt)
     currentItem.candidates[sender] = { prio = prio }
 
-    if GL.UI and GL.UI.RefreshCandidates then GL.UI.RefreshCandidates() end
+    -- RefreshLootTab statt nur RefreshCandidates: aktualisiert auch Button-States (hasCands)
+    if GL.UI and GL.UI.RefreshLootTab then
+        GL.UI.RefreshLootTab()
+    elseif GL.UI and GL.UI.RefreshCandidates then
+        GL.UI.RefreshCandidates()
+    end
 end
 
 -- ============================================================
@@ -301,7 +306,7 @@ function Loot.StartRoll()
 
     local lowestPrio = GetLowestPrio(currentItem.candidates)
     if not lowestPrio then
-        GL.Print("Keine Bedarfsmeldungen vorhanden.")
+        GL.Print("No prio submissions received.")
         return
     end
 
@@ -314,13 +319,21 @@ function Loot.StartRoll()
         end
     end
 
+    -- Nur ein Spieler mit bester Prio → kein Roll nötig
+    if #rollPlayers == 1 then
+        currentItem.winner = rollPlayers[1]
+        GL.PostToRaid(rollPlayers[1] .. " is the only Prio " .. lowestPrio .. " player — no roll needed.")
+        if GL.UI and GL.UI.RefreshLootTab then GL.UI.RefreshLootTab() end
+        return
+    end
+
     local rollSecs = ROLL_SECONDS()
     currentItem.rollState.active   = true
     currentItem.rollState.results  = {}
     currentItem.rollState.timeLeft = rollSecs
 
     local playerList = table.concat(rollPlayers, ", ")
-    GL.PostToRaid("Bitte /roll eingeben! " .. rollSecs .. " Sekunden: " .. playerList)
+    GL.PostToRaid("Please /roll now! " .. rollSecs .. " seconds: " .. playerList)
     if GL.Comm then GL.Comm.SendRollStart(rollSecs, rollPlayers) end
 
     -- Countdown in UI
@@ -387,7 +400,7 @@ function Loot.FinalizeRoll()
 
     local results = currentItem.rollState.results
     if not next(results) then
-        GL.Print("Kein Roll-Ergebnis erhalten.")
+        GL.Print("No roll results received.")
         if GL.UI and GL.UI.RefreshLootTab then GL.UI.RefreshLootTab() end
         return
     end
@@ -411,8 +424,8 @@ function Loot.FinalizeRoll()
 
     if #tied > 1 then
         -- Erneuter Roll für Gleichstand-Spieler
-        GL.Print("Gleichstand! Nochmal würfeln: " .. table.concat(tied, ", "))
-        GL.PostToRaid("Gleichstand bei " .. topValue .. "! Nochmal wuerfeln: " .. table.concat(tied, ", "))
+        GL.Print("Tie! Rolling again: " .. table.concat(tied, ", "))
+        GL.PostToRaid("Tie at " .. topValue .. "! Roll again: " .. table.concat(tied, ", "))
         -- Neue Roll-Runde nur für Gleichstand-Spieler
         currentItem.rollState.results = {}
         currentItem.rollState.players = {}
@@ -504,7 +517,7 @@ function Loot.AssignLootConfirm(fullName, diff)
     })
 
     -- Raid-Chat
-    GL.PostToRaid(GL.ShortName(fullName) .. " erhaelt " .. link .. " - bitte beim Lootmaster abholen.")
+    GL.PostToRaid(GL.ShortName(fullName) .. " receives " .. link .. " - please pick up from the loot master.")
 
     -- Item aus Pending entfernen
     local pl = pendingLoot()
@@ -553,7 +566,7 @@ function Loot.CancelPrio()
     if not currentItem.prioState.active then return end
     Loot.ClearCurrentItem()
     if GL.Comm then GL.Comm.SendItemClear() end
-    GL.Print("Prio-Phase abgebrochen.")
+    GL.Print("Prio phase cancelled.")
     if GL.UI and GL.UI.RefreshLootTab then GL.UI.RefreshLootTab() end
 end
 

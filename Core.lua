@@ -279,7 +279,7 @@ function GL.StartRaid(tier)
     raid.difficulty = GL.DetectDifficulty() or ""
     raid.lootLog    = {}
     GL.LoadRaidRoster()
-    GL.Print("Raid gestartet: " .. raid.tier .. ". " .. #raid.participants .. " Spieler geladen.")
+    GL.Print("Raid started: " .. raid.tier .. ". " .. #raid.participants .. " players loaded.")
     if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
 end
 
@@ -292,6 +292,7 @@ function GL.CloseRaid()
         difficulty   = raid.difficulty,
         participants = raid.participants,
         lootLog      = raid.lootLog,
+        pendingLoot  = raid.pendingLoot,
         closedAt     = time(),
     }
     if not GuildLootDB.raidHistory then GuildLootDB.raidHistory = {} end
@@ -308,18 +309,18 @@ function GL.CloseRaid()
     raid.sessionChecked          = {}
     raid.currentKillParticipants = {}
     if GL.Loot and GL.Loot.ClearCurrentItem then GL.Loot.ClearCurrentItem() end
-    GL.Print("Raid beendet und gespeichert (" .. #snapshot.lootLog .. " Loot-Einträge).")
+    GL.Print("Raid ended and saved (" .. #snapshot.lootLog .. " loot entries).")
     if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
 end
 
 function GL.ResumeRaid(idx)
     local history = GuildLootDB.raidHistory
     if not history or not history[idx] then
-        GL.Print("Raid nicht gefunden.")
+        GL.Print("Raid not found.")
         return
     end
     if GuildLootDB.currentRaid.active then
-        GL.Print("Bitte zuerst den aktuellen Raid beenden (/rlt reset oder 'Raid beenden').")
+        GL.Print("Please end the current raid first (/rlt reset or 'End Raid').")
         return
     end
     local snap = history[idx]
@@ -336,14 +337,17 @@ function GL.ResumeRaid(idx)
     for _, e in ipairs(snap.lootLog or {}) do
         table.insert(raid.lootLog, e)
     end
-    raid.absent                  = {}
-    raid.pendingLoot             = {}
+    raid.absent      = {}
+    raid.pendingLoot = {}
+    for _, item in ipairs(snap.pendingLoot or {}) do
+        table.insert(raid.pendingLoot, item)
+    end
     raid.sessionHidden           = {}
     raid.sessionChecked          = {}
     raid.currentKillParticipants = {}
     table.remove(history, idx)
-    GL.Print("Raid fortgesetzt: " .. (raid.tier ~= "" and raid.tier or "?")
-             .. " (" .. #raid.participants .. " Spieler, " .. #raid.lootLog .. " Loot-Einträge wiederhergestellt).")
+    GL.Print("Raid resumed: " .. (raid.tier ~= "" and raid.tier or "?")
+             .. " (" .. #raid.participants .. " players, " .. #raid.lootLog .. " loot entries restored).")
     if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
 end
 
@@ -359,7 +363,7 @@ function GL.ResetRaid()
     raid.sessionChecked         = {}
     raid.currentKillParticipants = {}
     if GL.Loot and GL.Loot.ClearCurrentItem then GL.Loot.ClearCurrentItem() end
-    GL.Print("Session wurde zurückgesetzt.")
+    GL.Print("Session has been reset.")
     if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
 end
 
@@ -378,14 +382,14 @@ function GL.ShowHistory(targetName)
     end
 
     if not found then
-        GL.Print("Spieler nicht gefunden: " .. (targetName or "?"))
+        GL.Print("Player not found: " .. (targetName or "?"))
         return
     end
 
     local data = players[found]
-    GL.Print("=== Loot-Historie: " .. GL.ShortName(found) .. " ===")
+    GL.Print("=== Loot History: " .. GL.ShortName(found) .. " ===")
     if #data.lootHistory == 0 then
-        GL.Print("  (keine Einträge)")
+        GL.Print("  (no entries)")
         return
     end
     for i = #data.lootHistory, math.max(1, #data.lootHistory - 9), -1 do
@@ -426,7 +430,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         local addonName = ...
         if addonName == "RaidLootTracker" then
             GL.InitDB()
-            GL.Print("Geladen. /rlt für das Hauptfenster.")
+            GL.Print("Loaded. /rlt to open the main window.")
         end
 
     elseif event == "PLAYER_LOGIN" then
@@ -434,7 +438,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         local db = GuildLootDB
         if db.currentRaid.active and db.lastLogout and db.lastLogout > 0 then
             if (time() - db.lastLogout) > 4 * 3600 then
-                GL.Print("Raid automatisch beendet (>4h offline).")
+                GL.Print("Raid automatically ended (>4h offline).")
                 GL.CloseRaid()
             end
         end
@@ -534,24 +538,31 @@ SlashCmdList["RAIDLOOTTRACKER"] = function(input)
             GL.ResetRaid()
         else
             GL._resetPending = true
-            GL.Print("Raid-Session zurücksetzen? Nochmal /rlt reset eingeben zum Bestätigen.")
+            GL.Print("Reset raid session? Type /rlt reset again to confirm.")
             C_Timer.After(10, function() GL._resetPending = false end)
         end
 
     elseif cmd == "ml" then
         local settings = GuildLootDB.settings
         settings.isMasterLooter = not settings.isMasterLooter
-        GL.Print("Master Looter: " .. (settings.isMasterLooter and "|cff00ff00AN|r" or "|cffff4444AUS|r"))
+        GL.Print("Master Looter: " .. (settings.isMasterLooter and "|cff00ff00ON|r" or "|cffff4444OFF|r"))
         if GL.UI and GL.UI.RefreshMLButton then GL.UI.RefreshMLButton() end
 
     elseif cmd == "test" then
         if GL.Test and GL.Test.AddPendingItem then
             GL.Test.AddPendingItem()
         else
-            GL.Print("Testmodus nicht geladen.")
+            GL.Print("Test mode not loaded.")
+        end
+
+    elseif cmd == "testroll" then
+        if GL.Test and GL.Test.SimulateRoll then
+            GL.Test.SimulateRoll()
+        else
+            GL.Print("Test mode not loaded.")
         end
 
     else
-        GL.Print("Befehle: /rlt | /rlt start [tier] | /rlt history [Name] | /rlt reset | /rlt ml | /rlt test")
+        GL.Print("Commands: /rlt | /rlt start [tier] | /rlt history [name] | /rlt reset | /rlt ml | /rlt test | /rlt testroll")
     end
 end

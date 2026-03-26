@@ -9,7 +9,7 @@ GL.Test = GL.Test or {}
 -- damit der komplette Loot-Flow (Prio → Roll → Vergabe) getestet werden kann.
 function GL.Test.AddPendingItem()
     if not GuildLootDB.currentRaid.active then
-        GL.Print("Kein aktiver Raid. Zuerst /rlt start.")
+        GL.Print("No active raid. Use /rlt start first.")
         return
     end
 
@@ -28,7 +28,7 @@ function GL.Test.AddPendingItem()
     end
 
     if #epicItems == 0 then
-        GL.Print("Keine epischen Items im Inventar gefunden.")
+        GL.Print("No epic items found in inventory.")
         return
     end
 
@@ -53,6 +53,64 @@ function GL.Test.AddPendingItem()
     end
 
     GL.Loot.TryAddPendingItem(item, chosen.equipLoc or "")
-    GL.Print("Test-Loot hinzugefügt: " .. chosen.link)
+    GL.Print("Test loot added: " .. chosen.link)
     if GL.UI and GL.UI.RefreshLootTab then GL.UI.RefreshLootTab() end
+end
+
+-- Simuliert einen laufenden Roll-Vorgang mit Fake-Kandidaten verschiedener Prios,
+-- damit die Results-Sektion ohne echten Raid getestet werden kann.
+function GL.Test.SimulateRoll()
+    -- Raid sicherstellen
+    if not GuildLootDB.currentRaid.active then
+        GL.StartRaid("Test-Tier")
+    end
+
+    -- Episches Item aus Inventar holen (gleiche Logik wie AddPendingItem)
+    local chosen = nil
+    for bag = 0, 4 do
+        for slot = 1, C_Container.GetContainerNumSlots(bag) do
+            local link = C_Container.GetContainerItemLink(bag, slot)
+            if link then
+                local name, _, rarity, _, _, _, _, _, equipLoc = GetItemInfo(link)
+                local isEquip = equipLoc and equipLoc ~= "" and equipLoc ~= "INVTYPE_NON_EQUIP_IGNORE"
+                if rarity and rarity >= 4 and isEquip then
+                    chosen = { link = link, name = name, equipLoc = equipLoc, quality = rarity }
+                    break
+                end
+            end
+        end
+        if chosen then break end
+    end
+
+    if not chosen then
+        GL.Print("SimulateRoll: No epic item found in inventory.")
+        return
+    end
+
+    -- Item aktivieren
+    GL.Loot.ActivateItem(chosen.link, chosen.name, 0, chosen.equipLoc, chosen.quality)
+
+    -- Fake-Kandidaten + Roll-State direkt setzen
+    local realm = GetRealmName() or "Realm"
+    local ci = GL.Loot.GetCurrentItem()
+    ci.candidates = {
+        ["TestPlayer1-" .. realm] = { prio = 1 },
+        ["TestPlayer2-" .. realm] = { prio = 1 },
+        ["TestPlayer3-" .. realm] = { prio = 1 },
+        ["TestPlayer4-" .. realm] = { prio = 1 },
+        ["TestPlayer5-" .. realm] = { prio = 2 },
+        ["TestPlayer6-" .. realm] = { prio = 2 },
+        ["TestPlayer7-" .. realm] = { prio = 3 },
+    }
+    ci.rollState.players = {
+        TestPlayer1 = true,
+        TestPlayer2 = true,
+        TestPlayer3 = true,
+        TestPlayer4 = true,
+    }
+    ci.rollState.results  = { TestPlayer2 = 87, TestPlayer3 = 42 }
+    ci.rollState.active   = true
+
+    if GL.UI and GL.UI.RefreshLootTab then GL.UI.RefreshLootTab() end
+    GL.Print("Roll simulation active — check the Loot tab Results section.")
 end
