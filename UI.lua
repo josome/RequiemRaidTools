@@ -137,7 +137,7 @@ function UI.BuildMainFrame()
     end)
     mainFrame:SetToplevel(true)
     mainFrame:SetResizable(true)
-    mainFrame:SetResizeBounds(480, 500, 1400, 1000)
+    mainFrame:SetResizeBounds(720, 500, 1400, 1000)
 
     -- Resize-Grip (untere rechte Ecke)
     local resizeGrip = CreateFrame("Button", nil, mainFrame)
@@ -232,13 +232,20 @@ function UI.BuildMainFrame()
     sessionBar:SetHeight(34)
     UI.sessionBar = sessionBar
 
-    -- Status-Label (volle Breite)
+    -- Status-Label links
     local statusLbl = sessionBar:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    statusLbl:SetPoint("LEFT",  sessionBar, "LEFT",   8, 0)
-    statusLbl:SetPoint("RIGHT", sessionBar, "RIGHT", -8, 0)
+    statusLbl:SetPoint("LEFT", sessionBar, "LEFT", 8, 0)
     statusLbl:SetJustifyH("LEFT")
-    statusLbl:SetText("|cff888888No active raid|r")
+    statusLbl:SetText("|cff888888● No active raid|r")
     UI.sessionStatusLbl = statusLbl
+
+    -- Absturz-Warnung rechts (nur wenn Raid aktiv)
+    local crashWarnLbl = sessionBar:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    crashWarnLbl:SetPoint("RIGHT", sessionBar, "RIGHT", -8, 0)
+    crashWarnLbl:SetJustifyH("RIGHT")
+    crashWarnLbl:SetText("|cffff4444● Absturz gefährdet Log-Daten — /reload sichert.|r")
+    crashWarnLbl:Hide()
+    UI.sessionCrashWarnLbl = crashWarnLbl
 
     -- Content-Frame (unterhalb der Titelleiste, oberhalb der Session-Leiste)
     contentFrame = CreateFrame("Frame", nil, mainFrame)
@@ -697,10 +704,7 @@ function UI.BuildLootPanel(parent)
     panel:Hide()
 
     -- ── RECHTE SIDEBAR: Pending Loot ──────────────────────────
-    local sidebar = CreateFrame("Frame", nil, panel, "BackdropTemplate")
-    sidebar:SetBackdrop({ bgFile="Interface\\DialogFrame\\UI-DialogBox-Background",
-        edgeFile="Interface\\Tooltips\\UI-Tooltip-Border", edgeSize=8,
-        insets={left=2,right=2,top=2,bottom=2} })
+    local sidebar = CreateFrame("Frame", nil, panel)
     sidebar:SetPoint("TOPRIGHT",    panel, "TOPRIGHT",    -4,  -2)
     sidebar:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -4,   4)
     sidebar:SetWidth(SIDEBAR_W)
@@ -709,13 +713,11 @@ function UI.BuildLootPanel(parent)
     pendingLabel:SetPoint("TOPLEFT", sidebar, "TOPLEFT", 6, -6)
     pendingLabel:SetText("|cffffcc00Pending Loot:|r")
 
-    local pendingScroll = CreateFrame("ScrollFrame", nil, sidebar, "UIPanelScrollFrameTemplate")
+    local pendingScroll = CreateFrame("ScrollFrame", "GuildLootPendingScroll", sidebar, "UIPanelScrollFrameTemplate")
     pendingScroll:SetPoint("TOPLEFT",     pendingLabel, "BOTTOMLEFT", 0, -2)
     pendingScroll:SetPoint("BOTTOMRIGHT", sidebar,      "BOTTOMRIGHT", -22, 4)
     local pendingContent = CreateFrame("Frame", nil, pendingScroll)
-    pendingContent:SetPoint("TOPLEFT",  pendingScroll)
-    pendingContent:SetPoint("TOPRIGHT", pendingScroll)
-    pendingContent:SetHeight(1)
+    pendingContent:SetSize(pendingScroll:GetWidth(), 1)
     pendingScroll:SetScrollChild(pendingContent)
     panel.pendingFrame   = sidebar       -- für Höhenanpassung (nicht mehr nötig)
     panel.pendingContent = pendingContent
@@ -790,14 +792,12 @@ function UI.BuildLootPanel(parent)
     candLabel:SetPoint("TOPLEFT", activeItemCategoryLabel, "BOTTOMLEFT", 0, -6)
     candLabel:SetText("|cffffcc00Prio Submissions:|r")
 
-    local candScroll = CreateFrame("ScrollFrame", nil, main, "UIPanelScrollFrameTemplate")
+    local candScroll = CreateFrame("ScrollFrame", "GuildLootCandScroll", main, "UIPanelScrollFrameTemplate")
     candScroll:SetPoint("TOPLEFT",  candLabel, "BOTTOMLEFT", 0, -2)
     candScroll:SetPoint("TOPRIGHT", main,      "TOPRIGHT",  -22, 0)
     candScroll:SetHeight(90)
     local candContent = CreateFrame("Frame", nil, candScroll)
-    candContent:SetPoint("TOPLEFT",  candScroll)
-    candContent:SetPoint("TOPRIGHT", candScroll)
-    candContent:SetHeight(1)
+    candContent:SetSize(candScroll:GetWidth(), 1)
     candScroll:SetScrollChild(candContent)
     panel.candContent = candContent
     panel.candLabel   = candLabel
@@ -809,16 +809,10 @@ function UI.BuildLootPanel(parent)
     startRollBtn = MakeButton(main, "Release Roll", 130, 24, function()
         GL.Loot.StartRoll()
     end)
-    startRollBtn:SetPoint("TOPLEFT", candScroll, "BOTTOMLEFT", 0, -6)
-
-    local cancelPrioBtn = MakeButton(main, "Roll Now", 90, 24, function()
-        GL.Loot.StartRoll()
-    end)
-    cancelPrioBtn:SetPoint("LEFT", startRollBtn, "RIGHT", 4, 0)
-    panel.cancelPrioBtn = cancelPrioBtn
+    startRollBtn:SetPoint("TOPLEFT", activeItemCategoryLabel, "BOTTOMLEFT", 0, -6)
 
     countdownLabel = main:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    countdownLabel:SetPoint("LEFT", cancelPrioBtn, "RIGHT", 8, 0)
+    countdownLabel:SetPoint("LEFT", startRollBtn, "RIGHT", 8, 0)
     countdownLabel:SetTextColor(1, 0.5, 0)
     countdownLabel:SetText("")
 
@@ -827,14 +821,12 @@ function UI.BuildLootPanel(parent)
     resultLabel:SetPoint("TOPLEFT", startRollBtn, "BOTTOMLEFT", 0, -8)
     resultLabel:SetText("|cffffcc00Results:|r")
 
-    local resultScroll = CreateFrame("ScrollFrame", nil, main, "UIPanelScrollFrameTemplate")
-    resultScroll:SetPoint("TOPLEFT",     resultLabel, "BOTTOMLEFT",  0,   -2)
-    resultScroll:SetPoint("TOPRIGHT",    main,        "TOPRIGHT",   -22,   0)
-    resultScroll:SetPoint("BOTTOMRIGHT", main,        "BOTTOMRIGHT", -22, 100)
+    local resultScroll = CreateFrame("ScrollFrame", "GuildLootResultScroll", main, "UIPanelScrollFrameTemplate")
+    resultScroll:SetPoint("TOPLEFT", resultLabel, "BOTTOMLEFT", 0, -2)
+    resultScroll:SetPoint("RIGHT",   main, "RIGHT", -22, 0)
+    resultScroll:SetHeight(120)  -- Startwert, wird via equalizeScrolls aktualisiert
     local resultContent = CreateFrame("Frame", nil, resultScroll)
-    resultContent:SetPoint("TOPLEFT",  resultScroll)
-    resultContent:SetPoint("TOPRIGHT", resultScroll)
-    resultContent:SetHeight(1)
+    resultContent:SetSize(resultScroll:GetWidth(), 1)
     resultScroll:SetScrollChild(resultContent)
     panel.resultContent = resultContent
     panel.resultScroll  = resultScroll
@@ -861,16 +853,28 @@ function UI.BuildLootPanel(parent)
     clearSessionBtn:SetPoint("LEFT", sessionLabel, "RIGHT", 8, 0)
     clearSessionBtn:SetPoint("TOP",  sessionLabel, "TOP",   0,  2)
 
-    local sessionScroll = CreateFrame("ScrollFrame", nil, main, "UIPanelScrollFrameTemplate")
+    local sessionScroll = CreateFrame("ScrollFrame", "GuildLootSessionScroll", main, "UIPanelScrollFrameTemplate")
     sessionScroll:SetPoint("TOPLEFT",     sessionLabel, "BOTTOMLEFT", 0, -2)
     sessionScroll:SetPoint("BOTTOMRIGHT", main,         "BOTTOMRIGHT", -22, 4)
     local sessionContent = CreateFrame("Frame", nil, sessionScroll)
-    sessionContent:SetPoint("TOPLEFT",  sessionScroll)
-    sessionContent:SetPoint("TOPRIGHT", sessionScroll)
-    sessionContent:SetHeight(1)
+    sessionContent:SetSize(sessionScroll:GetWidth(), 1)
     sessionScroll:SetScrollChild(sessionContent)
     panel.sessionContent = sessionContent
     panel.sessionScroll  = sessionScroll
+
+    -- ── Results und Session Loot gleichmäßig aufteilen ────────
+    -- Gesamtraum = resultLabel-Unterkante bis main-Unterkante minus Trennbereich
+    -- Trennbereich: 2(gap) + 6(divS-gap) + 1(divS) + 4(label-gap) + 12(label) + 2(scroll-gap) + 4(bottom) = 31px
+    local function equalizeScrolls()
+        local rlb = resultLabel:GetBottom()
+        local mb  = main:GetBottom()
+        if not rlb or not mb or rlb <= mb then return end
+        local each = math.floor((rlb - mb - 31) / 2)
+        if each < 20 then return end
+        resultScroll:SetHeight(each)
+    end
+    main:HookScript("OnSizeChanged", function() C_Timer.After(0, equalizeScrolls) end)
+    panel:HookScript("OnShow",       function() C_Timer.After(0, equalizeScrolls) end)
 
     return panel
 end
@@ -981,15 +985,11 @@ function UI.RefreshLootTab()
             local icon = select(10, GetItemInfo(ci.link))
             lootPanel.activeItemIconTex:SetTexture(icon or "Interface\\Icons\\INV_Misc_QuestionMark")
         end
-        if lootPanel.candLabel  then lootPanel.candLabel:Show()  end
-        if lootPanel.candScroll then lootPanel.candScroll:Show() end
     else
         activeItemLabel:SetText("|cff888888No active item|r")
         activeItemCategoryLabel:SetText("")
         resetItemBtn:SetEnabled(false)
         if lootPanel.activeItemIconTex then lootPanel.activeItemIconTex:SetTexture(nil) end
-        if lootPanel.candLabel         then lootPanel.candLabel:Hide()                  end
-        if lootPanel.candScroll        then lootPanel.candScroll:Hide()                 end
     end
 
     UI.RefreshCandidates()
@@ -1002,12 +1002,16 @@ function UI.RefreshLootTab()
     local prioActive = ci.prioState and ci.prioState.active
     local rollActive = ci.rollState.active
     local hasCands   = next(ci.candidates) ~= nil
+    local hasWinner  = ci.winner ~= nil
     local isML       = GL.IsMasterLooter()
 
     if rollActive then
         startRollBtn:SetText("Evaluate")
         startRollBtn:SetScript("OnClick", function() GL.Loot.FinalizeRoll() end)
         startRollBtn:SetEnabled(isML)
+    elseif hasWinner then
+        startRollBtn:SetText("Evaluate")
+        startRollBtn:SetEnabled(false)
     elseif prioActive then
         startRollBtn:SetText("Start Roll")
         startRollBtn:SetScript("OnClick", function() GL.Loot.StartRoll() end)
@@ -1022,7 +1026,7 @@ end
 function UI.RefreshCandidates()
     local ci = GL.Loot.GetCurrentItem()
     local content = lootPanel and lootPanel.candContent
-    if not content then return end
+    if not content then GL.Print("[DBG] RefreshCandidates: no content"); return end
     -- Alte Rows entfernen
     for _, r in ipairs(candidateRows) do r:Hide() end
     candidateRows = {}
@@ -1064,31 +1068,35 @@ function UI.RefreshRollResults()
     for _, r in ipairs(rollResultRows) do r:Hide() end
     rollResultRows = {}
 
-    -- Ergebnisse sortiert (höchster Roll zuerst)
-    local results = ci.rollState.results
-    local sorted  = {}
-    for name, val in pairs(results) do
-        table.insert(sorted, { name = name, roll = val })
+    -- Beste Prio bestimmen
+    local bestPrio = nil
+    for _, data in pairs(ci.candidates) do
+        if bestPrio == nil or data.prio < bestPrio then bestPrio = data.prio end
     end
-    -- Auch alle Roll-berechtigten anzeigen die noch nicht gewürfelt haben
-    for name, _ in pairs(ci.rollState.players) do
-        if not results[name] then
-            table.insert(sorted, { name = name, roll = nil })
-        end
+
+    -- Alle Kandidaten aufnehmen (nicht nur Roll-berechtigte)
+    local sorted = {}
+    for name, data in pairs(ci.candidates) do
+        local short = GL.ShortName(name)
+        table.insert(sorted, {
+            name     = short,
+            prio     = data.prio,
+            roll     = ci.rollState.results[short],
+            eligible = (data.prio == bestPrio),
+        })
     end
+
+    -- Sortierung: Prio aufsteigend, dann Roll absteigend (nil → hinten)
     table.sort(sorted, function(a, b)
+        if a.prio ~= b.prio then return a.prio < b.prio end
+        if a.roll == nil and b.roll == nil then return false end
         if a.roll == nil then return false end
         if b.roll == nil then return true end
         return a.roll > b.roll
     end)
 
-    local lowestPrio = nil
-    for _, data in pairs(ci.candidates) do
-        if lowestPrio == nil or data.prio < lowestPrio then lowestPrio = data.prio end
-    end
-
     local yOff = 0
-    for i, entry in ipairs(sorted) do
+    for _, entry in ipairs(sorted) do
         local isWinner = entry.name == ci.winner
         local row = CreateFrame("Frame", nil, content)
         row:SetPoint("TOPLEFT", content, "TOPLEFT", 0, yOff)
@@ -1107,38 +1115,41 @@ function UI.RefreshRollResults()
         nameText:SetWidth(160)
         if isWinner then
             nameText:SetText("|cffffcc00★ " .. entry.name .. "|r")
+        elseif not entry.eligible then
+            nameText:SetText("|cff888888" .. entry.name .. "|r")
         else
             nameText:SetText(entry.name)
         end
 
-        -- Prio anzeigen
-        local candData = ci.candidates[entry.name]
-        -- Kurzname-Lookup
-        if not candData then
-            for n, d in pairs(ci.candidates) do
-                if GL.ShortName(n) == entry.name then candData = d; break end
-            end
-        end
         local prioText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         prioText:SetPoint("LEFT", nameText, "RIGHT", 4, 0)
         prioText:SetWidth(60)
-        prioText:SetText(candData and ("Prio " .. candData.prio) or "")
-
-        local rollText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        rollText:SetPoint("LEFT", prioText, "RIGHT", 4, 0)
-        rollText:SetWidth(60)
-        if entry.roll then
-            rollText:SetText("|cff00ff00" .. entry.roll .. "|r")
+        if not entry.eligible then
+            prioText:SetText("|cff888888Prio " .. entry.prio .. "|r")
         else
-            rollText:SetText("|cff888888—|r")
+            prioText:SetText("Prio " .. entry.prio)
         end
 
-        -- Zuweisen-Button
-        local assignBtn = MakeButton(row, "Assign", 80, 20, function()
-            GL.Loot.AssignLoot(entry.name)
-        end)
-        assignBtn:SetPoint("RIGHT", row, "RIGHT", 0, 0)
-        assignBtn:SetEnabled(GL.IsMasterLooter() and not ci.rollState.active)
+        -- Roll-Wert nur für eligible Spieler
+        if entry.eligible then
+            local rollText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            rollText:SetPoint("LEFT", prioText, "RIGHT", 4, 0)
+            rollText:SetWidth(60)
+            if entry.roll then
+                rollText:SetText("|cff00ff00" .. entry.roll .. "|r")
+            else
+                rollText:SetText("|cff888888—|r")
+            end
+        end
+
+        -- Assign-Button nur für eligible Spieler
+        if entry.eligible then
+            local assignBtn = MakeButton(row, "Assign", 80, 20, function()
+                GL.Loot.AssignLoot(entry.name)
+            end)
+            assignBtn:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+            assignBtn:SetEnabled(GL.IsMasterLooter() and not ci.rollState.active)
+        end
 
         row:Show()
         table.insert(rollResultRows, row)
@@ -1324,7 +1335,7 @@ function UI.BuildSpielerPanel(parent)
     div:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -4, -22)
 
     -- Scroll-Bereich
-    local scroll = CreateFrame("ScrollFrame", nil, panel, "UIPanelScrollFrameTemplate")
+    local scroll = CreateFrame("ScrollFrame", "GuildLootSpielerScroll", panel, "UIPanelScrollFrameTemplate")
     scroll:SetPoint("TOPLEFT", div, "BOTTOMLEFT", 0, -2)
     scroll:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -26, 4)
     local content = CreateFrame("Frame", nil, scroll)
@@ -1518,7 +1529,7 @@ function UI.BuildLogPanel(parent)
     panel:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", 0, 0)
     panel:Hide()
 
-    local scroll = CreateFrame("ScrollFrame", nil, panel, "UIPanelScrollFrameTemplate")
+    local scroll = CreateFrame("ScrollFrame", "GuildLootLogScroll", panel, "UIPanelScrollFrameTemplate")
     scroll:SetPoint("TOPLEFT",     panel, "TOPLEFT",  4,  -4)
     scroll:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -26, 4)
     local content = CreateFrame("Frame", nil, scroll)
@@ -1731,7 +1742,7 @@ function UI.BuildRaidPanel(parent)
     listHeader:SetPoint("TOPLEFT", listFrame, "TOPLEFT", 6, -6)
     listHeader:SetText("|cffffcc00Past Raids:|r")
 
-    local listScroll = CreateFrame("ScrollFrame", nil, listFrame, "UIPanelScrollFrameTemplate")
+    local listScroll = CreateFrame("ScrollFrame", "GuildLootRaidListScroll", listFrame, "UIPanelScrollFrameTemplate")
     listScroll:SetPoint("TOPLEFT",     listHeader, "BOTTOMLEFT", 0,   -2)
     listScroll:SetPoint("BOTTOMRIGHT", listFrame,  "BOTTOMRIGHT", -22, 4)
     local listContent = CreateFrame("Frame", nil, listScroll)
@@ -1811,7 +1822,7 @@ function UI.BuildRaidPanel(parent)
         deleteBtn:SetText("Delete")
     end
 
-    local detailScroll = CreateFrame("ScrollFrame", nil, detailFrame, "UIPanelScrollFrameTemplate")
+    local detailScroll = CreateFrame("ScrollFrame", "GuildLootRaidDetailScroll", detailFrame, "UIPanelScrollFrameTemplate")
     detailScroll:SetPoint("TOPLEFT",     panel.detailHeader, "BOTTOMLEFT", 0,   -4)
     detailScroll:SetPoint("BOTTOMRIGHT", detailFrame,        "BOTTOMRIGHT", -22,  4)
     local detailContent = CreateFrame("Frame", nil, detailScroll)
@@ -2090,12 +2101,14 @@ function UI.RefreshSessionBar()
     if raid.active then
         local tierStr = (raid.tier and raid.tier ~= "") and (" – " .. raid.tier) or ""
         local count   = #raid.participants
-        UI.sessionStatusLbl:SetText("|cff00ff00Raid active|r" .. tierStr .. "  |cffffcc00" .. count .. " players|r")
+        UI.sessionStatusLbl:SetText("|cff00ff00●|r Raid active" .. tierStr .. "  |cffffcc00● " .. count .. " players|r")
+        if UI.sessionCrashWarnLbl then UI.sessionCrashWarnLbl:Show() end
         if UI.tierBox      then UI.tierBox:SetText(raid.tier or "") end
         if UI.startRaidBtn then UI.startRaidBtn:SetText("Reload Roster") end
         if UI.closeRaidBtn then UI.closeRaidBtn:Enable() end
     else
-        UI.sessionStatusLbl:SetText("|cff888888No active raid|r")
+        UI.sessionStatusLbl:SetText("|cff888888● No active raid|r")
+        if UI.sessionCrashWarnLbl then UI.sessionCrashWarnLbl:Hide() end
         if UI.startRaidBtn then UI.startRaidBtn:SetText("Start Raid") end
         if UI.closeRaidBtn then UI.closeRaidBtn:Disable() end
     end
@@ -2210,7 +2223,11 @@ function UI.LoadPosition()
     else
         -- Position wiederherstellen
         local sz = GuildLootDB.settings.frameSize
-        if sz then mainFrame:SetSize(sz.w, sz.h) end
+        if sz then
+            local w = math.max(sz.w or FRAME_W, 720)
+            local h = math.max(sz.h or FRAME_H, 500)
+            mainFrame:SetSize(w, h)
+        end
         local pos = GuildLootDB.settings.framePos
         if pos then
             mainFrame:ClearAllPoints()

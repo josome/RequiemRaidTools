@@ -319,6 +319,14 @@ function Loot.StartRoll()
         end
     end
 
+    -- Nur ein Spieler mit bester Prio → kein Roll nötig
+    if #rollPlayers == 1 then
+        currentItem.winner = rollPlayers[1]
+        GL.PostToRaid(rollPlayers[1] .. " is the only Prio " .. lowestPrio .. " player — no roll needed.")
+        if GL.UI and GL.UI.RefreshLootTab then GL.UI.RefreshLootTab() end
+        return
+    end
+
     local rollSecs = ROLL_SECONDS()
     currentItem.rollState.active   = true
     currentItem.rollState.results  = {}

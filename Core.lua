@@ -292,6 +292,7 @@ function GL.CloseRaid()
         difficulty   = raid.difficulty,
         participants = raid.participants,
         lootLog      = raid.lootLog,
+        pendingLoot  = raid.pendingLoot,
         closedAt     = time(),
     }
     if not GuildLootDB.raidHistory then GuildLootDB.raidHistory = {} end
@@ -336,8 +337,11 @@ function GL.ResumeRaid(idx)
     for _, e in ipairs(snap.lootLog or {}) do
         table.insert(raid.lootLog, e)
     end
-    raid.absent                  = {}
-    raid.pendingLoot             = {}
+    raid.absent      = {}
+    raid.pendingLoot = {}
+    for _, item in ipairs(snap.pendingLoot or {}) do
+        table.insert(raid.pendingLoot, item)
+    end
     raid.sessionHidden           = {}
     raid.sessionChecked          = {}
     raid.currentKillParticipants = {}
@@ -551,7 +555,14 @@ SlashCmdList["RAIDLOOTTRACKER"] = function(input)
             GL.Print("Test mode not loaded.")
         end
 
+    elseif cmd == "testroll" then
+        if GL.Test and GL.Test.SimulateRoll then
+            GL.Test.SimulateRoll()
+        else
+            GL.Print("Test mode not loaded.")
+        end
+
     else
-        GL.Print("Commands: /rlt | /rlt start [tier] | /rlt history [name] | /rlt reset | /rlt ml | /rlt test")
+        GL.Print("Commands: /rlt | /rlt start [tier] | /rlt history [name] | /rlt reset | /rlt ml | /rlt test | /rlt testroll")
     end
 end
