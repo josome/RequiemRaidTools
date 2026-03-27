@@ -153,6 +153,25 @@ function GL.ShortName(fullName)
 end
 
 -- ============================================================
+-- Raid-ID
+-- ============================================================
+
+--- Erzeugt eine stabile 8-stellige Hex-ID aus Timestamp, Tier und Schwierigkeit.
+--- Verwendet djb2-Hash (kein WoW-API nötig).
+--- @param tier string
+--- @param difficulty string
+--- @param timestamp number  Unix-Timestamp (time())
+--- @return string  z.B. "a3f2b891"
+function GL.GenerateRaidID(tier, difficulty, timestamp)
+    local raw = string.format("%d|%s|%s", timestamp or 0, tier or "", difficulty or "")
+    local h = 5381
+    for i = 1, #raw do
+        h = (h * 33 + raw:byte(i)) % 4294967296
+    end
+    return string.format("%08x", h)
+end
+
+-- ============================================================
 -- JSON-Export
 -- ============================================================
 

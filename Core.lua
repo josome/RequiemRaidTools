@@ -14,6 +14,9 @@ local DB_DEFAULTS = {
     lastLogout  = 0,
     currentRaid = {
         active       = false,
+        id           = "",
+        startedAt    = 0,
+        resumed      = false,
         tier         = "",
         difficulty   = "",
         participants = {},
@@ -278,6 +281,8 @@ function GL.StartRaid(tier)
     raid.resumed    = false
     raid.tier       = (tier and tier ~= "") and tier or AutoTierName()
     raid.difficulty = GL.DetectDifficulty() or ""
+    raid.startedAt  = time()
+    raid.id         = GL.GenerateRaidID(raid.tier, raid.difficulty, raid.startedAt)
     raid.lootLog    = {}
     GL.LoadRaidRoster()
     GL.Print("Raid started: " .. raid.tier .. ". " .. #raid.participants .. " players loaded.")
@@ -289,6 +294,8 @@ function GL.CloseRaid()
     if not raid.active then return end
     -- Snapshot in History speichern
     local snapshot = {
+        id           = raid.id,
+        startedAt    = raid.startedAt,
         tier         = raid.tier,
         difficulty   = raid.difficulty,
         participants = raid.participants,
@@ -300,6 +307,9 @@ function GL.CloseRaid()
     table.insert(GuildLootDB.raidHistory, snapshot)
     -- currentRaid zurücksetzen
     raid.active                  = false
+    raid.id                      = ""
+    raid.startedAt               = 0
+    raid.resumed                 = false
     raid.tier                    = ""
     raid.difficulty              = ""
     raid.participants            = {}
@@ -327,6 +337,8 @@ function GL.ResumeRaid(idx)
     local snap = history[idx]
     local raid = GuildLootDB.currentRaid
     raid.active     = true
+    raid.id         = snap.id or GL.GenerateRaidID(snap.tier, snap.difficulty, snap.startedAt or snap.closedAt or 0)
+    raid.startedAt  = snap.startedAt or 0
     raid.tier       = snap.tier
     raid.difficulty = snap.difficulty
     raid.participants = {}
@@ -356,6 +368,8 @@ end
 function GL.ResetRaid()
     local raid = GuildLootDB.currentRaid
     raid.active       = false
+    raid.id           = ""
+    raid.startedAt    = 0
     raid.resumed      = false
     raid.tier         = ""
     raid.difficulty   = ""
