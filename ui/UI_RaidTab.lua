@@ -60,17 +60,25 @@ function UI.BuildRaidPanel(parent)
     end)
     UI.tierBox = tierBox
 
-    -- [Start Raid]-Button
+    -- [Start Raid / Reload Roster]-Button
     local startRaidBtn = CreateFrame("Button", nil, controlStrip, "UIPanelButtonTemplate")
-    startRaidBtn:SetSize(90, 22)
+    startRaidBtn:SetSize(100, 22)
     startRaidBtn:SetPoint("LEFT", controlStrip, "LEFT", LIST_W + 4, 0)
     startRaidBtn:SetText("Start Raid")
     startRaidBtn:SetScript("OnClick", function()
-        local tier = tierBox:GetText()
-        GL.StartRaid(tier ~= "" and tier or nil)
-        UI.RefreshSessionBar()
-        UI.Refresh()
-        UI.UpdateEndResumeBtn()
+        local raid = GuildLootDB.currentRaid
+        if raid.active and raid.resumed then
+            GL.LoadRaidRoster()
+            UI.RefreshSessionBar()
+            UI.Refresh()
+        else
+            local tier = tierBox:GetText()
+            GL.StartRaid(tier ~= "" and tier or nil)
+            UI.RefreshSessionBar()
+            UI.Refresh()
+            UI.UpdateEndResumeBtn()
+        end
+        UI.UpdateStartRaidBtn()
     end)
     UI.startRaidBtn = startRaidBtn
 
@@ -218,8 +226,18 @@ function UI.BuildRaidPanel(parent)
 end
 
 -- ============================================================
--- End/Resume Button State
+-- Button State Updates
 -- ============================================================
+
+function UI.UpdateStartRaidBtn()
+    if not UI.startRaidBtn then return end
+    local raid = GuildLootDB.currentRaid
+    if raid.active and raid.resumed then
+        UI.startRaidBtn:SetText("Reload Roster")
+    else
+        UI.startRaidBtn:SetText("Start Raid")
+    end
+end
 
 function UI.UpdateEndResumeBtn()
     if not UI.endResumeBtn then return end
@@ -234,6 +252,7 @@ function UI.UpdateEndResumeBtn()
         UI.endResumeBtn:SetText("End Raid")
         UI.endResumeBtn:SetEnabled(false)
     end
+    UI.UpdateStartRaidBtn()
 end
 
 -- ============================================================

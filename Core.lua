@@ -275,6 +275,7 @@ function GL.StartRaid(tier)
     end
 
     raid.active     = true
+    raid.resumed    = false
     raid.tier       = (tier and tier ~= "") and tier or AutoTierName()
     raid.difficulty = GL.DetectDifficulty() or ""
     raid.lootLog    = {}
@@ -342,6 +343,7 @@ function GL.ResumeRaid(idx)
     for _, item in ipairs(snap.pendingLoot or {}) do
         table.insert(raid.pendingLoot, item)
     end
+    raid.resumed                 = true
     raid.sessionHidden           = {}
     raid.sessionChecked          = {}
     raid.currentKillParticipants = {}
@@ -354,6 +356,7 @@ end
 function GL.ResetRaid()
     local raid = GuildLootDB.currentRaid
     raid.active       = false
+    raid.resumed      = false
     raid.tier         = ""
     raid.difficulty   = ""
     raid.participants = {}
