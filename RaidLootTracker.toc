@@ -9,10 +9,10 @@ Core.lua
 Comm.lua
 Loot.lua
 MinimapButton.lua
-UI.lua
-UI_Settings.lua
-UI_LootTab.lua
-UI_SpielerTab.lua
-UI_LogTab.lua
-UI_RaidTab.lua
+ui/UI.lua
+ui/UI_Settings.lua
+ui/UI_LootTab.lua
+ui/UI_SpielerTab.lua
+ui/UI_LogTab.lua
+ui/UI_RaidTab.lua
 Test.lua
