@@ -1560,16 +1560,29 @@ function UI.ShowExportPopup()
 
         local title = exportPopup:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         title:SetPoint("TOP", exportPopup, "TOP", 0, -8)
-        title:SetText("JSON Export – Ctrl+A then Ctrl+C to copy")
+        title:SetText("JSON Export – press Copy All, then Ctrl+C")
 
-        local eb = CreateFrame("EditBox", nil, exportPopup, "InputBoxTemplate")
-        eb:SetPoint("TOPLEFT",     exportPopup, "TOPLEFT",   10, -30)
-        eb:SetPoint("BOTTOMRIGHT", exportPopup, "BOTTOMRIGHT", -10, 10)
+        local sf = CreateFrame("ScrollFrame", "RaidLootExportScroll", exportPopup, "UIPanelScrollFrameTemplate")
+        sf:SetPoint("TOPLEFT",     exportPopup, "TOPLEFT",    10, -30)
+        sf:SetPoint("BOTTOMRIGHT", exportPopup, "BOTTOMRIGHT", -30, 36)
+
+        local eb = CreateFrame("EditBox", nil, sf)
         eb:SetMultiLine(true)
         eb:SetAutoFocus(false)
         eb:SetFontObject(GameFontHighlightSmall)
+        eb:SetWidth(sf:GetWidth())
         eb:SetScript("OnEscapePressed", function() exportPopup:Hide() end)
+        sf:SetScrollChild(eb)
         exportPopup.editBox = eb
+
+        local copyBtn = CreateFrame("Button", nil, exportPopup, "UIPanelButtonTemplate")
+        copyBtn:SetSize(100, 22)
+        copyBtn:SetPoint("BOTTOM", exportPopup, "BOTTOM", 0, 10)
+        copyBtn:SetText("Mark All")
+        copyBtn:SetScript("OnClick", function()
+            eb:SetFocus()
+            eb:HighlightText()
+        end)
     end
 
     exportPopup.editBox:SetText(GL.ExportJSON())
@@ -1649,7 +1662,7 @@ function UI.BuildRaidPanel(parent)
 
     -- Tier-Eingabe im controlStrip
     local tierBox = CreateFrame("EditBox", "GuildLootTierBox", controlStrip, "InputBoxTemplate")
-    tierBox:SetSize(160, 20)
+    tierBox:SetSize(LIST_W - 8, 20)
     tierBox:SetPoint("LEFT", controlStrip, "LEFT", 4, 0)
     tierBox:SetAutoFocus(false)
     tierBox:SetMaxLetters(48)
@@ -1674,37 +1687,41 @@ function UI.BuildRaidPanel(parent)
     -- [Raid starten]-Button
     local startRaidBtn = CreateFrame("Button", nil, controlStrip, "UIPanelButtonTemplate")
     startRaidBtn:SetSize(90, 22)
-    startRaidBtn:SetPoint("LEFT", tierBox, "RIGHT", 4, 0)
+    startRaidBtn:SetPoint("LEFT", controlStrip, "LEFT", LIST_W + 4, 0)
     startRaidBtn:SetText("Start Raid")
     startRaidBtn:SetScript("OnClick", function()
-        if GuildLootDB.currentRaid.active then
-            -- Raid läuft bereits → nur Roster neu laden
-            GL.LoadRaidRoster()
-            GL.Print("Roster reloaded: " .. #GuildLootDB.currentRaid.participants .. " players.")
-        else
-            local tier = tierBox:GetText()
-            GL.StartRaid(tier ~= "" and tier or nil)
-        end
+        local tier = tierBox:GetText()
+        GL.StartRaid(tier ~= "" and tier or nil)
         UI.RefreshSessionBar()
         UI.Refresh()
+        UI.UpdateEndResumeBtn()
     end)
     UI.startRaidBtn = startRaidBtn
 
-    -- [Raid beenden]-Button
-    local closeRaidBtn = CreateFrame("Button", nil, controlStrip, "UIPanelButtonTemplate")
-    closeRaidBtn:SetSize(90, 22)
-    closeRaidBtn:SetPoint("LEFT", startRaidBtn, "RIGHT", 2, 0)
-    closeRaidBtn:SetText("End Raid")
-    closeRaidBtn:SetScript("OnClick", function()
-        GL.CloseRaid()
-        UI.RefreshSessionBar()
+    -- [End Raid / Resume Raid]-Button
+    local endResumeBtn = CreateFrame("Button", nil, controlStrip, "UIPanelButtonTemplate")
+    endResumeBtn:SetSize(100, 22)
+    endResumeBtn:SetPoint("LEFT", startRaidBtn, "RIGHT", 2, 0)
+    endResumeBtn:SetText("End Raid")
+    endResumeBtn:SetEnabled(false)
+    endResumeBtn:SetScript("OnClick", function()
+        if GuildLootDB.currentRaid and GuildLootDB.currentRaid.active then
+            GL.CloseRaid()
+            UI.RefreshSessionBar()
+            UI.Refresh()
+        elseif selectedHistoryIndex then
+            GL.ResumeRaid(selectedHistoryIndex)
+            selectedHistoryIndex = nil
+            UI.ShowTab(TAB_LOOT)
+        end
+        UI.UpdateEndResumeBtn()
     end)
-    UI.closeRaidBtn = closeRaidBtn
+    UI.endResumeBtn = endResumeBtn
 
     -- [Reset]-Button
     local resetRaidBtn = CreateFrame("Button", nil, controlStrip, "UIPanelButtonTemplate")
     resetRaidBtn:SetSize(60, 22)
-    resetRaidBtn:SetPoint("LEFT", closeRaidBtn, "RIGHT", 2, 0)
+    resetRaidBtn:SetPoint("LEFT", endResumeBtn, "RIGHT", 2, 0)
     resetRaidBtn:SetText("Reset")
     local resetPending = false
     local resetTimer   = nil
@@ -1725,6 +1742,47 @@ function UI.BuildRaidPanel(parent)
         end
     end)
     UI.resetRaidBtn = resetRaidBtn
+
+    -- [Export JSON]-Button
+    local exportRaidBtn = CreateFrame("Button", nil, controlStrip, "UIPanelButtonTemplate")
+    exportRaidBtn:SetSize(90, 22)
+    exportRaidBtn:SetPoint("LEFT", resetRaidBtn, "RIGHT", 2, 0)
+    exportRaidBtn:SetText("Export JSON")
+    exportRaidBtn:SetEnabled(false)
+    exportRaidBtn:SetScript("OnClick", function()
+        UI.ShowExportPopup()
+    end)
+    UI.exportRaidBtn = exportRaidBtn
+
+    -- [Delete]-Button
+    local deletePending = false
+    local deleteTimer   = nil
+    local deleteRaidBtn = CreateFrame("Button", nil, controlStrip, "UIPanelButtonTemplate")
+    deleteRaidBtn:SetSize(70, 22)
+    deleteRaidBtn:SetPoint("LEFT", exportRaidBtn, "RIGHT", 2, 0)
+    deleteRaidBtn:SetText("Delete")
+    deleteRaidBtn:SetEnabled(false)
+    deleteRaidBtn:SetScript("OnClick", function()
+        if not selectedHistoryIndex then return end
+        if deletePending then
+            if deleteTimer then deleteTimer:Cancel(); deleteTimer = nil end
+            deletePending = false
+            deleteRaidBtn:SetText("Delete")
+            table.remove(GuildLootDB.raidHistory, selectedHistoryIndex)
+            selectedHistoryIndex = nil
+            UI.RefreshRaidTab()
+            UI.RefreshRaidDetail(nil)
+        else
+            deletePending = true
+            deleteRaidBtn:SetText("|cffff4444Sure?|r")
+            deleteTimer = C_Timer.NewTimer(3, function()
+                deletePending = false
+                deleteTimer   = nil
+                deleteRaidBtn:SetText("Delete")
+            end)
+        end
+    end)
+    UI.deleteRaidBtn = deleteRaidBtn
 
     -- Linke Spalte: Raid-Liste
     local listFrame = CreateFrame("Frame", nil, panel, "BackdropTemplate")
@@ -1766,60 +1824,9 @@ function UI.BuildRaidPanel(parent)
     panel.detailHeader:SetPoint("TOPLEFT", detailFrame, "TOPLEFT", 6, -6)
     panel.detailHeader:SetText("|cff888888— Select a raid —|r")
 
-    local resumeBtn = MakeButton(detailFrame, "Resume Raid", 120, 22, function()
-        if selectedHistoryIndex then
-            GL.ResumeRaid(selectedHistoryIndex)
-            selectedHistoryIndex = nil
-            UI.ShowTab(TAB_LOOT)
-        end
-    end)
-    resumeBtn:SetPoint("TOPRIGHT", detailFrame, "TOPRIGHT", -6, -4)
-    resumeBtn:Hide()
-    panel.resumeBtn = resumeBtn
-
-    local deletePending = false
-    local deleteTimer   = nil
-
-    local deleteBtn = MakeButton(detailFrame, "Delete", 80, 22, function()
-        if not selectedHistoryIndex then return end
-        if deletePending then
-            -- zweiter Klick → löschen
-            if deleteTimer then deleteTimer:Cancel(); deleteTimer = nil end
-            deletePending = false
-            panel.deleteBtn:SetText("Delete")
-            table.remove(GuildLootDB.raidHistory, selectedHistoryIndex)
-            selectedHistoryIndex = nil
-            UI.RefreshRaidTab()
-            UI.RefreshRaidDetail(nil)
-        else
-            -- erster Klick → 3-Sekunden-Fenster öffnen
-            deletePending = true
-            panel.deleteBtn:SetText("|cffff4444Sure?|r")
-            deleteTimer = C_Timer.NewTimer(3, function()
-                deletePending = false
-                deleteTimer   = nil
-                if panel.deleteBtn then
-                    panel.deleteBtn:SetText("Delete")
-                end
-            end)
-        end
-    end)
-    deleteBtn:SetPoint("RIGHT", resumeBtn, "LEFT", -4, 0)
-    deleteBtn:Hide()
-    panel.deleteBtn = deleteBtn
-
-    local exportBtn = MakeButton(detailFrame, "Export JSON", 100, 22, function()
-        UI.ShowExportPopup()
-    end)
-    exportBtn:SetPoint("RIGHT", deleteBtn, "LEFT", -4, 0)
-    exportBtn:Hide()
-    panel.exportBtn = exportBtn
-
     -- Arm-Zustand zurücksetzen wenn Auswahl wechselt
     panel.resetDeleteArm = function()
-        if deleteTimer then deleteTimer:Cancel(); deleteTimer = nil end
-        deletePending = false
-        deleteBtn:SetText("Delete")
+        if UI.deleteRaidBtn then UI.deleteRaidBtn:SetText("Delete") end
     end
 
     local detailScroll = CreateFrame("ScrollFrame", "GuildLootRaidDetailScroll", detailFrame, "UIPanelScrollFrameTemplate")
@@ -1832,6 +1839,21 @@ function UI.BuildRaidPanel(parent)
     panel.detailScroll  = detailScroll
 
     return panel
+end
+
+function UI.UpdateEndResumeBtn()
+    if not UI.endResumeBtn then return end
+    local active = GuildLootDB.currentRaid and GuildLootDB.currentRaid.active
+    if active then
+        UI.endResumeBtn:SetText("End Raid")
+        UI.endResumeBtn:SetEnabled(true)
+    elseif selectedHistoryIndex then
+        UI.endResumeBtn:SetText("Resume Raid")
+        UI.endResumeBtn:SetEnabled(true)
+    else
+        UI.endResumeBtn:SetText("End Raid")
+        UI.endResumeBtn:SetEnabled(false)
+    end
 end
 
 function UI.RefreshRaidTab()
@@ -1982,9 +2004,9 @@ function UI.RefreshRaidDetail(idx)
                 raidPanel.resetDeleteArm()
             end
             lastDetailIdx = 0
-            if raidPanel.resumeBtn then raidPanel.resumeBtn:Hide() end  -- schon aktiv
-            if raidPanel.deleteBtn then raidPanel.deleteBtn:Hide() end  -- aktiven Raid nicht löschbar
-            if raidPanel.exportBtn then raidPanel.exportBtn:Show() end
+            if UI.deleteRaidBtn then UI.deleteRaidBtn:SetEnabled(false) end  -- aktiven Raid nicht löschbar
+            if UI.exportRaidBtn then UI.exportRaidBtn:SetEnabled(true) end
+            UI.UpdateEndResumeBtn()
             local diffStr = raid.difficulty and (" [" .. raid.difficulty .. "]") or ""
             raidPanel.detailHeader:SetText("|cff00ff00● Active|r  " .. (raid.tier or "?") .. diffStr)
             local log     = raid.lootLog or {}
@@ -2023,9 +2045,9 @@ function UI.RefreshRaidDetail(idx)
     if not snap then
         raidPanel.detailHeader:SetText("|cff888888— Select a raid —|r")
         raidPanel.detailContent:SetHeight(1)
-        if raidPanel.resumeBtn    then raidPanel.resumeBtn:Hide() end
-        if raidPanel.deleteBtn    then raidPanel.deleteBtn:Hide() end
-        if raidPanel.exportBtn    then raidPanel.exportBtn:Hide() end
+        if UI.deleteRaidBtn then UI.deleteRaidBtn:SetEnabled(false) end
+        if UI.exportRaidBtn then UI.exportRaidBtn:SetEnabled(false) end
+        UI.UpdateEndResumeBtn()
         if raidPanel.resetDeleteArm then raidPanel.resetDeleteArm() end
         lastDetailIdx = nil
         return
@@ -2036,12 +2058,9 @@ function UI.RefreshRaidDetail(idx)
         raidPanel.resetDeleteArm()
     end
     lastDetailIdx = idx
-    if raidPanel.resumeBtn then
-        raidPanel.resumeBtn:Show()
-        raidPanel.resumeBtn:SetEnabled(not GuildLootDB.currentRaid.active)
-    end
-    if raidPanel.deleteBtn then raidPanel.deleteBtn:Show() end
-    if raidPanel.exportBtn then raidPanel.exportBtn:Show() end
+    if UI.deleteRaidBtn then UI.deleteRaidBtn:SetEnabled(true) end
+    if UI.exportRaidBtn then UI.exportRaidBtn:SetEnabled(true) end
+    UI.UpdateEndResumeBtn()
 
     local diffStr = snap.difficulty and (" [" .. snap.difficulty .. "]") or ""
     local dateStr = snap.closedAt and date("%d.%m.%Y", snap.closedAt) or "?"
@@ -2105,13 +2124,12 @@ function UI.RefreshSessionBar()
         if UI.sessionCrashWarnLbl then UI.sessionCrashWarnLbl:Show() end
         if UI.tierBox      then UI.tierBox:SetText(raid.tier or "") end
         if UI.startRaidBtn then UI.startRaidBtn:SetText("Reload Roster") end
-        if UI.closeRaidBtn then UI.closeRaidBtn:Enable() end
     else
         UI.sessionStatusLbl:SetText("|cff888888● No active raid|r")
         if UI.sessionCrashWarnLbl then UI.sessionCrashWarnLbl:Hide() end
         if UI.startRaidBtn then UI.startRaidBtn:SetText("Start Raid") end
-        if UI.closeRaidBtn then UI.closeRaidBtn:Disable() end
     end
+    UI.UpdateEndResumeBtn()
     UI.RefreshDockTab()
 end
 
