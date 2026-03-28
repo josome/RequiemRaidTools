@@ -86,6 +86,13 @@
         }
         .btn:hover { background: linear-gradient(180deg, #c8a84b, #8b6914); }
 
+        /* WoWhead links */
+        .wowhead-link {
+            cursor: pointer;
+            text-decoration: none;
+        }
+        .wowhead-link:hover { text-decoration: underline; }
+
         /* Content */
         #content { display: none; }
 
@@ -418,11 +425,9 @@ function itemHTML(link) {
     const id    = itemId(link);
     const title = (link||'').replace(/"/g, '&quot;');
     if (id) {
-        return `<a href="https://www.wowhead.com/item=${id}" target="_blank" rel="noopener"
-                   style="color:${color};text-decoration:none"
-                   title="${title}"
-                   onmouseover="this.style.textDecoration='underline'"
-                   onmouseout="this.style.textDecoration='none'">${name}</a>`;
+        const url = `https://www.wowhead.com/item=${id}`;
+        return `<span class="wowhead-link" style="color:${color}" title="${title}"
+                      onclick="window.open('${url}','_blank')">${name}</span>`;
     }
     return `<span class="item-name" style="color:${color}" title="${title}">${name}</span>`;
 }
