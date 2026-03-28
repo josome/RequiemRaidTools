@@ -12,6 +12,7 @@ local UI = GL.UI
 
 local FRAME_W, FRAME_H = 720, 560
 local TAB_LOOT, TAB_SPIELER, TAB_LOG, TAB_RAID = 1, 2, 3, 4
+UI.TAB_LOOT = TAB_LOOT
 local DIFF_COLORS = { N = "|cff1eff00", H = "|cff0070dd", M = "|cffff8000" }
 
 -- Tab-Konstanten für Split-Dateien
@@ -371,6 +372,7 @@ function UI.Undock()
     UI.LoadPosition()
     mainFrame:Show()
     UI.Refresh()
+    UI.ShowStartupTab()
 end
 
 function UI.ToggleMinimize()

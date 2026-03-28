@@ -287,6 +287,7 @@ function GL.StartRaid(tier)
     GL.LoadRaidRoster()
     GL.Print("Raid started: " .. raid.tier .. ". " .. #raid.participants .. " players loaded.")
     if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
+    if GL.UI and GL.UI.ShowTab then GL.UI.ShowTab(GL.UI.TAB_LOOT) end
 end
 
 function GL.CloseRaid()
@@ -363,6 +364,7 @@ function GL.ResumeRaid(idx)
     GL.Print("Raid resumed: " .. (raid.tier ~= "" and raid.tier or "?")
              .. " (" .. #raid.participants .. " players, " .. #raid.lootLog .. " loot entries restored).")
     if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
+    if GL.UI and GL.UI.ShowTab then GL.UI.ShowTab(GL.UI.TAB_LOOT) end
 end
 
 function GL.ResetRaid()
@@ -579,7 +581,26 @@ SlashCmdList["RAIDLOOTTRACKER"] = function(input)
             GL.Print("Test mode not loaded.")
         end
 
+    elseif cmd == "cleanup" then
+        local history = GuildLootDB.raidHistory or {}
+        local removed = 0
+        for i = #history, 1, -1 do
+            local snap = history[i]
+            if not snap.id or snap.id == "" then
+                table.remove(history, i)
+                removed = removed + 1
+            end
+        end
+        local raid = GuildLootDB.currentRaid
+        local currentReset = 0
+        if not raid.id or raid.id == "" then
+            GL.ResetRaid()
+            currentReset = 1
+        end
+        GL.Print(string.format("Cleanup done: %d history raid(s) removed, %s.", removed, currentReset == 1 and "active raid reset (no ID)" or "active raid kept"))
+        if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
+
     else
-        GL.Print("Commands: /rlt | /rlt start [tier] | /rlt history [name] | /rlt reset | /rlt ml | /rlt test | /rlt testroll")
+        GL.Print("Commands: /rlt | /rlt start [tier] | /rlt history [name] | /rlt reset | /rlt ml | /rlt cleanup | /rlt test | /rlt testroll")
     end
 end

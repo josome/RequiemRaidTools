@@ -50,7 +50,9 @@ Ein World of Warcraft Addon für Gilden-Offiziere und Raid-Leader zur strukturie
 | `/rlt reset` | Raid zurücksetzen (zweifache Bestätigung) |
 | `/rlt history [Spieler]` | Loot-Historie eines Spielers anzeigen |
 | `/rlt ml` | Master Looter Modus umschalten |
-| `/rlt test` | Test-Item aus dem Inventar in Pending-Loot einfügen (nur Ausrüstung) |
+| `/rlt cleanup` | Leere Raid-Einträge (kein Loot, keine Teilnehmer) aus der History entfernen |
+| `/rlt test` | Test-Item aus dem Inventar in Pending-Loot einfügen (nur Ausrüstung, ≥ Episch) |
+| `/rlt testroll` | Roll-Vorgang mit Fake-Kandidaten simulieren (ohne echten Raid notwendig) |
 
 ---
 
@@ -97,6 +99,38 @@ Ein World of Warcraft Addon für Gilden-Offiziere und Raid-Leader zur strukturie
 - **Addon-Kommunikation**: Prefix `RLT` (RegisterAddonMessagePrefix)
 - **WoW Interface**: 120001
 - **Sprache**: Deutsch
+
+---
+
+## Entwicklung & Test
+
+Test-Funktionen sind in `Test.lua` definiert und nur für die Entwicklung gedacht. Sie werden über Slash-Commands ausgelöst:
+
+### `/rlt test` — Pending-Item einfügen
+
+Sucht ein zufälliges episches Ausrüstungs-Item aus dem Inventar des Spielers und fügt es als Pending-Loot in den aktiven Raid ein. Startet damit den vollständigen Loot-Flow (Prio-Phase → Roll-Phase → Vergabe).
+
+**Voraussetzung:** Aktiver Raid (`/rlt start`), mindestens ein episches Ausrüstungsstück im Inventar.
+
+**Was passiert intern:**
+- Durchsucht alle Taschen nach Items mit Qualität ≥ Episch (Rarity 4) und einem Ausrüstungsslot
+- Fügt den eigenen Charakter zur Teilnehmerliste hinzu, falls noch nicht vorhanden
+- Ruft `GL.Loot.TryAddPendingItem()` auf, wie es auch der echte Loot-Event tun würde
+- Aktualisiert den Loot-Tab
+
+---
+
+### `/rlt testroll` — Roll-Vorgang simulieren
+
+Aktiviert ein episches Item aus dem Inventar und setzt direkt einen simulierten Roll-State mit Fake-Kandidaten verschiedener Prioritäten. Damit kann die Results-Sektion im Loot-Tab ohne echten Raid getestet werden.
+
+**Was passiert intern:**
+- Startet automatisch einen Raid mit dem Namen `Test-Tier`, falls noch kein Raid aktiv ist
+- Aktiviert das erste gefundene epische Item via `GL.Loot.ActivateItem()`
+- Setzt `ci.candidates` mit 7 Fake-Spielern auf Prio 1/2/3
+- Setzt `ci.rollState.players` (4 Spieler haben gerollt) und `ci.rollState.results` (2 Ergebnisse vorhanden)
+- Setzt `ci.rollState.active = true`
+- Aktualisiert den Loot-Tab
 
 ---
 

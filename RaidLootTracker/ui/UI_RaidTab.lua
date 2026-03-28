@@ -208,13 +208,17 @@ function UI.BuildRaidPanel(parent)
     panel.detailHeader:SetPoint("TOPLEFT", detailFrame, "TOPLEFT", 6, -6)
     panel.detailHeader:SetText("|cff888888— Select a raid —|r")
 
+    panel.detailIdLabel = detailFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    panel.detailIdLabel:SetPoint("TOPLEFT", panel.detailHeader, "BOTTOMLEFT", 0, -2)
+    panel.detailIdLabel:SetText("")
+
     -- Arm-Zustand zurücksetzen wenn Auswahl wechselt
     panel.resetDeleteArm = function()
         if UI.deleteRaidBtn then UI.deleteRaidBtn:SetText("Delete") end
     end
 
     local detailScroll = CreateFrame("ScrollFrame", "GuildLootRaidDetailScroll", detailFrame, "UIPanelScrollFrameTemplate")
-    detailScroll:SetPoint("TOPLEFT",     panel.detailHeader, "BOTTOMLEFT", 0,   -4)
+    detailScroll:SetPoint("TOPLEFT",     panel.detailIdLabel, "BOTTOMLEFT", 0,   -4)
     detailScroll:SetPoint("BOTTOMRIGHT", detailFrame,        "BOTTOMRIGHT", -22,  4)
     local detailContent = CreateFrame("Frame", nil, detailScroll)
     detailContent:SetSize(detailScroll:GetWidth(), 1)
@@ -234,8 +238,13 @@ function UI.UpdateStartRaidBtn()
     local raid = GuildLootDB.currentRaid
     if raid.active and raid.resumed then
         UI.startRaidBtn:SetText("Reload Roster")
+        UI.startRaidBtn:SetEnabled(true)
+    elseif raid.active then
+        UI.startRaidBtn:SetText("Start Raid")
+        UI.startRaidBtn:SetEnabled(false)
     else
         UI.startRaidBtn:SetText("Start Raid")
+        UI.startRaidBtn:SetEnabled(true)
     end
 end
 
@@ -410,6 +419,11 @@ function UI.RefreshRaidDetail(idx)
             UI.UpdateEndResumeBtn()
             local diffStr = raid.difficulty and (" [" .. raid.difficulty .. "]") or ""
             UI.raidPanel.detailHeader:SetText("|cff00ff00● Active|r  " .. (raid.tier or "?") .. diffStr)
+            if UI.raidPanel.detailIdLabel then
+                local pendingCount = #(raid.pendingLoot or {})
+                local pendingStr = pendingCount > 0 and ("  |cffff9900" .. pendingCount .. " pending|r") or ""
+                UI.raidPanel.detailIdLabel:SetText("|cff555555ID: " .. (raid.id and raid.id ~= "" and raid.id or "—") .. "|r" .. pendingStr)
+            end
             local log     = raid.lootLog or {}
             local content = UI.raidPanel.detailContent
             local yOff    = 0
@@ -445,6 +459,7 @@ function UI.RefreshRaidDetail(idx)
     local snap    = history[idx]
     if not snap then
         UI.raidPanel.detailHeader:SetText("|cff888888— Select a raid —|r")
+        if UI.raidPanel.detailIdLabel then UI.raidPanel.detailIdLabel:SetText("") end
         UI.raidPanel.detailContent:SetHeight(1)
         if UI.deleteRaidBtn then UI.deleteRaidBtn:SetEnabled(false) end
         if UI.exportRaidBtn then UI.exportRaidBtn:SetEnabled(false) end
@@ -465,6 +480,11 @@ function UI.RefreshRaidDetail(idx)
     local diffStr = snap.difficulty and (" [" .. snap.difficulty .. "]") or ""
     local dateStr = snap.closedAt and date("%d.%m.%Y", snap.closedAt) or "?"
     UI.raidPanel.detailHeader:SetText((snap.tier or "?") .. diffStr .. "  |cff888888" .. dateStr .. "|r")
+    if UI.raidPanel.detailIdLabel then
+        local pendingCount = #(snap.pendingLoot or {})
+        local pendingStr = pendingCount > 0 and ("  |cffff9900" .. pendingCount .. " pending|r") or ""
+        UI.raidPanel.detailIdLabel:SetText("|cff555555ID: " .. (snap.id and snap.id ~= "" and snap.id or "—") .. "|r" .. pendingStr)
+    end
 
     local log     = snap.lootLog or {}
     local content = UI.raidPanel.detailContent
