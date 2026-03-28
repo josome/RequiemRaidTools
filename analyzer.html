@@ -381,6 +381,7 @@ const PRIO_COLOR  = { 1:'#FFD700', 2:'#88FF88', 3:'#888888', 4:'#666666' };
 const TRACK_LABEL = { N:'Champion', H:'Hero', M:'Mythic' };
 const TRACK_COLOR = { N:'#0070dd', H:'#a335ee', M:'#ff8000' };
 const CAT_LABEL   = { weapons:'Weapon', trinket:'Trinket', setItems:'Set', other:'Other' };
+const QUALITY_COLOR = { 0:'#9d9d9d', 1:'#ffffff', 2:'#1eff00', 3:'#0070dd', 4:'#a335ee', 5:'#ff8000', 6:'#e6cc80' };
 
 // ── Helpers ───────────────────────────────────────────────────
 function itemName(link) {
@@ -390,10 +391,14 @@ function itemName(link) {
     const bracketed = link.match(/^\[(.+)\]$/);
     return bracketed ? bracketed[1] : link;
 }
-function itemColor(link) {
-    if (!link) return '#ffffff';
-    const m = link.match(/\|cff([0-9a-fA-F]{6})/);
-    return m ? '#' + m[1] : '#cccccc';
+function itemColor(link, quality) {
+    if (link) {
+        const m = link.match(/\|cff([0-9a-fA-F]{6})/);
+        if (m) return '#' + m[1];
+    }
+    // fallback: WoW quality tier color (most raid loot is epic = 4)
+    if (quality != null) return QUALITY_COLOR[quality] || '#cccccc';
+    return '#cccccc';
 }
 function shortName(p) { return p ? p.split('-')[0] : '?'; }
 function clsColor(cls) { return CLASS_COLORS[cls] || CLASS_COLORS._default; }
@@ -421,9 +426,9 @@ function itemId(link) {
     const m = link.match(/\|Hitem:(\d+)/);
     return m ? m[1] : null;
 }
-function itemHTML(link, explicitId) {
+function itemHTML(link, explicitId, quality) {
     const name  = itemName(link);
-    const color = itemColor(link);
+    const color = itemColor(link, quality);
     const id    = explicitId || itemId(link);
     const title = (link||'').replace(/"/g, '&quot;');
     const url   = id
@@ -629,7 +634,7 @@ function renderLootLog(log, players) {
             <td>${trackHTML(e.difficulty)}</td>
             <td>${catHTML(e.category)}</td>
             <td>${prioHTML(e.winnerPrio)}</td>
-            <td>${itemHTML(e.link || e.item, e.itemID)}</td>
+            <td>${itemHTML(e.link || e.item, e.itemID, e.quality)}</td>
         `;
         tbody.appendChild(tr);
     });
@@ -679,7 +684,7 @@ function renderSimpleItems(tableId, countId, items) {
     if (!items.length) { tbody.innerHTML = '<tr><td colspan="2" class="empty">Keine Einträge</td></tr>'; return; }
     items.forEach(item => {
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${catHTML(item.category)}</td><td>${itemHTML(item.link||item.item||'', item.itemID)}</td>`;
+        tr.innerHTML = `<td>${catHTML(item.category)}</td><td>${itemHTML(item.link||item.item||'', item.itemID, item.quality)}</td>`;
         tbody.appendChild(tr);
     });
 }

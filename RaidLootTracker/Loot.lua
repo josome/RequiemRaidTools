@@ -204,6 +204,7 @@ function Loot.ActivateItem(link, name, iLevel, equipLoc, quality)
     currentItem.name       = name
     currentItem.itemID     = itemID
     currentItem.itemLevel  = iLevel
+    currentItem.quality    = quality or 0
     currentItem.category   = GL.GetItemCategory(itemID, equipLoc or "", quality or 0)
     currentItem.candidates = {}
     currentItem.winner     = nil
@@ -518,6 +519,7 @@ function Loot.AssignLootConfirm(fullName, diff)
         item       = link,
         link       = link,
         itemID     = currentItem.itemID,
+        quality    = currentItem.quality,
         category   = category,
         difficulty = diff,
         winnerPrio = winnerPrio,

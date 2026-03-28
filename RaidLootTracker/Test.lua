@@ -163,9 +163,10 @@ function GL.Test.AddLootEntry()
 
     local entry = {
         player     = pick.name,
-        item       = chosen.name,
+        item       = chosen.link,
         link       = chosen.link,
         itemID     = itemID,
+        quality    = chosen.quality,
         category   = category,
         difficulty = diff,
         winnerPrio = pick.prio,
