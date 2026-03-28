@@ -92,6 +92,16 @@ end
 -- Log-Tab Refresh
 -- ============================================================
 
+local PRIO_LABEL = { [1]="|cffffcc00BIS|r", [2]="|cff88ff88Upg|r", [3]="|cff888888OS|r", [4]="|cff888888Fun|r" }
+local CAT_LABEL  = { weapons="Weapon", trinket="Trinket", setItems="Set", other="Other" }
+
+local function TrackColor(diff)
+    if diff == "N" then return "|cff0070ddChampion|r"
+    elseif diff == "H" then return "|cffa335eeHero|r"
+    elseif diff == "M" then return "|cffff8000Mythic|r"
+    else return diff or "" end
+end
+
 function UI.RefreshLogTab()
     if UI.activeTab ~= TAB_LOG then return end
     if not UI.logPanel or not UI.logPanel.content then return end
@@ -112,21 +122,32 @@ function UI.RefreshLogTab()
 
         local ts = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         ts:SetPoint("LEFT", row, "LEFT", 4, 0)
-        ts:SetWidth(100)
+        ts:SetWidth(88)
         ts:SetText(GL.FormatTimestamp(entry.timestamp))
         ts:SetTextColor(0.6, 0.6, 0.6)
 
         local playerLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         playerLbl:SetPoint("LEFT", ts, "RIGHT", 4, 0)
-        playerLbl:SetWidth(120)
+        playerLbl:SetWidth(100)
         playerLbl:SetText(GL.ShortName(entry.player or "?"))
 
-        local diffLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        diffLbl:SetPoint("LEFT", playerLbl, "RIGHT", 4, 0)
-        diffLbl:SetWidth(30)
-        diffLbl:SetText(ColorDiff(entry.difficulty))
+        local trackLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        trackLbl:SetPoint("LEFT", playerLbl, "RIGHT", 4, 0)
+        trackLbl:SetWidth(68)
+        trackLbl:SetText(TrackColor(entry.difficulty))
 
-        MakeItemLinkBtn(row, diffLbl, 4, entry.link or entry.item, entry.item or "?")
+        local catLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        catLbl:SetPoint("LEFT", trackLbl, "RIGHT", 4, 0)
+        catLbl:SetWidth(52)
+        catLbl:SetText(CAT_LABEL[entry.category] or (entry.category or ""))
+        catLbl:SetTextColor(0.7, 0.7, 0.7)
+
+        local prioLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        prioLbl:SetPoint("LEFT", catLbl, "RIGHT", 4, 0)
+        prioLbl:SetWidth(52)
+        prioLbl:SetText(entry.winnerPrio and (PRIO_LABEL[entry.winnerPrio] or tostring(entry.winnerPrio)) or "|cff555555—|r")
+
+        MakeItemLinkBtn(row, prioLbl, 4, entry.link or entry.item, entry.item or "?")
 
         row:Show()
         table.insert(logRows, row)

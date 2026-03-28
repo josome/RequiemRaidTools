@@ -213,6 +213,14 @@ local function JsonVal(val, seen)
     end
 end
 
+--- Wandelt Raid-Schwierigkeit in WoW-Item-Track-Bezeichnung um.
+function GL.DiffToTrack(diff)
+    if diff == "N" then return "Champion"
+    elseif diff == "H" then return "Hero"
+    elseif diff == "M" then return "Mythic"
+    else return diff or "" end
+end
+
 --- Serialisiert die relevanten GuildLootDB-Daten als JSON-String.
 function GL.ExportJSON(raidData)
     local data = {
@@ -224,28 +232,63 @@ function GL.ExportJSON(raidData)
 end
 
 --- Exportiert den Loot-Log eines Raids als CSV (Google-Sheets-kompatibel).
+-- Enthält: zugewiesene Items (lootLog) + getrashte Items (trashedLoot).
 function GL.ExportCSV(raidData)
     local raid = raidData or GuildLootDB.currentRaid
-    local lines = {}
-    table.insert(lines, "RaidID,Tier,RaidDifficulty,Date,Player,Item,Category,LootDifficulty,Timestamp")
-    local raidDate = raid.startedAt and raid.startedAt > 0 and GL.FormatTimestamp(raid.startedAt) or ""
+
+    local PRIO_LABEL = { [1]="BIS", [2]="Upgrade", [3]="OS", [4]="Fun" }
+    local CAT_LABEL  = { weapons="Weapon", trinket="Trinket", setItems="Set", other="Other" }
+
     local function esc(s)
         s = tostring(s or "")
         if s:find('[",\n]') then s = '"' .. s:gsub('"', '""') .. '"' end
         return s
     end
+
+    local lines = {}
+    local header = "RaidID,Tier,Difficulty,Track,Date,Status,Player,Item,Category,Prio,Timestamp"
+    table.insert(lines, header)
+
+    local raidDate = raid.startedAt and raid.startedAt > 0 and GL.FormatTimestamp(raid.startedAt) or ""
+    local raidTrack = GL.DiffToTrack(raid.difficulty or "")
+
+    -- Zugewiesene Items (lootLog)
     for _, entry in ipairs(raid.lootLog or {}) do
+        local track = GL.DiffToTrack(entry.difficulty or raid.difficulty or "")
+        local prio  = entry.winnerPrio and (PRIO_LABEL[entry.winnerPrio] or tostring(entry.winnerPrio)) or ""
+        local cat   = CAT_LABEL[entry.category] or (entry.category or "")
+        table.insert(lines, table.concat({
+            esc(raid.id or ""),
+            esc(raid.tier or ""),
+            esc(entry.difficulty or raid.difficulty or ""),
+            esc(track),
+            esc(raidDate),
+            "Assigned",
+            esc(GL.ShortName(entry.player or "")),
+            esc(entry.item or ""),
+            esc(cat),
+            esc(prio),
+            esc(entry.timestamp and GL.FormatTimestamp(entry.timestamp) or ""),
+        }, ","))
+    end
+
+    -- Getrashte Items (trashedLoot)
+    for _, entry in ipairs(raid.trashedLoot or {}) do
+        local cat = CAT_LABEL[entry.category] or (entry.category or "")
         table.insert(lines, table.concat({
             esc(raid.id or ""),
             esc(raid.tier or ""),
             esc(raid.difficulty or ""),
+            esc(raidTrack),
             esc(raidDate),
-            esc(GL.ShortName(entry.player or "")),
-            esc(entry.item or ""),
-            esc(entry.category or ""),
-            esc(entry.difficulty or ""),
-            esc(entry.timestamp and GL.FormatTimestamp(entry.timestamp) or ""),
+            "Trashed",
+            "",
+            esc(entry.item or entry.link or ""),
+            esc(cat),
+            "",
+            "",
         }, ","))
     end
+
     return table.concat(lines, "\n")
 end

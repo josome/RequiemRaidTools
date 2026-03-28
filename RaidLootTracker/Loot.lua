@@ -493,6 +493,10 @@ function Loot.AssignLootConfirm(fullName, diff)
     local link     = currentItem.link
     local ts       = GL.GetTimestamp()
 
+    -- Prio des Gewinners aus der Kandidaten-Liste
+    local shortName  = GL.ShortName(fullName)
+    local winnerPrio = currentItem.candidates[shortName] and currentItem.candidates[shortName].prio or nil
+
     -- DB-Eintrag
     GL.CreatePlayerRecord(fullName)
     local playerData = GuildLootDB.players[fullName]
@@ -515,6 +519,7 @@ function Loot.AssignLootConfirm(fullName, diff)
         link       = link,
         category   = category,
         difficulty = diff,
+        winnerPrio = winnerPrio,
         timestamp  = ts,
     })
 
