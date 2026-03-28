@@ -209,5 +209,29 @@ function UI.BuildSettingsPanel(parent)
 
     MakeCheck("Announce item start as raid warning", "raidWarnItem")
 
+    -- Export Format Dropdown
+    local expFmtLbl = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    expFmtLbl:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
+    expFmtLbl:SetText("|cff888888Export Format:|r")
+
+    local ddExpFmt = CreateFrame("Frame", "GuildLootSettingsDD_exportFormat", panel, "UIDropDownMenuTemplate")
+    UIDropDownMenu_SetWidth(ddExpFmt, 80)
+    ddExpFmt:SetPoint("LEFT", expFmtLbl, "RIGHT", -8, 0)
+    UIDropDownMenu_SetText(ddExpFmt, GuildLootDB.settings.exportFormat or "JSON")
+    UIDropDownMenu_Initialize(ddExpFmt, function()
+        for _, v in ipairs({ "JSON", "CSV" }) do
+            local info = UIDropDownMenu_CreateInfo()
+            info.text = v
+            info.notCheckable = true
+            info.func = function()
+                GuildLootDB.settings.exportFormat = v
+                UIDropDownMenu_SetText(ddExpFmt, v)
+                CloseDropDownMenus()
+            end
+            UIDropDownMenu_AddButton(info)
+        end
+    end)
+    y = y - 30
+
     return panel
 end

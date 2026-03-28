@@ -40,6 +40,7 @@ local DB_DEFAULTS = {
         minimapAngle = 45,
         lastTab      = nil,
         raidWarnItem = true,
+        exportFormat = "JSON",  -- "JSON" | "CSV"
         filterNonEquip   = true,
         filterCategories = {
             weapons  = true,

@@ -54,7 +54,7 @@ function UI.ShowExportPopup(raidData)
 
         local title = exportPopup:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         title:SetPoint("TOP", exportPopup, "TOP", 0, -8)
-        title:SetText("JSON Export – press Mark All, then Ctrl+C")
+        exportPopup.titleText = title
 
         local sf = CreateFrame("ScrollFrame", "RaidLootExportScroll", exportPopup, "UIPanelScrollFrameTemplate")
         sf:SetPoint("TOPLEFT",     exportPopup, "TOPLEFT",    10, -30)
@@ -79,7 +79,10 @@ function UI.ShowExportPopup(raidData)
         end)
     end
 
-    exportPopup.editBox:SetText(GL.ExportJSON(raidData))
+    local fmt = GuildLootDB.settings.exportFormat or "JSON"
+    exportPopup.titleText:SetText(fmt .. " Export – press Mark All, then Ctrl+C")
+    local text = (fmt == "CSV") and GL.ExportCSV(raidData) or GL.ExportJSON(raidData)
+    exportPopup.editBox:SetText(text)
     exportPopup.editBox:HighlightText()
     exportPopup:Show()
     exportPopup.editBox:SetFocus()

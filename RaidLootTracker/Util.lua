@@ -222,3 +222,30 @@ function GL.ExportJSON(raidData)
     }
     return JsonVal(data, {})
 end
+
+--- Exportiert den Loot-Log eines Raids als CSV (Google-Sheets-kompatibel).
+function GL.ExportCSV(raidData)
+    local raid = raidData or GuildLootDB.currentRaid
+    local lines = {}
+    table.insert(lines, "RaidID,Tier,RaidDifficulty,Date,Player,Item,Category,LootDifficulty,Timestamp")
+    local raidDate = raid.startedAt and raid.startedAt > 0 and GL.FormatTimestamp(raid.startedAt) or ""
+    local function esc(s)
+        s = tostring(s or "")
+        if s:find('[",\n]') then s = '"' .. s:gsub('"', '""') .. '"' end
+        return s
+    end
+    for _, entry in ipairs(raid.lootLog or {}) do
+        table.insert(lines, table.concat({
+            esc(raid.id or ""),
+            esc(raid.tier or ""),
+            esc(raid.difficulty or ""),
+            esc(raidDate),
+            esc(GL.ShortName(entry.player or "")),
+            esc(entry.item or ""),
+            esc(entry.category or ""),
+            esc(entry.difficulty or ""),
+            esc(entry.timestamp and GL.FormatTimestamp(entry.timestamp) or ""),
+        }, ","))
+    end
+    return table.concat(lines, "\n")
+end

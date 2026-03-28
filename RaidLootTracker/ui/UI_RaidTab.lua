@@ -131,7 +131,7 @@ function UI.BuildRaidPanel(parent)
     local exportRaidBtn = CreateFrame("Button", nil, controlStrip, "UIPanelButtonTemplate")
     exportRaidBtn:SetSize(90, 22)
     exportRaidBtn:SetPoint("LEFT", resetRaidBtn, "RIGHT", 2, 0)
-    exportRaidBtn:SetText("Export JSON")
+    exportRaidBtn:SetText("Export")
     exportRaidBtn:SetEnabled(false)
     exportRaidBtn:SetScript("OnClick", function()
         if selectedHistoryIndex == 0 then
