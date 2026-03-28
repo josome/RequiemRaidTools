@@ -8,10 +8,35 @@ local TAB_SPIELER = UI.TAB_SPIELER
 local ColorDiff   = UI._H.ColorDiff
 
 -- ============================================================
--- Tab-Widgets (file-local)
+-- File-local state & Konstanten
 -- ============================================================
 
-local playerRows = {}
+local playerRows      = {}
+local expandedPlayers = {}   -- expandedPlayers[fullName] = true/nil
+
+local PRIO_LABEL = { [1]="|cffffcc00BIS|r", [2]="|cff88ff88Upg|r", [3]="|cff888888OS|r", [4]="|cff888888Fun|r" }
+local CAT_LABEL  = { weapons="Weapon", trinket="Trinket", setItems="Set", other="Other" }
+local SUB_ROW_H  = 20
+local SUB_INDENT = 22   -- Einrückung der Sub-Rows
+
+-- Item-Name aus WoW-Hyperlink oder [Name]-Format extrahieren
+local function ParseItemName(link)
+    if not link then return "?" end
+    local name = link:match("|h%[(.-)%]|h")
+    if name then return name end
+    name = link:match("^%[(.-)%]$")
+    if name then return name end
+    return link
+end
+
+-- Farbcode aus Item-Qualität (0–6), Fallback Epic-Lila
+local function ItemQualityHex(quality)
+    local r, g, b = GetItemQualityColor(quality or 4)
+    if r then
+        return string.format("|cff%02x%02x%02x", r * 255, g * 255, b * 255)
+    end
+    return "|cffA335EE"
+end
 
 -- ============================================================
 -- Spieler-Panel bauen
@@ -26,7 +51,7 @@ function UI.BuildSpielerPanel(parent)
     -- Header
     local headers = { "Raider", "Loot", "Set", "Weapon", "Trinket", "Other", "Set Bonus" }
     local colW    = { 140, 30, 40, 50, 50, 30, 70 }
-    local xOff = 4
+    local xOff = 4 + 20   -- 20px Platz für Toggle-Button
     for i, h in ipairs(headers) do
         local lbl = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         lbl:SetPoint("TOPLEFT", panel, "TOPLEFT", xOff, -6)
@@ -58,6 +83,83 @@ function UI.BuildSpielerPanel(parent)
 end
 
 -- ============================================================
+-- Sub-Rows für einen aufgeklappten Spieler bauen
+-- ============================================================
+
+local function BuildItemSubRows(content, fullName, rowW, yOff)
+    local log = GuildLootDB.currentRaid and GuildLootDB.currentRaid.lootLog or {}
+    local shortN = GL.ShortName(fullName)
+    local count  = 0
+
+    for _, entry in ipairs(log) do
+        if GL.ShortName(entry.player) == shortN then
+            count = count + 1
+            local subRow = CreateFrame("Frame", nil, content)
+            subRow:SetSize(rowW - SUB_INDENT, SUB_ROW_H)
+            subRow:SetPoint("TOPLEFT", content, "TOPLEFT", SUB_INDENT, yOff)
+
+            -- leichter Hintergrund für Sub-Rows
+            local bg = subRow:CreateTexture(nil, "BACKGROUND")
+            bg:SetAllPoints()
+            bg:SetColorTexture(0.1, 0.1, 0.1, 0.4)
+
+            local x = 4
+
+            -- Schwierigkeitsgrad
+            local diffLbl = subRow:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            diffLbl:SetPoint("TOPLEFT", subRow, "TOPLEFT", x, -3)
+            diffLbl:SetWidth(26)
+            diffLbl:SetText(ColorDiff(entry.difficulty))
+            x = x + 26 + 4
+
+            -- Kategorie
+            local catLbl = subRow:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            catLbl:SetPoint("TOPLEFT", subRow, "TOPLEFT", x, -3)
+            catLbl:SetWidth(48)
+            catLbl:SetText("|cffaaaaaa" .. (CAT_LABEL[entry.category] or "?") .. "|r")
+            x = x + 48 + 4
+
+            -- Prio
+            local prioLbl = subRow:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            prioLbl:SetPoint("TOPLEFT", subRow, "TOPLEFT", x, -3)
+            prioLbl:SetWidth(36)
+            prioLbl:SetText(PRIO_LABEL[entry.winnerPrio] or "|cff888888—|r")
+            x = x + 36 + 4
+
+            -- Item-Name (klickbar mit Tooltip falls echter Link vorhanden)
+            local safeLink   = (entry.link or ""):find("|H") and entry.link or nil
+            local itemColor  = ItemQualityHex(entry.quality)
+            local itemText   = itemColor .. ParseItemName(entry.link or entry.item) .. "|r"
+
+            local itemAnchor = subRow:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            itemAnchor:SetPoint("TOPLEFT", subRow, "TOPLEFT", x, -3)
+            itemAnchor:SetWidth(0)  -- nur als Anker, kein sichtbarer Text
+
+            UI._H.MakeItemLinkBtn(subRow, itemAnchor, 0, safeLink, itemText)
+
+            subRow:Show()
+            table.insert(playerRows, subRow)
+            yOff = yOff - SUB_ROW_H
+        end
+    end
+
+    -- Platzhalter wenn keine Items
+    if count == 0 then
+        local emptyRow = CreateFrame("Frame", nil, content)
+        emptyRow:SetSize(rowW - SUB_INDENT, SUB_ROW_H)
+        emptyRow:SetPoint("TOPLEFT", content, "TOPLEFT", SUB_INDENT, yOff)
+        local emptyLbl = emptyRow:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        emptyLbl:SetPoint("TOPLEFT", emptyRow, "TOPLEFT", 4, -3)
+        emptyLbl:SetText("|cff666666Kein Loot in diesem Raid|r")
+        emptyRow:Show()
+        table.insert(playerRows, emptyRow)
+        yOff = yOff - SUB_ROW_H
+    end
+
+    return yOff
+end
+
+-- ============================================================
 -- Spieler-Tab Refresh
 -- ============================================================
 
@@ -80,23 +182,40 @@ function UI.RefreshSpielerTab()
     local colW         = UI.spielerPanel.colW
     local content      = UI.spielerPanel.content
 
-    local yOff = 0
+    local yOff     = 0
+    local zebraIdx = 0   -- separater Zähler für Zebra (Sub-Rows sollen Parity nicht brechen)
+
     for _, fullName in ipairs(participants) do
         local data     = players[fullName] or {}
         local isAbsent = absent[fullName]
-        local row = CreateFrame("Frame", nil, content)
-        local rowW = math.max(content:GetWidth() - 30, 200)
+        local row      = CreateFrame("Frame", nil, content)
+        local rowW     = math.max(content:GetWidth() - 30, 200)
         row:SetSize(rowW, 22)
         row:SetPoint("TOPLEFT", content, "TOPLEFT", 4, yOff)
 
-        -- Zebra-Streifen
-        if (#playerRows % 2 == 0) then
+        -- Zebra-Streifen (nur Player-Rows, nicht Sub-Rows)
+        if (zebraIdx % 2 == 0) then
             local bg = row:CreateTexture(nil, "BACKGROUND")
             bg:SetAllPoints()
             bg:SetColorTexture(1, 1, 1, 0.03)
         end
 
         local xOff = 4
+
+        -- Toggle-Button ▶/▼
+        local isExpanded = expandedPlayers[fullName]
+        local toggleBtn  = CreateFrame("Button", nil, row)
+        toggleBtn:SetSize(16, 16)
+        toggleBtn:SetPoint("TOPLEFT", row, "TOPLEFT", xOff, -3)
+        local toggleLbl = toggleBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        toggleLbl:SetAllPoints()
+        toggleLbl:SetJustifyH("CENTER")
+        toggleLbl:SetText(isExpanded and "|cffFFD700▼|r" or "|cff888888▶|r")
+        toggleBtn:SetScript("OnClick", function()
+            expandedPlayers[fullName] = not expandedPlayers[fullName]
+            UI.RefreshSpielerTab()
+        end)
+        xOff = xOff + 16 + 4
 
         -- Spalte 1: Raider-Name
         local nameLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -200,7 +319,13 @@ function UI.RefreshSpielerTab()
 
         row:Show()
         table.insert(playerRows, row)
-        yOff = yOff - 24
+        yOff     = yOff - 24
+        zebraIdx = zebraIdx + 1
+
+        -- Sub-Rows wenn aufgeklappt
+        if isExpanded then
+            yOff = BuildItemSubRows(content, fullName, rowW, yOff)
+        end
     end
     content:SetHeight(math.max(1, -yOff))
 end
