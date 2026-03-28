@@ -214,11 +214,11 @@ local function JsonVal(val, seen)
 end
 
 --- Serialisiert die relevanten GuildLootDB-Daten als JSON-String.
-function GL.ExportJSON()
+function GL.ExportJSON(raidData)
     local data = {
-        exportedAt  = GL.FormatTimestamp(time()),
-        currentRaid = GuildLootDB.currentRaid,
-        players     = GuildLootDB.players,
+        exportedAt = GL.FormatTimestamp(time()),
+        raid       = raidData or GuildLootDB.currentRaid,
+        players    = GuildLootDB.players,
     }
     return JsonVal(data, {})
 end

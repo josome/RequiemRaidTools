@@ -134,7 +134,11 @@ function UI.BuildRaidPanel(parent)
     exportRaidBtn:SetText("Export JSON")
     exportRaidBtn:SetEnabled(false)
     exportRaidBtn:SetScript("OnClick", function()
-        UI.ShowExportPopup()
+        if selectedHistoryIndex == 0 then
+            UI.ShowExportPopup(GuildLootDB.currentRaid)
+        elseif selectedHistoryIndex then
+            UI.ShowExportPopup(GuildLootDB.raidHistory[selectedHistoryIndex])
+        end
     end)
     UI.exportRaidBtn = exportRaidBtn
 

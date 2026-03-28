@@ -40,7 +40,7 @@ end
 -- JSON-Export Popup
 -- ============================================================
 
-function UI.ShowExportPopup()
+function UI.ShowExportPopup(raidData)
     if not exportPopup then
         exportPopup = CreateFrame("Frame", "RaidLootExportPopup", UIParent, "BasicFrameTemplateWithInset")
         exportPopup:SetSize(600, 400)
@@ -79,7 +79,7 @@ function UI.ShowExportPopup()
         end)
     end
 
-    exportPopup.editBox:SetText(GL.ExportJSON())
+    exportPopup.editBox:SetText(GL.ExportJSON(raidData))
     exportPopup.editBox:HighlightText()
     exportPopup:Show()
     exportPopup.editBox:SetFocus()
