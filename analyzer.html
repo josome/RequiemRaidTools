@@ -407,10 +407,24 @@ function catHTML(cat) {
     const label = CAT_LABEL[cat] || cat || '?';
     return `<span class="cat-badge cat-${cat||'other'}">${label}</span>`;
 }
+function itemId(link) {
+    if (!link) return null;
+    const m = link.match(/\|Hitem:(\d+)/);
+    return m ? m[1] : null;
+}
 function itemHTML(link) {
     const name  = itemName(link);
     const color = itemColor(link);
-    return `<span class="item-name" style="color:${color}" title="${(link||'').replace(/"/g,'&quot;')}">${name}</span>`;
+    const id    = itemId(link);
+    const title = (link||'').replace(/"/g, '&quot;');
+    if (id) {
+        return `<a href="https://www.wowhead.com/item=${id}" target="_blank" rel="noopener"
+                   style="color:${color};text-decoration:none"
+                   title="${title}"
+                   onmouseover="this.style.textDecoration='underline'"
+                   onmouseout="this.style.textDecoration='none'">${name}</a>`;
+    }
+    return `<span class="item-name" style="color:${color}" title="${title}">${name}</span>`;
 }
 
 // ── Tab switching ─────────────────────────────────────────────
