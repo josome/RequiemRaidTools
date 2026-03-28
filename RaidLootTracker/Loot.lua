@@ -517,6 +517,7 @@ function Loot.AssignLootConfirm(fullName, diff)
         player     = fullName,
         item       = link,
         link       = link,
+        itemID     = currentItem.itemID,
         category   = category,
         difficulty = diff,
         winnerPrio = winnerPrio,

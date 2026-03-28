@@ -385,8 +385,10 @@ const CAT_LABEL   = { weapons:'Weapon', trinket:'Trinket', setItems:'Set', other
 // ── Helpers ───────────────────────────────────────────────────
 function itemName(link) {
     if (!link) return '?';
-    const m = link.match(/\|h\[(.+?)\]\|h/);
-    return m ? m[1] : link;
+    const full = link.match(/\|h\[(.+?)\]\|h/);
+    if (full) return full[1];
+    const bracketed = link.match(/^\[(.+)\]$/);
+    return bracketed ? bracketed[1] : link;
 }
 function itemColor(link) {
     if (!link) return '#ffffff';
@@ -419,17 +421,16 @@ function itemId(link) {
     const m = link.match(/\|Hitem:(\d+)/);
     return m ? m[1] : null;
 }
-function itemHTML(link) {
+function itemHTML(link, explicitId) {
     const name  = itemName(link);
     const color = itemColor(link);
-    const id    = itemId(link);
+    const id    = explicitId || itemId(link);
     const title = (link||'').replace(/"/g, '&quot;');
-    if (id) {
-        const url = `https://www.wowhead.com/item=${id}`;
-        return `<span class="wowhead-link" style="color:${color}" title="${title}"
-                      onclick="window.open('${url}','_blank')">${name}</span>`;
-    }
-    return `<span class="item-name" style="color:${color}" title="${title}">${name}</span>`;
+    const url   = id
+        ? `https://www.wowhead.com/item=${id}`
+        : `https://www.wowhead.com/search?q=${encodeURIComponent(name)}`;
+    return `<span class="wowhead-link" style="color:${color}" title="${title}"
+                  onclick="window.open('${url}','_blank')">${name}</span>`;
 }
 
 // ── Tab switching ─────────────────────────────────────────────
@@ -628,7 +629,7 @@ function renderLootLog(log, players) {
             <td>${trackHTML(e.difficulty)}</td>
             <td>${catHTML(e.category)}</td>
             <td>${prioHTML(e.winnerPrio)}</td>
-            <td>${itemHTML(e.link || e.item)}</td>
+            <td>${itemHTML(e.link || e.item, e.itemID)}</td>
         `;
         tbody.appendChild(tr);
     });
@@ -678,7 +679,7 @@ function renderSimpleItems(tableId, countId, items) {
     if (!items.length) { tbody.innerHTML = '<tr><td colspan="2" class="empty">Keine Einträge</td></tr>'; return; }
     items.forEach(item => {
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${catHTML(item.category)}</td><td>${itemHTML(item.link||item.item||'')}</td>`;
+        tr.innerHTML = `<td>${catHTML(item.category)}</td><td>${itemHTML(item.link||item.item||'', item.itemID)}</td>`;
         tbody.appendChild(tr);
     });
 }
