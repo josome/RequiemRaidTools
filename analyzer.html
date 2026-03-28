@@ -30,19 +30,48 @@
         #upload-area {
             border: 2px dashed #8b6914;
             border-radius: 8px;
-            padding: 60px 48px;
+            padding: 32px 48px;
             text-align: center;
-            cursor: pointer;
             transition: all 0.2s;
             background: rgba(139,105,20,0.05);
         }
-        #upload-area:hover, #upload-area.drag-over {
+        #upload-area.drag-over {
             border-color: #ffd700;
             background: rgba(255,215,0,0.08);
         }
         #upload-area h2 { color: #ffd700; font-size: 1.3rem; margin-bottom: 10px; }
         #upload-area p  { color: #888; font-size: 0.9rem; }
         #file-input { display: none; }
+
+        /* Tabs */
+        .import-tabs {
+            display: flex; gap: 0; margin-bottom: 16px;
+            border-bottom: 1px solid #8b6914;
+        }
+        .import-tab {
+            padding: 8px 20px; cursor: pointer; font-size: 0.9rem;
+            color: #888; border: 1px solid transparent;
+            border-bottom: none; border-radius: 4px 4px 0 0;
+            margin-bottom: -1px; transition: all 0.15s;
+        }
+        .import-tab:hover { color: #ffd700; }
+        .import-tab.active {
+            color: #ffd700; background: #141428;
+            border-color: #8b6914; border-bottom-color: #141428;
+        }
+        .import-pane { display: none; }
+        .import-pane.active { display: block; }
+
+        /* Paste area */
+        #paste-box {
+            width: 100%; height: 140px;
+            background: #0d0d20; border: 1px solid #2a2a4a;
+            border-radius: 4px; color: #c8c8c8;
+            font-family: monospace; font-size: 0.8rem;
+            padding: 10px; resize: vertical;
+        }
+        #paste-box:focus { outline: none; border-color: #8b6914; }
+        #paste-error { color: #ff6666; font-size: 0.82rem; margin-top: 6px; display: none; }
         .btn {
             display: inline-block;
             padding: 8px 20px;
@@ -201,11 +230,31 @@
 <div class="container">
 
     <!-- Upload -->
-    <div id="upload-area" onclick="document.getElementById('file-input').click()">
+    <div id="upload-area">
         <h2>⬆ JSON importieren</h2>
-        <p>Exportierte JSON-Datei aus dem Addon hierher ziehen oder klicken</p>
-        <div class="btn">Datei auswählen</div>
-        <input type="file" id="file-input" accept=".json">
+
+        <div class="import-tabs">
+            <div class="import-tab active" onclick="switchTab('file')">📁 Datei</div>
+            <div class="import-tab"        onclick="switchTab('paste')">📋 JSON einfügen</div>
+        </div>
+
+        <!-- File drop -->
+        <div class="import-pane active" id="pane-file"
+             onclick="document.getElementById('file-input').click()"
+             style="cursor:pointer; padding: 24px 0 8px;">
+            <p>Datei hierher ziehen oder klicken zum Auswählen</p>
+            <div class="btn">Datei auswählen</div>
+            <input type="file" id="file-input" accept=".json">
+        </div>
+
+        <!-- Paste -->
+        <div class="import-pane" id="pane-paste" style="padding: 16px 0 8px;">
+            <textarea id="paste-box" placeholder='JSON hier einfügen (Strg+V) …'></textarea>
+            <div id="paste-error"></div>
+            <div>
+                <div class="btn" onclick="loadPaste()" style="margin-top:10px">Auswerten</div>
+            </div>
+        </div>
     </div>
 
     <!-- Main content -->
@@ -364,6 +413,15 @@ function itemHTML(link) {
     return `<span class="item-name" style="color:${color}" title="${(link||'').replace(/"/g,'&quot;')}">${name}</span>`;
 }
 
+// ── Tab switching ─────────────────────────────────────────────
+function switchTab(name) {
+    document.querySelectorAll('.import-tab').forEach((t, i) =>
+        t.classList.toggle('active', i === (name === 'file' ? 0 : 1)));
+    document.getElementById('pane-file') .classList.toggle('active', name === 'file');
+    document.getElementById('pane-paste').classList.toggle('active', name === 'paste');
+    document.getElementById('paste-error').style.display = 'none';
+}
+
 // ── File handling ─────────────────────────────────────────────
 const uploadArea = document.getElementById('upload-area');
 uploadArea.addEventListener('dragover',  e => { e.preventDefault(); uploadArea.classList.add('drag-over'); });
@@ -374,6 +432,30 @@ uploadArea.addEventListener('drop', e => {
 });
 document.getElementById('file-input').addEventListener('change', e => {
     if (e.target.files[0]) loadFile(e.target.files[0]);
+});
+
+// ── Paste handling ────────────────────────────────────────────
+function loadPaste() {
+    const raw = document.getElementById('paste-box').value.trim();
+    const err = document.getElementById('paste-error');
+    if (!raw) { err.textContent = 'Bitte zuerst JSON einfügen.'; err.style.display = 'block'; return; }
+    try {
+        const data = JSON.parse(raw);
+        err.style.display = 'none';
+        renderAll(data);
+        uploadArea.style.display = 'none';
+        document.getElementById('content').style.display = 'block';
+    } catch(e) {
+        err.textContent = 'Ungültiges JSON: ' + e.message;
+        err.style.display = 'block';
+    }
+}
+
+// Strg+Enter im Textarea löst Auswerten aus
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('paste-box').addEventListener('keydown', e => {
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) loadPaste();
+    });
 });
 
 let charts = {};
