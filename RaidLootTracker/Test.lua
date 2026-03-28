@@ -114,3 +114,66 @@ function GL.Test.SimulateRoll()
     if GL.UI and GL.UI.RefreshLootTab then GL.UI.RefreshLootTab() end
     GL.Print("Roll simulation active — check the Loot tab Results section.")
 end
+
+-- Fügt einen fertigen Loot-Log-Eintrag mit echtem Item aus dem Inventar ein,
+-- damit der Analyzer/Export mit itemID-verlinkten Einträgen getestet werden kann.
+-- Verhält sich wie ein echter AssignLoot-Eintrag (inkl. itemID, category, difficulty, prio).
+function GL.Test.AddLootEntry()
+    if not GuildLootDB.currentRaid.active then
+        GL.Print("No active raid. Use /rlt start first.")
+        return
+    end
+
+    -- Episches Equip-Item aus Inventar suchen
+    local chosen = nil
+    for bag = 0, 4 do
+        for slot = 1, C_Container.GetContainerNumSlots(bag) do
+            local link = C_Container.GetContainerItemLink(bag, slot)
+            if link then
+                local name, _, rarity, _, _, _, _, _, equipLoc = GetItemInfo(link)
+                local isEquip = equipLoc and equipLoc ~= "" and equipLoc ~= "INVTYPE_NON_EQUIP_IGNORE"
+                if rarity and rarity >= 4 and isEquip then
+                    chosen = { link = link, name = name, equipLoc = equipLoc, quality = rarity }
+                    break
+                end
+            end
+        end
+        if chosen then break end
+    end
+
+    if not chosen then
+        GL.Print("AddLootEntry: No epic equippable item found in inventory.")
+        return
+    end
+
+    local itemID   = tonumber(chosen.link:match("item:(%d+)"))
+    local _, _, _, _, _, _, _, _, equipLoc = GetItemInfo(chosen.link)
+    local category = GL.GetItemCategory(itemID, equipLoc or chosen.equipLoc, chosen.quality)
+    local diff     = GL.DetectDifficulty() or GuildLootDB.currentRaid.difficulty or "N"
+
+    -- Fake-Spieler: abwechselnde Prios für abwechslungsreiche Testdaten
+    local realm    = GetRealmName() or "Realm"
+    local fakePlayers = {
+        { name = "TestPlayer1-" .. realm, prio = 1 },
+        { name = "TestPlayer2-" .. realm, prio = 2 },
+        { name = "TestPlayer3-" .. realm, prio = 1 },
+        { name = "TestPlayer4-" .. realm, prio = 3 },
+    }
+    local pick = fakePlayers[math.random(#fakePlayers)]
+
+    local entry = {
+        player     = pick.name,
+        item       = chosen.name,
+        link       = chosen.link,
+        itemID     = itemID,
+        category   = category,
+        difficulty = diff,
+        winnerPrio = pick.prio,
+        timestamp  = time(),
+    }
+
+    table.insert(GuildLootDB.currentRaid.lootLog, entry)
+    GL.Print("Test loot entry added: " .. chosen.link .. " → " .. GL.ShortName(pick.name))
+    if GL.UI and GL.UI.RefreshLogTab  then GL.UI.RefreshLogTab()  end
+    if GL.UI and GL.UI.RefreshLootTab then GL.UI.RefreshLootTab() end
+end

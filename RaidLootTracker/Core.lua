@@ -590,6 +590,13 @@ SlashCmdList["RAIDLOOTTRACKER"] = function(input)
             GL.Print("Test mode not loaded.")
         end
 
+    elseif cmd == "testentry" then
+        if GL.Test and GL.Test.AddLootEntry then
+            GL.Test.AddLootEntry()
+        else
+            GL.Print("Test mode not loaded.")
+        end
+
     elseif cmd == "cleanup" then
         local history = GuildLootDB.raidHistory or {}
         local removed = 0
@@ -610,6 +617,6 @@ SlashCmdList["RAIDLOOTTRACKER"] = function(input)
         if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
 
     else
-        GL.Print("Commands: /rlt | /rlt start [tier] | /rlt history [name] | /rlt reset | /rlt ml | /rlt cleanup | /rlt test | /rlt testroll")
+        GL.Print("Commands: /rlt | /rlt start [tier] | /rlt history [name] | /rlt reset | /rlt ml | /rlt cleanup | /rlt test | /rlt testroll | /rlt testentry")
     end
 end
