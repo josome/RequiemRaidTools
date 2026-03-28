@@ -23,6 +23,7 @@ local DB_DEFAULTS = {
         absent       = {},
         lootLog         = {},
         pendingLoot     = {},
+        trashedLoot     = {},
         sessionHidden           = {},
         sessionChecked          = {},
         currentKillParticipants = {},
@@ -302,6 +303,7 @@ function GL.CloseRaid()
         participants = raid.participants,
         lootLog      = raid.lootLog,
         pendingLoot  = raid.pendingLoot,
+        trashedLoot  = raid.trashedLoot,
         closedAt     = time(),
     }
     if not GuildLootDB.raidHistory then GuildLootDB.raidHistory = {} end
@@ -356,6 +358,10 @@ function GL.ResumeRaid(idx)
     for _, item in ipairs(snap.pendingLoot or {}) do
         table.insert(raid.pendingLoot, item)
     end
+    raid.trashedLoot = {}
+    for _, item in ipairs(snap.trashedLoot or {}) do
+        table.insert(raid.trashedLoot, item)
+    end
     raid.resumed                 = true
     raid.sessionHidden           = {}
     raid.sessionChecked          = {}
@@ -378,6 +384,8 @@ function GL.ResetRaid()
     raid.participants = {}
     raid.absent       = {}
     raid.lootLog                = {}
+    raid.pendingLoot            = {}
+    raid.trashedLoot            = {}
     raid.sessionHidden          = {}
     raid.sessionChecked         = {}
     raid.currentKillParticipants = {}

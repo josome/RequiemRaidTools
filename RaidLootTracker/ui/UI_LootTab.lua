@@ -15,6 +15,80 @@ local MakeButton      = UI._H.MakeButton
 -- ============================================================
 
 local pendingButtons       = {}
+local pendingActiveTab     = "pending"   -- "pending" | "trash"
+
+-- Minitab helpers (nach OPie/TenSettings-Vorbild, Options_Tab_* Atlas)
+local minitabData = {}
+local function minitab_deselect(b)
+    local r = minitabData[b]
+    if not r then return end
+    r.Text:SetPoint("BOTTOM", 0, 6)
+    r.Text:SetFontObject("GameFontNormalSmall")
+    r.Left:SetAtlas("Options_Tab_Left", true)
+    r.Middle:SetAtlas("Options_Tab_Middle", true)
+    r.Right:SetAtlas("Options_Tab_Right", true)
+    r.NormalBG:SetPoint("TOPRIGHT", -2, -15)
+    r.HighlightBG:SetColorTexture(1,1,1,1)
+    r.SelectedBG:SetColorTexture(0,0,0,0)
+    b:SetNormalFontObject(GameFontNormalSmall)
+end
+local function minitab_select(b)
+    local r = minitabData[b]
+    if not r then return end
+    r.Text:SetPoint("BOTTOM", 0, 8)
+    r.Text:SetFontObject("GameFontHighlightSmall")
+    r.Left:SetAtlas("Options_Tab_Active_Left", true)
+    r.Middle:SetAtlas("Options_Tab_Active_Middle", true)
+    r.Right:SetAtlas("Options_Tab_Active_Right", true)
+    r.NormalBG:SetPoint("TOPRIGHT", -2, -12)
+    r.HighlightBG:SetColorTexture(0,0,0,0)
+    r.SelectedBG:SetColorTexture(1,1,1,1)
+    b:SetNormalFontObject(GameFontHighlightSmall)
+end
+local function minitab_new(parent, text, onClick)
+    local b, r = CreateFrame("Button", nil, parent), {}
+    minitabData[b] = r
+    local fs = b:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    b:SetFontString(fs)
+    fs:ClearAllPoints()
+    fs:SetPoint("BOTTOM", 0, 6)
+    b:SetNormalFontObject(GameFontNormalSmall)
+    b:SetDisabledFontObject(GameFontDisableSmall)
+    b:SetHighlightFontObject(GameFontHighlightSmall)
+    b:SetPushedTextOffset(0, 0)
+    fs:SetText(text)
+    r.Text = fs
+    r.Left = b:CreateTexture(nil, "BACKGROUND")
+    r.Left:SetPoint("BOTTOMLEFT")
+    r.Right = b:CreateTexture(nil, "BACKGROUND")
+    r.Right:SetPoint("BOTTOMRIGHT")
+    r.Middle = b:CreateTexture(nil, "BACKGROUND")
+    r.Middle:SetPoint("TOPLEFT",  r.Left,  "TOPRIGHT",  0, 0)
+    r.Middle:SetPoint("TOPRIGHT", r.Right, "TOPLEFT",   0, 0)
+    r.NormalBG = b:CreateTexture(nil, "BACKGROUND", nil, -2)
+    r.NormalBG:SetPoint("BOTTOMLEFT", 2, 0)
+    r.NormalBG:SetPoint("TOPRIGHT", -2, -15)
+    r.NormalBG:SetColorTexture(1,1,1,1)
+    r.NormalBG:SetGradient("VERTICAL",
+        {r=0.1, g=0.1, b=0.1, a=0.85},
+        {r=0.15, g=0.15, b=0.15, a=0.85})
+    r.HighlightBG = b:CreateTexture(nil, "HIGHLIGHT")
+    r.HighlightBG:SetPoint("BOTTOMLEFT", 2, 0)
+    r.HighlightBG:SetPoint("TOPRIGHT", b, "BOTTOMRIGHT", -2, 12)
+    r.HighlightBG:SetGradient("VERTICAL",
+        {r=1, g=1, b=1, a=0.15},
+        {r=0, g=0, b=0, a=0})
+    r.SelectedBG = b:CreateTexture(nil, "BACKGROUND", nil, -1)
+    r.SelectedBG:SetPoint("BOTTOMLEFT", 2, 0)
+    r.SelectedBG:SetPoint("TOPRIGHT", b, "BOTTOMRIGHT", -2, 16)
+    r.SelectedBG:SetGradient("VERTICAL",
+        {r=1, g=1, b=1, a=0.15},
+        {r=0, g=0, b=0, a=0})
+    b:SetSize(fs:GetStringWidth() + 40, 37)
+    b:SetScript("OnClick", onClick)
+    minitab_deselect(b)
+    return b
+end
 local activeItemLabel
 local activeItemCategoryLabel
 local candidateRows        = {}
@@ -22,6 +96,7 @@ local rollResultRows       = {}
 local sessionLootRows      = {}
 local countdownLabel
 local resetItemBtn
+local trashItemBtn
 local startRollBtn
 
 local function sessionHidden()  return GuildLootDB.currentRaid.sessionHidden  end
@@ -43,13 +118,24 @@ function UI.BuildLootPanel(parent)
     sidebar:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -4,   4)
     sidebar:SetWidth(SIDEBAR_W)
 
-    local pendingLabel = sidebar:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    pendingLabel:SetPoint("TOPLEFT", sidebar, "TOPLEFT", 6, -6)
-    pendingLabel:SetText("|cffffcc00Pending Loot:|r")
+    local tabPending = minitab_new(sidebar, "Pending Loot", function()
+        pendingActiveTab = "pending"
+        UI.RefreshLootTab()
+    end)
+    tabPending:SetPoint("BOTTOMLEFT", sidebar, "TOPLEFT", 4, -29)
+
+    local tabTrash = minitab_new(sidebar, "Trash bin", function()
+        pendingActiveTab = "trash"
+        UI.RefreshLootTab()
+    end)
+    tabTrash:SetPoint("LEFT", tabPending, "RIGHT", 5, 0)
+
+    panel.tabPending = tabPending
+    panel.tabTrash   = tabTrash
 
     local pendingScroll = CreateFrame("ScrollFrame", "GuildLootPendingScroll", sidebar, "UIPanelScrollFrameTemplate")
-    pendingScroll:SetPoint("TOPLEFT",     pendingLabel, "BOTTOMLEFT", 0, -2)
-    pendingScroll:SetPoint("BOTTOMRIGHT", sidebar,      "BOTTOMRIGHT", -22, 4)
+    pendingScroll:SetPoint("TOPLEFT",     sidebar, "TOPLEFT",    0,  -34)
+    pendingScroll:SetPoint("BOTTOMRIGHT", sidebar, "BOTTOMRIGHT", -22,  4)
     local pendingContent = CreateFrame("Frame", nil, pendingScroll)
     pendingContent:SetSize(pendingScroll:GetWidth(), 1)
     pendingScroll:SetScrollChild(pendingContent)
@@ -90,13 +176,13 @@ function UI.BuildLootPanel(parent)
 
     activeItemLabel = main:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     activeItemLabel:SetPoint("LEFT",  activeItemIcon, "RIGHT", 6, 0)
-    activeItemLabel:SetPoint("RIGHT", main, "RIGHT", -110, 0)
+    activeItemLabel:SetPoint("RIGHT", main, "RIGHT", -195, 0)
     activeItemLabel:SetJustifyH("LEFT")
     activeItemLabel:SetText("No active item")
 
     local activeItemHover = CreateFrame("Frame", nil, main)
     activeItemHover:SetPoint("LEFT",  activeItemIcon, "RIGHT", 6, 0)
-    activeItemHover:SetPoint("RIGHT", main, "RIGHT", -110, 0)
+    activeItemHover:SetPoint("RIGHT", main, "RIGHT", -195, 0)
     activeItemHover:SetPoint("TOP",    activeItemIcon, "TOP",    0, 0)
     activeItemHover:SetPoint("BOTTOM", activeItemIcon, "BOTTOM", 0, 0)
     activeItemHover:EnableMouse(true)
@@ -119,6 +205,12 @@ function UI.BuildLootPanel(parent)
     end)
     resetItemBtn:SetPoint("RIGHT", main, "RIGHT", 0, 0)
     resetItemBtn:SetPoint("TOP",   divA, "BOTTOM", 0, -2)
+
+    trashItemBtn = MakeButton(main, "Trash", 80, 22, function()
+        GL.Loot.TrashActiveItem()
+    end)
+    trashItemBtn:SetPoint("RIGHT", resetItemBtn, "LEFT", -4, 0)
+    trashItemBtn:SetPoint("TOP",   divA, "BOTTOM", 0, -2)
 
     -- Kandidaten
     local candLabel = main:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -218,50 +310,79 @@ function UI.RefreshLootTab()
     if UI.activeTab ~= TAB_LOOT then return end
     if not UI.lootPanel then return end
 
-    local ci = GL.Loot.GetCurrentItem()
-    local pl = GL.Loot.GetPendingLoot()
+    local ci    = GL.Loot.GetCurrentItem()
+    local isML  = GL.IsMasterLooter()
+    local isTrashed = (pendingActiveTab == "trash")
+    local items = isTrashed and GL.Loot.GetTrashedLoot() or GL.Loot.GetPendingLoot()
 
-    -- Pending Loot Buttons
+    -- Tab-Highlighting
+    if UI.lootPanel.tabPending then
+        if isTrashed then
+            minitab_deselect(UI.lootPanel.tabPending)
+            minitab_select(UI.lootPanel.tabTrash)
+        else
+            minitab_select(UI.lootPanel.tabPending)
+            minitab_deselect(UI.lootPanel.tabTrash)
+        end
+    end
+
+    -- Pending / Trash Rows
     for _, btn in ipairs(pendingButtons) do btn:Hide() end
     pendingButtons = {}
     local pf = UI.lootPanel.pendingContent
     pf:SetWidth(SIDEBAR_W - 26)
     local yOff = -2
     local ROW_H = 30
-    for i, item in ipairs(pl) do
+    for _, item in ipairs(items) do
         local row = CreateFrame("Frame", nil, pf)
         row:SetPoint("TOPLEFT",  pf, "TOPLEFT",  0, yOff)
         row:SetPoint("TOPRIGHT", pf, "TOPRIGHT", 0, yOff)
         row:SetHeight(ROW_H)
 
-        local releaseBtn = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
-        releaseBtn:SetSize(22, 22)
-        releaseBtn:SetPoint("LEFT", row, "LEFT", 0, 0)
-        releaseBtn:SetText("«")
-        releaseBtn:SetScript("OnClick", function()
-            GL.Loot.ReleaseItem(item.link)
-        end)
-        releaseBtn:SetScript("OnEnter", function(self)
-            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:SetText("Item auswählen", 1, 1, 1)
-            GameTooltip:Show()
-        end)
-        releaseBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-        if not GL.IsMasterLooter() then releaseBtn:Disable() end
+        local leftBtn = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+        leftBtn:SetSize(22, 22)
+        leftBtn:SetPoint("LEFT", row, "LEFT", 0, 0)
+        if isTrashed then
+            leftBtn:SetText("←")
+            leftBtn:SetScript("OnClick", function()
+                GL.Loot.RestoreFromTrash(item.link)
+            end)
+            leftBtn:SetScript("OnEnter", function(self)
+                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                GameTooltip:SetText("Zurück in Pending", 1, 1, 1)
+                GameTooltip:Show()
+            end)
+        else
+            leftBtn:SetText("«")
+            leftBtn:SetScript("OnClick", function()
+                GL.Loot.ReleaseItem(item.link)
+            end)
+            leftBtn:SetScript("OnEnter", function(self)
+                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                GameTooltip:SetText("Item auswählen", 1, 1, 1)
+                GameTooltip:Show()
+            end)
+        end
+        leftBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        if not isML then leftBtn:Disable() end
 
-        local removeBtn = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
-        removeBtn:SetSize(22, 22)
-        removeBtn:SetPoint("RIGHT", row, "RIGHT", 0, 0)
-        removeBtn:SetText("×")
-        removeBtn:SetScript("OnClick", function()
-            GL.Loot.RemovePendingItem(item.link)
-            UI.RefreshLootTab()
-        end)
-        if not GL.IsMasterLooter() then removeBtn:Disable() end
+        local rightBtn = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+        rightBtn:SetSize(22, 22)
+        rightBtn:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+        if isTrashed then
+            rightBtn:Hide()  -- kein × im Trash
+        else
+            rightBtn:SetText("×")
+            rightBtn:SetScript("OnClick", function()
+                GL.Loot.RemovePendingItem(item.link)
+                UI.RefreshLootTab()
+            end)
+            if not isML then rightBtn:Disable() end
+        end
 
         local pendingIcon = CreateFrame("Frame", nil, row)
         pendingIcon:SetSize(24, 24)
-        pendingIcon:SetPoint("LEFT", releaseBtn, "RIGHT", 4, 0)
+        pendingIcon:SetPoint("LEFT", leftBtn, "RIGHT", 4, 0)
         local pendingIconTex = pendingIcon:CreateTexture(nil, "ARTWORK")
         pendingIconTex:SetAllPoints()
         pendingIconTex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
@@ -275,9 +396,10 @@ function UI.RefreshLootTab()
         end)
         pendingIcon:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
+        local rightAnchor = isTrashed and row or rightBtn
         local linkBtn = CreateFrame("Frame", nil, row)
         linkBtn:SetPoint("LEFT",  pendingIcon, "RIGHT", 4, 0)
-        linkBtn:SetPoint("RIGHT", removeBtn,   "LEFT", -4, 0)
+        linkBtn:SetPoint("RIGHT", rightAnchor, isTrashed and "RIGHT" or "LEFT", isTrashed and 0 or -4, 0)
         linkBtn:SetHeight(ROW_H)
         linkBtn:EnableMouse(true)
 
@@ -298,7 +420,7 @@ function UI.RefreshLootTab()
         yOff = yOff - ROW_H - 2
     end
 
-    local totalH = math.max(1, (#pl * (ROW_H + 2)) + 8)
+    local totalH = math.max(1, (#items * (ROW_H + 2)) + 8)
     pf:SetHeight(totalH)
 
     -- Aktives Item
@@ -306,7 +428,8 @@ function UI.RefreshLootTab()
         activeItemLabel:SetText(ci.link)
         local catNames = { weapons="Weapon", trinket="Trinket", setItems="Set/Token", other="Other" }
         activeItemCategoryLabel:SetText("[" .. (catNames[ci.category] or "?") .. "]")
-        resetItemBtn:SetEnabled(GL.IsMasterLooter())
+        resetItemBtn:SetEnabled(isML)
+        if trashItemBtn then trashItemBtn:SetShown(true) ; trashItemBtn:SetEnabled(isML) end
         if UI.lootPanel.activeItemIconTex then
             local icon = select(10, GetItemInfo(ci.link))
             UI.lootPanel.activeItemIconTex:SetTexture(icon or "Interface\\Icons\\INV_Misc_QuestionMark")
@@ -315,6 +438,7 @@ function UI.RefreshLootTab()
         activeItemLabel:SetText("|cff888888No active item|r")
         activeItemCategoryLabel:SetText("")
         resetItemBtn:SetEnabled(false)
+        if trashItemBtn then trashItemBtn:SetShown(false) end
         if UI.lootPanel.activeItemIconTex then UI.lootPanel.activeItemIconTex:SetTexture(nil) end
     end
 
@@ -329,7 +453,6 @@ function UI.RefreshLootTab()
     local rollActive = ci.rollState.active
     local hasCands   = next(ci.candidates) ~= nil
     local hasWinner  = ci.winner ~= nil
-    local isML       = GL.IsMasterLooter()
 
     if rollActive then
         startRollBtn:SetText("Evaluate")

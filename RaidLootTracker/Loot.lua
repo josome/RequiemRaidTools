@@ -12,6 +12,7 @@ local Loot = GL.Loot
 
 -- pendingLoot wird direkt aus GuildLootDB gelesen (überlebt Reloads)
 local function pendingLoot() return GuildLootDB.currentRaid.pendingLoot end
+local function trashedLoot() return GuildLootDB.currentRaid.trashedLoot or {} end
 local currentItem  = {
     link       = nil,
     name       = nil,
@@ -48,6 +49,7 @@ local deferredPendingItems = {}
 -- ============================================================
 
 function Loot.GetPendingLoot()  return pendingLoot()  end
+function Loot.GetTrashedLoot()  return trashedLoot()  end
 function Loot.GetCurrentItem()  return currentItem  end
 
 -- Prüft Loot-Filter und fügt Item ggf. in pendingLoot ein
@@ -575,14 +577,36 @@ function Loot.RemovePendingItem(link)
     local pl = pendingLoot()
     for i, p in ipairs(pl) do
         if p.link == link then
+            table.insert(trashedLoot(), p)  -- in Trash verschieben statt löschen
             table.remove(pl, i)
             break
         end
     end
-    -- Falls dieses Item gerade aktiv war, zurücksetzen
     if currentItem.link == link then
         Loot.ClearCurrentItem()
     end
+end
+
+function Loot.RestoreFromTrash(link)
+    if not GL.IsMasterLooter() then return end
+    local tl = trashedLoot()
+    for i, p in ipairs(tl) do
+        if p.link == link then
+            table.insert(pendingLoot(), p)
+            table.remove(tl, i)
+            break
+        end
+    end
+    if GL.UI and GL.UI.RefreshLootTab then GL.UI.RefreshLootTab() end
+end
+
+function Loot.TrashActiveItem()
+    if not GL.IsMasterLooter() then return end
+    local link = currentItem.link
+    if not link then return end
+    Loot.ClearCurrentItem()
+    Loot.RemovePendingItem(link)
+    if GL.UI and GL.UI.RefreshLootTab then GL.UI.RefreshLootTab() end
 end
 
 -- ============================================================
