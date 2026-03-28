@@ -2,6 +2,58 @@
 
 ## Offen
 
+### Spieler-Tab: Aufklappbare Loot-Historie
+
+- [ ] **Expandable Player Rows**
+  Jede Zeile im Spieler-Tab aufklappbar. Beim Aufklappen erscheinen alle erhaltenen Items
+  des aktuellen Raids als eingerückte Sub-Rows (Item, Kategorie, Schwierigkeitsgrad, Prio).
+  - Toggle-Button `▶`/`▼` links vom Namen (16px), restliche Spalten bleiben unverändert
+  - Expansion-State in `local expandedPlayers = {}` (file-local, überlebt Refresh, nicht Reload)
+  - Sub-Rows aus `currentRaid.lootLog` gefiltert nach `GL.ShortName(fullName)`
+  - Sub-Rows landen in `playerRows` → automatisch aufgeräumt beim nächsten Refresh
+  - Scroll-Höhe passt sich automatisch an (gleicher `yOff`-Counter)
+  - Zebra-Stripe-Fix: separater `zebraIdx`-Zähler statt `#playerRows % 2`
+  - Nur `UI_SpielerTab.lua` betroffen, keine anderen Dateien
+
+- [ ] **Loot-Historie aus alten Raids anzeigen**
+  Aufgeklappte Spieler-Rows zeigen zusätzlich Loot aus `raidHistory` (abgeschlossene Raids),
+  gruppiert nach Raid mit Separator-Header (Raid-Name + Datum).
+  - Scan über alle `raidHistory[i].lootLog` nach `entry.player == GL.ShortName(fullName)`
+  - `itemID` überlebt SavedVariables-Reload → WoWhead-Links funktionieren auch für alte Einträge
+  - Aktueller Raid zuerst, danach ältere Raids chronologisch absteigend
+  - Optional: Limit auf letzte N Raids oder letzte X Items
+
+---
+
+### CSV Roundtrip: Google Sheets ↔ Addon
+
+- [ ] **CSV um `ItemID` und `Quality` erweitern**
+  Aktuelle Spalten: `RaidID, Tier, Difficulty, Track, Date, Status, Player, Item, Category, Prio, Timestamp`
+  Erweitert: `RaidID, Tier, Difficulty, Track, Date, Status, Player, Item, ItemID, Quality, Category, Prio, Timestamp`
+  → `GL.ExportCSV()` in `Util.lua` anpassen
+
+- [ ] **CSV-Importer im Addon**
+  Paste-Feld im Addon (eigener Tab oder im Raid-Tab) für CSV-String aus Google Sheets.
+  Parser gruppiert flache Zeilen nach `RaidID` und rekonstruiert `raidHistory`-Einträge
+  mit `lootLog` (Status=Assigned) und `trashedLoot` (Status=Trashed).
+
+  **Validierung & Fehlerbehandlung:**
+  - Import läuft in temporären Buffer — erst nach vollständiger Validierung committed
+  - Pflichtfeld-Check pro Zeile: `RaidID`, `Player`, `Timestamp` (Zahl), `Status` (Assigned/Trashed)
+  - Fehlerhafte Zeilen werden übersprungen (Warning), kein kompletter Abbruch
+  - Duplikat-Check: falls Raid mit gleicher `RaidID` bereits in `raidHistory` → Confirmation-Dialog
+  - Dry-Run Vorschau vor Import: "X Raids, Y Einträge gefunden, Z Zeilen übersprungen"
+
+  **Robustheit gegen Sheets-Eigenheiten:**
+  - BOM-Zeichen (`\xEF\xBB\xBF`) am Anfang entfernen
+  - `\r\n` und `\n` beide akzeptieren
+  - RFC-4180 Quotes behandeln (mehrzeilige Felder, escaped Quotes)
+  - Leere Abschlusszeilen ignorieren
+
+---
+
+### Sonstiges
+
 - [ ] **Lokalisierung (i18n)**
   Aktuell ~40+ gestreute Strings, gemischt Deutsch/Englisch, kein L[]-System.
   → `Locales/deDE.lua` + `Locales/enUS.lua` anlegen, alle UI-Strings durch `L["key"]` ersetzen, TOC um Locale-Dateien erweitern.
