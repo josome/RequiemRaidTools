@@ -210,7 +210,7 @@ function UI.RefreshSpielerTab()
         local toggleLbl = toggleBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         toggleLbl:SetAllPoints()
         toggleLbl:SetJustifyH("CENTER")
-        toggleLbl:SetText(isExpanded and "|cffFFD700▼|r" or "|cff888888▶|r")
+        toggleLbl:SetText(isExpanded and "|cffFFD700-|r" or "|cff888888+|r")
         toggleBtn:SetScript("OnClick", function()
             expandedPlayers[fullName] = not expandedPlayers[fullName]
             UI.RefreshSpielerTab()
