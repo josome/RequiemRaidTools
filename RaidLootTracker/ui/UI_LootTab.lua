@@ -419,7 +419,7 @@ function UI.RefreshLootTab()
         local rightAnchor = rightBtn
         local linkBtn = CreateFrame("Frame", nil, row)
         linkBtn:SetPoint("LEFT",  pendingIcon, "RIGHT", 4, 0)
-        linkBtn:SetPoint("RIGHT", rightAnchor, isTrashed and "RIGHT" or "LEFT", isTrashed and 0 or -4, 0)
+        linkBtn:SetPoint("RIGHT", rightAnchor, "LEFT", -4, 0)
         linkBtn:SetHeight(ROW_H)
         linkBtn:EnableMouse(true)
 
