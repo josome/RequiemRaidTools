@@ -188,7 +188,27 @@ function UI.BuildMainFrame()
     mlCheck.text:SetJustifyH("RIGHT")
     mlCheck:SetChecked(GuildLootDB.settings.isMasterLooter)
     mlCheck:SetScript("OnClick", function(self)
-        GuildLootDB.settings.isMasterLooter = self:GetChecked()
+        local wantsML = self:GetChecked()
+        if wantsML then
+            -- ML-Claim-Protokoll
+            local currentML = GuildLootDB.currentRaid and GuildLootDB.currentRaid.mlName or ""
+            local myName    = GL.ShortName(UnitName("player") or "")
+            if currentML ~= "" and GL.ShortName(currentML) ~= myName and GL.IsPlayerInGroup(currentML) then
+                -- Aktueller ML ist noch in der Gruppe → Anfrage stellen
+                self:SetChecked(false)  -- noch nicht setzen, erst auf Bestätigung warten
+                if GL.Comm then GL.Comm.SendMLRequest(UnitName("player") or "") end
+                GL.Print("ML-Anfrage an " .. GL.ShortName(currentML) .. " gesendet...")
+                return
+            else
+                -- Kein ML oder ML weg → sofort übernehmen
+                GuildLootDB.settings.isMasterLooter = true
+                if GL.Comm and (IsInRaid() or IsInGroup()) then
+                    GL.Comm.SendMLAnnounce(UnitName("player") or "")
+                end
+            end
+        else
+            GuildLootDB.settings.isMasterLooter = false
+        end
         GL.Print("Master Looter: " .. (GuildLootDB.settings.isMasterLooter and "|cff00ff00ON|r" or "|cffff4444OFF|r"))
         if UI.RefreshLootTab then UI.RefreshLootTab() end
     end)
@@ -225,13 +245,13 @@ function UI.BuildMainFrame()
     local statusLbl = sessionBar:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     statusLbl:SetPoint("LEFT", sessionBar, "LEFT", 8, 0)
     statusLbl:SetJustifyH("LEFT")
-    statusLbl:SetText("|cff888888● No active raid|r")
+    statusLbl:SetText("|cff888888No active raid|r")
     UI.sessionStatusLbl = statusLbl
 
     local crashWarnLbl = sessionBar:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     crashWarnLbl:SetPoint("RIGHT", sessionBar, "RIGHT", -8, 0)
     crashWarnLbl:SetJustifyH("RIGHT")
-    crashWarnLbl:SetText("|cffff4444● Absturz gefährdet Log-Daten — /reload sichert.|r")
+    crashWarnLbl:SetText("|cffff4444Absturz gefährdet Log-Daten — /reload sichert.|r")
     crashWarnLbl:Hide()
     UI.sessionCrashWarnLbl = crashWarnLbl
 
@@ -445,12 +465,12 @@ function UI.RefreshSessionBar()
     if raid.active then
         local tierStr = (raid.tier and raid.tier ~= "") and (" – " .. raid.tier) or ""
         local count   = #raid.participants
-        UI.sessionStatusLbl:SetText("|cff00ff00●|r Raid active" .. tierStr .. "  |cffffcc00● " .. count .. " players|r")
+        UI.sessionStatusLbl:SetText("|cff00ff00Raid active|r" .. tierStr .. "  |cffffcc00" .. count .. " players|r")
         if UI.sessionCrashWarnLbl then UI.sessionCrashWarnLbl:Show() end
         if UI.tierBox      then UI.tierBox:SetText(raid.tier or "") end
         if UI.startRaidBtn then UI.startRaidBtn:SetText("Reload Roster") end
     else
-        UI.sessionStatusLbl:SetText("|cff888888● No active raid|r")
+        UI.sessionStatusLbl:SetText("|cff888888No active raid|r")
         if UI.sessionCrashWarnLbl then UI.sessionCrashWarnLbl:Hide() end
         if UI.startRaidBtn then UI.startRaidBtn:SetText("Start Raid") end
     end

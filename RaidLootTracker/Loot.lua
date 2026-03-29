@@ -77,6 +77,7 @@ end
 -- ============================================================
 
 function Loot.OnLootOpened()
+    if not GL.IsMasterLooter() then return end  -- Observer ignorieren das Loot-Fenster
     local minQ = GuildLootDB.settings.minQuality or 4
 
     -- Alle qualifizierten Items aus dem Loot-Fenster sammeln

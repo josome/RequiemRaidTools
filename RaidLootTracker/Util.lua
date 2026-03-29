@@ -119,6 +119,23 @@ function GL.IsMasterLooter()
     return GuildLootDB and GuildLootDB.settings and GuildLootDB.settings.isMasterLooter == true
 end
 
+function GL.IsPlayerInGroup(name)
+    if not name then return false end
+    name = GL.ShortName(name)
+    if IsInRaid() then
+        for i = 1, GetNumGroupMembers() do
+            local n = GetRaidRosterInfo(i)
+            if n and GL.ShortName(n) == name then return true end
+        end
+    elseif IsInGroup() then
+        for i = 1, GetNumGroupMembers() - 1 do
+            local n = UnitName("party" .. i)
+            if n and GL.ShortName(n) == name then return true end
+        end
+    end
+    return false
+end
+
 function GL.GetTimestamp()
     return time()
 end

@@ -277,6 +277,22 @@ function UI.RefreshRaidTab()
     if UI.activeTab ~= TAB_RAID then return end
     if not UI.raidPanel or not UI.raidPanel.listContent then return end
 
+    -- TierBox: aktiven Raid anzeigen, sonst aktuellen Zonennamen vorschlagen
+    if UI.tierBox then
+        local raid = GuildLootDB.currentRaid
+        if raid.active then
+            UI.tierBox:SetText(raid.tier or "")
+        else
+            local mapInfo = C_Map.GetMapInfo(C_Map.GetBestMapForUnit("player"))
+            local zoneName = (mapInfo and mapInfo.name and mapInfo.name ~= "") and mapInfo.name or GetRealZoneText()
+            if zoneName and zoneName ~= "" then
+                UI.tierBox:SetText(zoneName .. " (" .. date("%d.%m.%Y") .. ")")
+            else
+                UI.tierBox:SetText("")
+            end
+        end
+    end
+
     local sw = UI.raidPanel.listScroll and UI.raidPanel.listScroll:GetWidth() or 0
     if sw > 10 then UI.raidPanel.listContent:SetWidth(sw) end
 
@@ -286,7 +302,7 @@ function UI.RefreshRaidTab()
     local history = GuildLootDB.raidHistory or {}
     local content = UI.raidPanel.listContent
     local yOff    = 0
-    local ROW_H   = 40
+    local ROW_H   = 48
 
     -- Aktiver Raid ganz oben
     local raid = GuildLootDB.currentRaid
@@ -309,7 +325,7 @@ function UI.RefreshRaidTab()
         tierLbl:SetPoint("TOPLEFT", row, "TOPLEFT", 4, -4)
         tierLbl:SetPoint("RIGHT",   row, "RIGHT",  -4, 0)
         tierLbl:SetJustifyH("LEFT")
-        tierLbl:SetText("|cff00ff00▶ |r" .. ((raid.tier and raid.tier ~= "") and raid.tier or "|cff888888Unknown|r"))
+        tierLbl:SetText((raid.tier and raid.tier ~= "") and "|cff00ff00" .. raid.tier .. "|r" or "|cff888888Unknown|r")
 
         local infoLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         infoLbl:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 4, 4)
@@ -423,7 +439,7 @@ function UI.RefreshRaidDetail(idx)
             if UI.exportRaidBtn then UI.exportRaidBtn:SetEnabled(true) end
             UI.UpdateEndResumeBtn()
             local diffStr = raid.difficulty and (" [" .. raid.difficulty .. "]") or ""
-            UI.raidPanel.detailHeader:SetText("|cff00ff00● Active|r  " .. (raid.tier or "?") .. diffStr)
+            UI.raidPanel.detailHeader:SetText("|cff00ff00Active|r  " .. (raid.tier or "?") .. diffStr)
             if UI.raidPanel.detailIdLabel then
                 local pendingCount = #(raid.pendingLoot or {})
                 local pendingStr = pendingCount > 0 and ("  |cffff9900" .. pendingCount .. " pending|r") or ""

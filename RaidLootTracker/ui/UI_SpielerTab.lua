@@ -50,7 +50,7 @@ function UI.BuildSpielerPanel(parent)
 
     -- Header
     local headers = { "Raider", "Loot", "Set", "Weapon", "Trinket", "Other", "Set Bonus" }
-    local colW    = { 140, 30, 40, 50, 50, 30, 70 }
+    local colW    = { 140, 30, 40, 50, 50, 46, 60 }
     local xOff = 4 + 20   -- 20px Platz für Toggle-Button
     for i, h in ipairs(headers) do
         local lbl = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -258,67 +258,49 @@ function UI.RefreshSpielerTab()
             diffLbl:SetJustifyH("CENTER")
             diffLbl:SetText(ColorDiff(ld))
             diffBtn:SetScript("OnClick", function()
-                if GL.IsMasterLooter() then
-                    UI.ShowDifficultyOverrideMenu(diffBtn, fullName, cat, diffLbl)
-                end
+                UI.ShowDifficultyOverrideMenu(diffBtn, fullName, cat, diffLbl)
             end)
             xOff = xOff + cw + 4
         end
 
-        -- Spalte 6: Rest-Loot Anzahl
-        local restCount = (data.counts and data.counts.other) or 0
-        local restLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        restLbl:SetPoint("TOPLEFT", row, "TOPLEFT", xOff, -3)
-        restLbl:SetWidth(colW[6])
-        restLbl:SetJustifyH("CENTER")
-        restLbl:SetText(tostring(restCount))
+        -- Spalte 6: Other-Loot Anzahl (Dropdown 0-10)
+        local otherBtn = CreateFrame("Button", nil, row)
+        otherBtn:SetSize(colW[6], 18)
+        otherBtn:SetPoint("TOPLEFT", row, "TOPLEFT", xOff, -2)
+        local otherBtnLbl = otherBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        otherBtnLbl:SetAllPoints()
+        otherBtnLbl:SetJustifyH("CENTER")
+        local function UpdateOtherBtn()
+            GL.CreatePlayerRecord(fullName)
+            local p = GuildLootDB.players[fullName]
+            p.counts = p.counts or {}
+            otherBtnLbl:SetText(tostring(p.counts.other or 0))
+        end
+        UpdateOtherBtn()
+        otherBtn:SetScript("OnClick", function()
+            UI.ShowCountMenu(otherBtn, fullName, "other", 0, 10, otherBtnLbl)
+        end)
         xOff = xOff + colW[6] + 4
 
-        -- Spalte 7: Set Bonus (Spinner 0-4)
-        local setPieces = (data.setPieces) or 0
-        local spinFrame = CreateFrame("Frame", nil, row)
-        spinFrame:SetSize(colW[7], 18)
-        spinFrame:SetPoint("TOPLEFT", row, "TOPLEFT", xOff, -2)
-
-        local minusBtn = CreateFrame("Button", nil, spinFrame, "UIPanelButtonTemplate")
-        minusBtn:SetSize(18, 18)
-        minusBtn:SetPoint("LEFT", spinFrame, "LEFT", 0, 0)
-        minusBtn:SetText("-")
-
-        local pieceLbl = spinFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        pieceLbl:SetPoint("LEFT", minusBtn, "RIGHT", 2, 0)
-        pieceLbl:SetWidth(28)
-        pieceLbl:SetJustifyH("CENTER")
-        local function UpdatePieceLbl()
+        -- Spalte 7: Set Bonus (Dropdown 0-4)
+        local setBtn = CreateFrame("Button", nil, row)
+        setBtn:SetSize(colW[7], 18)
+        setBtn:SetPoint("TOPLEFT", row, "TOPLEFT", xOff, -2)
+        local setBtnLbl = setBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        setBtnLbl:SetAllPoints()
+        setBtnLbl:SetJustifyH("CENTER")
+        local function UpdateSetBtn()
             GL.CreatePlayerRecord(fullName)
             local sp = GuildLootDB.players[fullName].setPieces or 0
             if sp >= 4 then
-                pieceLbl:SetText("|cff00ff00" .. sp .. "/4|r")
+                setBtnLbl:SetText("|cff00ff00" .. sp .. "/4|r")
             else
-                pieceLbl:SetText(sp .. "/4")
+                setBtnLbl:SetText(sp .. "/4")
             end
         end
-        UpdatePieceLbl()
-
-        local plusBtn = CreateFrame("Button", nil, spinFrame, "UIPanelButtonTemplate")
-        plusBtn:SetSize(18, 18)
-        plusBtn:SetPoint("LEFT", pieceLbl, "RIGHT", 2, 0)
-        plusBtn:SetText("+")
-
-        minusBtn:SetEnabled(GL.IsMasterLooter())
-        plusBtn:SetEnabled(GL.IsMasterLooter())
-
-        minusBtn:SetScript("OnClick", function()
-            GL.CreatePlayerRecord(fullName)
-            local p = GuildLootDB.players[fullName]
-            p.setPieces = math.max(0, (p.setPieces or 0) - 1)
-            UpdatePieceLbl()
-        end)
-        plusBtn:SetScript("OnClick", function()
-            GL.CreatePlayerRecord(fullName)
-            local p = GuildLootDB.players[fullName]
-            p.setPieces = math.min(4, (p.setPieces or 0) + 1)
-            UpdatePieceLbl()
+        UpdateSetBtn()
+        setBtn:SetScript("OnClick", function()
+            UI.ShowCountMenu(setBtn, fullName, "setPieces", 0, 4, setBtnLbl, UpdateSetBtn)
         end)
 
         row:Show()
@@ -352,6 +334,37 @@ function UI.ShowDifficultyOverrideMenu(anchor, fullName, category, label)
                 GL.CreatePlayerRecord(fullName)
                 GuildLootDB.players[fullName].lastDifficulty[category] = opt.diff
                 label:SetText(ColorDiff(opt.diff))
+                CloseDropDownMenus()
+            end
+            UIDropDownMenu_AddButton(info)
+        end
+    end, "MENU")
+    ToggleDropDownMenu(1, nil, menu, anchor, 0, 0)
+end
+
+-- Zahlen-Dropdown für Other (0-10) und Set Bonus (0-4)
+function UI.ShowCountMenu(anchor, fullName, field, minVal, maxVal, label, updateFn)
+    local menu = CreateFrame("Frame", "GuildLootCountMenu", UIParent, "UIDropDownMenuTemplate")
+    UIDropDownMenu_Initialize(menu, function()
+        for v = minVal, maxVal do
+            local info = UIDropDownMenu_CreateInfo()
+            info.text = tostring(v)
+            info.notCheckable = true
+            info.func = function()
+                GL.CreatePlayerRecord(fullName)
+                local p = GuildLootDB.players[fullName]
+                if field == "setPieces" then
+                    p.setPieces = v
+                else
+                    p.counts = p.counts or {}
+                    p.counts[field] = v
+                end
+                if updateFn then
+                    updateFn()
+                else
+                    p.counts = p.counts or {}
+                    label:SetText(tostring(p.counts[field] or 0))
+                end
                 CloseDropDownMenus()
             end
             UIDropDownMenu_AddButton(info)

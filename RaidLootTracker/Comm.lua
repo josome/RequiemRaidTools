@@ -7,7 +7,7 @@ local GL = GuildLoot
 GL.Comm = GL.Comm or {}
 local Comm = GL.Comm
 
-local PREFIX = "RLT"
+local PREFIX = "RequiemRLT"
 local SEP    = "\t"   -- Tab als Trennzeichen (sicher in Addon-Nachrichten)
 
 -- Prefix beim Laden registrieren
@@ -56,13 +56,44 @@ function Comm.SendAssign(playerName, difficulty, itemLink)
                          .. (difficulty or "") .. SEP .. (itemLink or ""))
 end
 
+--- ML hat Raid gestartet (auch bei GROUP_ROSTER_UPDATE → Late-Joiner-Sync)
+function Comm.SendRaidStart(tier, difficulty, id, startedAt)
+    SendToGroup("RAID_START" .. SEP .. (tier or "") .. SEP .. (difficulty or "")
+                             .. SEP .. (id or "") .. SEP .. tostring(startedAt or 0))
+end
+
+--- ML hat Raid beendet
+function Comm.SendRaidEnd(raidID)
+    SendToGroup("RAID_END" .. SEP .. (raidID or ""))
+end
+
+--- Neuer ML steht fest (direkte Übernahme oder nach Bestätigung)
+function Comm.SendMLAnnounce(newMLName)
+    SendToGroup("ML_ANNOUNCE" .. SEP .. (newMLName or ""))
+end
+
+--- Anfrage an aktuellen ML: Claimant möchte ML werden
+function Comm.SendMLRequest(claimantName)
+    SendToGroup("ML_REQUEST" .. SEP .. (claimantName or ""))
+end
+
+--- ML verweigert den Claim
+function Comm.SendMLDeny(claimantName)
+    SendToGroup("ML_DENY" .. SEP .. (claimantName or ""))
+end
+
 -- ============================================================
 -- Receive-Handler (alle Addon-User empfangen)
 -- ============================================================
 
 function Comm.OnMessage(msg, sender)
     -- Eigene Nachrichten ignorieren (ML hat bereits lokal verarbeitet)
-    if sender == UnitName("player") then return end
+    -- Ausnahme: commLoopback-Flag für Tests
+    if sender == UnitName("player") then
+        if not (GuildLootDB and GuildLootDB.settings and GuildLootDB.settings.commLoopback) then
+            return
+        end
+    end
 
     -- Nachricht aufsplitten
     local parts = {}
@@ -99,6 +130,32 @@ function Comm.OnMessage(msg, sender)
         local name, diff, link = parts[2], parts[3], parts[4]
         if GL.Loot and GL.Loot.OnCommAssign then
             GL.Loot.OnCommAssign(name, diff, link)
+        end
+
+    elseif cmd == "RAID_START" then
+        local tier, difficulty, id, startedAt = parts[2], parts[3], parts[4], parts[5]
+        if GL.OnCommRaidStart then
+            GL.OnCommRaidStart(tier, difficulty, id, tonumber(startedAt) or 0, sender)
+        end
+
+    elseif cmd == "RAID_END" then
+        if GL.OnCommRaidEnd then
+            GL.OnCommRaidEnd(parts[2])
+        end
+
+    elseif cmd == "ML_ANNOUNCE" then
+        if GL.OnCommMLAnnounce then
+            GL.OnCommMLAnnounce(parts[2])
+        end
+
+    elseif cmd == "ML_REQUEST" then
+        if GL.OnCommMLRequest then
+            GL.OnCommMLRequest(parts[2], sender)
+        end
+
+    elseif cmd == "ML_DENY" then
+        if GL.OnCommMLDeny then
+            GL.OnCommMLDeny(parts[2])
         end
     end
 end
