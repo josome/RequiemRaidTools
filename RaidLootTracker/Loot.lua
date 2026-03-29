@@ -608,6 +608,18 @@ function Loot.RestoreFromTrash(link)
     if GL.UI and GL.UI.RefreshLootTab then GL.UI.RefreshLootTab() end
 end
 
+function Loot.DeleteFromTrash(link)
+    if not GL.IsMasterLooter() then return end
+    local tl = trashedLoot()
+    for i, p in ipairs(tl) do
+        if p.link == link then
+            table.remove(tl, i)
+            break
+        end
+    end
+    if GL.UI and GL.UI.RefreshLootTab then GL.UI.RefreshLootTab() end
+end
+
 function Loot.TrashActiveItem()
     if not GL.IsMasterLooter() then return end
     local link = currentItem.link

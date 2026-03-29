@@ -370,7 +370,27 @@ function UI.RefreshLootTab()
         rightBtn:SetSize(22, 22)
         rightBtn:SetPoint("RIGHT", row, "RIGHT", 0, 0)
         if isTrashed then
-            rightBtn:Hide()  -- kein × im Trash
+            local deletePending = false
+            local deleteTimer   = nil
+            rightBtn:SetText("×")
+            rightBtn:SetScript("OnClick", function()
+                if not GL.IsMasterLooter() then return end
+                if deletePending then
+                    if deleteTimer then deleteTimer:Cancel(); deleteTimer = nil end
+                    deletePending = false
+                    rightBtn:SetText("×")
+                    GL.Loot.DeleteFromTrash(item.link)
+                else
+                    deletePending = true
+                    rightBtn:SetText("|cffff4444Sure?|r")
+                    deleteTimer = C_Timer.NewTimer(3, function()
+                        deletePending = false
+                        deleteTimer   = nil
+                        rightBtn:SetText("×")
+                    end)
+                end
+            end)
+            if not isML then rightBtn:Disable() end
         else
             rightBtn:SetText("×")
             rightBtn:SetScript("OnClick", function()
@@ -396,7 +416,7 @@ function UI.RefreshLootTab()
         end)
         pendingIcon:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
-        local rightAnchor = isTrashed and row or rightBtn
+        local rightAnchor = rightBtn
         local linkBtn = CreateFrame("Frame", nil, row)
         linkBtn:SetPoint("LEFT",  pendingIcon, "RIGHT", 4, 0)
         linkBtn:SetPoint("RIGHT", rightAnchor, isTrashed and "RIGHT" or "LEFT", isTrashed and 0 or -4, 0)
