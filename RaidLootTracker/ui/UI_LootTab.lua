@@ -339,13 +339,11 @@ function UI.RefreshLootTab()
         row:SetPoint("TOPRIGHT", pf, "TOPRIGHT", 0, yOff)
         row:SetHeight(ROW_H)
 
-        local leftBtn = CreateFrame("Button", nil, row)
+        local leftBtn = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
         leftBtn:SetSize(22, 22)
         leftBtn:SetPoint("LEFT", row, "LEFT", 0, 0)
-        leftBtn:SetNormalTexture("Interface\\Buttons\\LeftArrow-Up")
-        leftBtn:SetPushedTexture("Interface\\Buttons\\LeftArrow-Down")
-        leftBtn:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square")
         if isTrashed then
+            leftBtn:SetText("<")
             leftBtn:SetScript("OnClick", function()
                 GL.Loot.RestoreFromTrash(item.link)
             end)
@@ -355,6 +353,7 @@ function UI.RefreshLootTab()
                 GameTooltip:Show()
             end)
         else
+            leftBtn:SetText("<")
             leftBtn:SetScript("OnClick", function()
                 GL.Loot.ReleaseItem(item.link)
             end)
@@ -365,7 +364,7 @@ function UI.RefreshLootTab()
             end)
         end
         leftBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-        if not isML then leftBtn:SetAlpha(0.4); leftBtn:EnableMouse(false) end
+        if not isML then leftBtn:Disable() end
 
         local rightBtn = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
         rightBtn:SetSize(22, 22)
