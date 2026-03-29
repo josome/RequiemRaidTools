@@ -48,12 +48,13 @@ end
 
 local function MakeItemLinkBtn(parent, leftAnchorFrame, xOff, link, displayText)
     local btn = CreateFrame("Button", nil, parent)
-    btn:SetPoint("LEFT",  leftAnchorFrame, "RIGHT", xOff, 0)
-    btn:SetPoint("RIGHT", parent,          "RIGHT", -4,   0)
+    btn:SetPoint("TOPLEFT", leftAnchorFrame, "TOPRIGHT", xOff, 0)
+    btn:SetPoint("RIGHT", parent,           "RIGHT",    -4,   0)
     btn:SetHeight(18)
     local fs = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     fs:SetAllPoints()
     fs:SetJustifyH("LEFT")
+    fs:SetJustifyV("TOP")
     fs:SetText(displayText or "?")
     if link and link ~= "" then
         btn:EnableMouse(true)

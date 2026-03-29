@@ -122,9 +122,9 @@ local function BuildItemSubRows(content, fullName, rowW, yOff)
             -- Prio
             local prioLbl = subRow:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
             prioLbl:SetPoint("TOPLEFT", subRow, "TOPLEFT", x, -3)
-            prioLbl:SetWidth(36)
-            prioLbl:SetText(PRIO_LABEL[entry.winnerPrio] or "|cff888888—|r")
-            x = x + 36 + 4
+            prioLbl:SetWidth(46)
+            prioLbl:SetText(entry.winnerPrio and ("|cffaaaaaa" .. entry.winnerPrio .. "|r " .. (PRIO_LABEL[entry.winnerPrio] or "?")) or "|cff888888—|r")
+            x = x + 46 + 4
 
             -- Item-Name (klickbar mit Tooltip falls echter Link vorhanden)
             local safeLink   = (entry.link or ""):find("|H") and entry.link or nil

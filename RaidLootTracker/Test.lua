@@ -111,6 +111,15 @@ function GL.Test.SimulateRoll()
     ci.rollState.results  = { TestPlayer2 = 87, TestPlayer3 = 42 }
     ci.rollState.active   = true
 
+    -- Fake-Spieler zu Teilnehmern hinzufügen damit AssignLoot den realm-qualifizierten
+    -- Namen aus candidates findet und winnerPrio korrekt auslesen kann
+    local participants = GuildLootDB.currentRaid.participants
+    for name in pairs(ci.candidates) do
+        local found = false
+        for _, p in ipairs(participants) do if p == name then found = true; break end end
+        if not found then table.insert(participants, name) end
+    end
+
     if GL.UI and GL.UI.RefreshLootTab then GL.UI.RefreshLootTab() end
     GL.Print("Roll simulation active — check the Loot tab Results section.")
 end

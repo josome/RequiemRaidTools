@@ -482,7 +482,7 @@ function Loot.AssignLoot(recipientShortName)
         -- UI zeigt Popup → wird in UI.lua behandelt
         -- AssignLootConfirm wird danach aufgerufen
         if GL.UI and GL.UI.ShowDifficultyPopup then
-            GL.UI.ShowDifficultyPopup(recipientShortName)
+            GL.UI.ShowDifficultyPopup(fullName)
         end
         return
     end
@@ -538,8 +538,8 @@ function Loot.AssignLootConfirm(fullName, diff)
         end
     end
 
-    -- Observer informieren
-    if GL.Comm then GL.Comm.SendAssign(GL.ShortName(fullName), diff, link, category, currentItem.quality) end
+    -- Observer informieren (fullName ist bereits realm-qualifiziert)
+    if GL.Comm then GL.Comm.SendAssign(fullName, diff, link, category, currentItem.quality) end
 
     -- Zustand zurücksetzen
     Loot.ClearCurrentItem()
