@@ -272,8 +272,8 @@ function Loot.OnChatMessage(msg, sender)
     local prio = GL.ParseLootInput(msg)
     if not prio then return end
 
-    -- Kandidaten registrieren (Override erlaubt)
-    currentItem.candidates[sender] = { prio = prio }
+    -- Kandidaten registrieren (Override erlaubt) – immer realm-qualifiziert als Key
+    currentItem.candidates[GL.NormalizeName(sender) or sender] = { prio = prio }
 
     -- RefreshLootTab statt nur RefreshCandidates: aktualisiert auch Button-States (hasCands)
     if GL.UI and GL.UI.RefreshLootTab then
@@ -495,9 +495,8 @@ function Loot.AssignLootConfirm(fullName, diff)
     local link     = currentItem.link
     local ts       = GL.GetTimestamp()
 
-    -- Prio des Gewinners aus der Kandidaten-Liste
-    local shortName  = GL.ShortName(fullName)
-    local winnerPrio = currentItem.candidates[shortName] and currentItem.candidates[shortName].prio or nil
+    -- Prio des Gewinners aus der Kandidaten-Liste (key ist realm-qualifiziert, Fallback auf ShortName)
+    local winnerPrio = (currentItem.candidates[fullName] or currentItem.candidates[GL.ShortName(fullName)] or {}).prio
 
     -- DB-Eintrag
     GL.CreatePlayerRecord(fullName)
@@ -540,7 +539,7 @@ function Loot.AssignLootConfirm(fullName, diff)
     end
 
     -- Observer informieren
-    if GL.Comm then GL.Comm.SendAssign(GL.ShortName(fullName), diff, link) end
+    if GL.Comm then GL.Comm.SendAssign(GL.ShortName(fullName), diff, link, category, currentItem.quality) end
 
     -- Zustand zurücksetzen
     Loot.ClearCurrentItem()
@@ -650,12 +649,29 @@ function Loot.OnCommItemActivate(link, category)
     currentItem.winner     = nil
     currentItem.prioState  = { active = true,  timeLeft = 0, timer = nil }
     currentItem.rollState  = { active = false, players  = {}, results = {}, timer = nil, timeLeft = 0 }
+    -- Item auch in lokale pendingLoot einfügen damit die Sidebar es anzeigt
+    local pl = pendingLoot()
+    local found = false
+    for _, p in ipairs(pl) do
+        if p.link == link then found = true; break end
+    end
+    if not found then
+        table.insert(pl, { link = link, name = name, itemID = itemID, quality = 0, category = category })
+    end
     if GL.UI and GL.UI.RefreshLootTab then GL.UI.RefreshLootTab() end
 end
 
 --- ML hat Item abgebrochen → Observer leeren Anzeige
 function Loot.OnCommItemClear()
     if GL.IsMasterLooter() then return end
+    -- Item aus lokaler pendingLoot entfernen
+    local link = currentItem.link
+    if link then
+        local pl = pendingLoot()
+        for i = #pl, 1, -1 do
+            if pl[i].link == link then table.remove(pl, i); break end
+        end
+    end
     if currentItem.prioState.timer then currentItem.prioState.timer:Cancel() end
     if currentItem.rollState.timer  then currentItem.rollState.timer:Cancel()  end
     currentItem.link       = nil
@@ -694,13 +710,14 @@ function Loot.OnCommRollStart(seconds, players)
 end
 
 --- ML hat Loot zugewiesen → Observer aktualisieren Session-Log
-function Loot.OnCommAssign(playerName, diff, link)
+function Loot.OnCommAssign(playerName, diff, link, category, quality)
     if GL.IsMasterLooter() then return end
     if not playerName or playerName == "" then return end
-    -- Vollständigen Namen suchen (Kurzname-Match)
+    -- Name realm-qualifizieren und in participants suchen
+    playerName = GL.NormalizeName(playerName) or playerName
     local fullName = playerName
     for _, p in ipairs(GuildLootDB.currentRaid.participants) do
-        if GL.ShortName(p) == playerName or p == playerName then
+        if p == playerName or GL.ShortName(p) == GL.ShortName(playerName) then
             fullName = p; break
         end
     end
@@ -708,6 +725,8 @@ function Loot.OnCommAssign(playerName, diff, link)
         player     = fullName,
         item       = link or "",
         link       = link or "",
+        category   = category or "other",
+        quality    = quality or 0,
         difficulty = diff or "",
         timestamp  = time(),
     })

@@ -139,13 +139,8 @@ end
 -- Roster-Verwaltung
 -- ============================================================
 
-local function NormalizeName(name)
-    if name and not name:find("-") then
-        local realm = GetRealmName()
-        if realm then name = name .. "-" .. realm end
-    end
-    return name
-end
+-- NormalizeName ist jetzt GL.NormalizeName (Util.lua) – hier Alias für Abwärtskompatibilität
+local NormalizeName = function(name) return GL.NormalizeName(name) end
 
 function GL.LoadRaidRoster()
     local raid = GuildLootDB.currentRaid
@@ -351,17 +346,35 @@ function GL.OnCommRaidStart(tier, difficulty, id, startedAt, sender)
         if GL.UI and GL.UI.RefreshSessionBar then GL.UI.RefreshSessionBar() end
         return
     end
+    -- Resume-Fall: eigenen History-Snapshot mit gleicher ID suchen und lootLog wiederherstellen
+    local restoredLog = {}
+    local histIdx = nil
+    local history = GuildLootDB.raidHistory or {}
+    for i, snap in ipairs(history) do
+        if snap.id == id then
+            restoredLog = snap.lootLog or {}
+            histIdx = i
+            break
+        end
+    end
     raid.active      = true
     raid.tier        = tier or ""
     raid.difficulty  = difficulty or ""
     raid.id          = id or ""
     raid.startedAt   = startedAt or 0
-    raid.resumed     = false
+    raid.resumed     = (histIdx ~= nil)
     raid.mlName      = NormalizeName(sender) or ""
-    raid.lootLog     = raid.lootLog or {}
+    raid.lootLog     = restoredLog
     raid.pendingLoot = {}
+    if histIdx then
+        table.remove(history, histIdx)
+    end
     GL.LoadRaidRoster()
-    GL.Print("Raid synced from ML: " .. (tier or "?"))
+    if histIdx then
+        GL.Print("Raid resumed from ML: " .. (tier or "?") .. " (" .. #restoredLog .. " loot entries restored).")
+    else
+        GL.Print("Raid synced from ML: " .. (tier or "?"))
+    end
     if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
 end
 
@@ -397,9 +410,10 @@ function GL.OnCommRaidEnd(raidID)
 end
 
 function GL.OnCommMLAnnounce(newMLName)
-    local myName = NormalizeName(UnitName("player")) or ""
-    GuildLootDB.currentRaid.mlName = newMLName or ""
-    if myName ~= newMLName then
+    local myName    = NormalizeName(UnitName("player")) or ""
+    local normalNew = NormalizeName(newMLName or "") or ""
+    GuildLootDB.currentRaid.mlName = normalNew   -- immer realm-qualifiziert speichern
+    if myName ~= normalNew then
         GuildLootDB.settings.isMasterLooter = false
     end
     GL.Print(GL.ShortName(newMLName or "") .. " ist jetzt Master Looter.")
@@ -428,7 +442,7 @@ end
 
 function GL.OnCommMLDeny(claimantName)
     local myName = NormalizeName(UnitName("player")) or ""
-    if myName ~= claimantName then return end
+    if myName ~= NormalizeName(claimantName or "") then return end
     GuildLootDB.settings.isMasterLooter = false
     GL.Print("|cffff4444ML-Anfrage abgelehnt.|r")
     if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
@@ -470,12 +484,16 @@ function GL.ResumeRaid(idx)
         table.insert(raid.trashedLoot, item)
     end
     raid.resumed                 = true
+    raid.mlName                  = NormalizeName(UnitName("player")) or ""
     raid.sessionHidden           = {}
     raid.sessionChecked          = {}
     raid.currentKillParticipants = {}
     table.remove(history, idx)
     GL.Print("Raid resumed: " .. (raid.tier ~= "" and raid.tier or "?")
              .. " (" .. #raid.participants .. " players, " .. #raid.lootLog .. " loot entries restored).")
+    if GL.Comm and GL.Comm.SendRaidStart then
+        GL.Comm.SendRaidStart(raid.tier, raid.difficulty, raid.id, raid.startedAt)
+    end
     if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
     if GL.UI and GL.UI.ShowTab then GL.UI.ShowTab(GL.UI.TAB_LOOT) end
 end

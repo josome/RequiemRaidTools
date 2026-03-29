@@ -115,6 +115,16 @@ end
 -- Hilfsfunktionen
 -- ============================================================
 
+--- Stellt sicher dass ein Name das Format "Name-Realm" hat.
+--- WoW gibt auf gleichem Realm nur "Name" zurück; cross-realm enthält "-" bereits.
+function GL.NormalizeName(name)
+    if name and not name:find("-") then
+        local realm = GetRealmName()
+        if realm then name = name .. "-" .. realm end
+    end
+    return name
+end
+
 function GL.IsMasterLooter()
     return GuildLootDB and GuildLootDB.settings and GuildLootDB.settings.isMasterLooter == true
 end

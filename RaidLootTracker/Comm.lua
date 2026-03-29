@@ -51,9 +51,10 @@ function Comm.SendRollStart(seconds, players)
 end
 
 --- ML hat Loot einem Spieler zugewiesen
-function Comm.SendAssign(playerName, difficulty, itemLink)
+function Comm.SendAssign(playerName, difficulty, itemLink, category, quality)
     SendToGroup("ASSIGN" .. SEP .. (playerName or "") .. SEP
-                         .. (difficulty or "") .. SEP .. (itemLink or ""))
+                         .. (difficulty or "") .. SEP .. (itemLink or "")
+                         .. SEP .. (category or "other") .. SEP .. tostring(quality or 0))
 end
 
 --- ML hat Raid gestartet (auch bei GROUP_ROSTER_UPDATE → Late-Joiner-Sync)
@@ -69,17 +70,17 @@ end
 
 --- Neuer ML steht fest (direkte Übernahme oder nach Bestätigung)
 function Comm.SendMLAnnounce(newMLName)
-    SendToGroup("ML_ANNOUNCE" .. SEP .. (newMLName or ""))
+    SendToGroup("ML_ANNOUNCE" .. SEP .. (GL.NormalizeName(newMLName or "") or ""))
 end
 
 --- Anfrage an aktuellen ML: Claimant möchte ML werden
 function Comm.SendMLRequest(claimantName)
-    SendToGroup("ML_REQUEST" .. SEP .. (claimantName or ""))
+    SendToGroup("ML_REQUEST" .. SEP .. (GL.NormalizeName(claimantName or "") or ""))
 end
 
 --- ML verweigert den Claim
 function Comm.SendMLDeny(claimantName)
-    SendToGroup("ML_DENY" .. SEP .. (claimantName or ""))
+    SendToGroup("ML_DENY" .. SEP .. (GL.NormalizeName(claimantName or "") or ""))
 end
 
 -- ============================================================
@@ -127,9 +128,9 @@ function Comm.OnMessage(msg, sender)
         end
 
     elseif cmd == "ASSIGN" then
-        local name, diff, link = parts[2], parts[3], parts[4]
+        local name, diff, link, category, quality = parts[2], parts[3], parts[4], parts[5], parts[6]
         if GL.Loot and GL.Loot.OnCommAssign then
-            GL.Loot.OnCommAssign(name, diff, link)
+            GL.Loot.OnCommAssign(name, diff, link, category, tonumber(quality) or 0)
         end
 
     elseif cmd == "RAID_START" then
