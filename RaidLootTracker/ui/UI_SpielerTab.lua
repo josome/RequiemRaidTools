@@ -204,14 +204,17 @@ function UI.RefreshSpielerTab()
 
         -- Toggle-Button ▶/▼
         local isExpanded = expandedPlayers[fullName]
-        local toggleBtn  = CreateFrame("Button", nil, row)
+        local toggleBtn = CreateFrame("Button", nil, row)
         toggleBtn:SetSize(16, 16)
         toggleBtn:SetPoint("TOPLEFT", row, "TOPLEFT", xOff, -3)
-        local toggleLbl = toggleBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        toggleLbl:SetAllPoints()
-        toggleLbl:SetJustifyH("CENTER")
-        toggleLbl:SetFont(toggleLbl:GetFont(), 14, "OUTLINE")
-        toggleLbl:SetText(isExpanded and "|cffFFD700-|r" or "|cff888888+|r")
+        if isExpanded then
+            toggleBtn:SetNormalTexture("Interface\\Buttons\\UI-MinusButton-UP")
+            toggleBtn:SetPushedTexture("Interface\\Buttons\\UI-MinusButton-DOWN")
+        else
+            toggleBtn:SetNormalTexture("Interface\\Buttons\\UI-PlusButton-UP")
+            toggleBtn:SetPushedTexture("Interface\\Buttons\\UI-PlusButton-DOWN")
+        end
+        toggleBtn:SetHighlightTexture("Interface\\Buttons\\UI-PlusButton-Hilight")
         toggleBtn:SetScript("OnClick", function()
             expandedPlayers[fullName] = not expandedPlayers[fullName]
             UI.RefreshSpielerTab()
