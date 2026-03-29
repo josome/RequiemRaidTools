@@ -250,9 +250,10 @@ end
 
 --- Hilfsfunktion: Instanzname + Datum als Tier-String
 local function AutoTierName()
-    local instanceName, instanceType = GetInstanceInfo()
-    if instanceType == "raid" or instanceType == "party" then
-        return instanceName .. " (" .. date("%d.%m.%Y") .. ")"
+    local mapInfo = C_Map.GetMapInfo(C_Map.GetBestMapForUnit("player"))
+    local zoneName = (mapInfo and mapInfo.name and mapInfo.name ~= "") and mapInfo.name or GetRealZoneText()
+    if zoneName and zoneName ~= "" then
+        return zoneName .. " (" .. date("%d.%m.%Y") .. ")"
     end
     return date("%d.%m.%Y")
 end

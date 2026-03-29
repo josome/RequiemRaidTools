@@ -51,9 +51,10 @@ function UI.BuildRaidPanel(parent)
     end)
     tierBox:SetScript("OnEditFocusGained", function(self)
         if self:GetText() == "" then
-            local name, iType = GetInstanceInfo()
-            if iType == "raid" or iType == "party" then
-                self:SetText(name .. " (" .. date("%d.%m.%Y") .. ")")
+            local mapInfo = C_Map.GetMapInfo(C_Map.GetBestMapForUnit("player"))
+            local zoneName = (mapInfo and mapInfo.name and mapInfo.name ~= "") and mapInfo.name or GetRealZoneText()
+            if zoneName and zoneName ~= "" then
+                self:SetText(zoneName .. " (" .. date("%d.%m.%Y") .. ")")
                 self:HighlightText()
             end
         end
