@@ -87,12 +87,21 @@ function GL.Test.SimulateRoll()
         return
     end
 
-    -- Item aktivieren
-    GL.Loot.ActivateItem(chosen.link, chosen.name, 0, chosen.equipLoc, chosen.quality)
+    local itemID   = tonumber(chosen.link:match("item:(%d+)"))
+    local _, _, _, _, _, _, _, _, equipLoc = GetItemInfo(chosen.link)
+    local category = GL.GetItemCategory(itemID, equipLoc or chosen.equipLoc, chosen.quality)
 
-    -- Fake-Kandidaten + Roll-State direkt setzen
+    -- Alle laufenden Timer stoppen (kein ActivateItem, damit kein Prio-Timer gestartet wird)
+    GL.Loot.ClearCurrentItem()
+
+    -- currentItem direkt befüllen ohne Timer zu starten
     local realm = GetRealmName() or "Realm"
     local ci = GL.Loot.GetCurrentItem()
+    ci.link     = chosen.link
+    ci.name     = chosen.name
+    ci.itemID   = itemID
+    ci.quality  = chosen.quality
+    ci.category = category
     ci.candidates = {
         ["TestPlayer1-" .. realm] = { prio = 1 },
         ["TestPlayer2-" .. realm] = { prio = 1 },
@@ -108,8 +117,7 @@ function GL.Test.SimulateRoll()
         TestPlayer3 = true,
         TestPlayer4 = true,
     }
-    ci.rollState.results  = { TestPlayer2 = 87, TestPlayer3 = 42 }
-    ci.rollState.active   = true
+    ci.rollState.results = { TestPlayer2 = 87, TestPlayer3 = 42 }
 
     -- Fake-Spieler zu Teilnehmern hinzufügen damit AssignLoot den realm-qualifizierten
     -- Namen aus candidates findet und winnerPrio korrekt auslesen kann
@@ -120,8 +128,9 @@ function GL.Test.SimulateRoll()
         if not found then table.insert(participants, name) end
     end
 
-    if GL.UI and GL.UI.RefreshLootTab then GL.UI.RefreshLootTab() end
-    GL.Print("Roll simulation active — check the Loot tab Results section.")
+    -- Ergebnisse sofort auswerten → Assign-Buttons direkt aktiv ohne "Evaluate"
+    GL.Loot.FinalizeRoll()
+    GL.Print("Roll simulation: TestPlayer2 won (87) — check the Loot tab to assign.")
 end
 
 -- Fügt einen fertigen Loot-Log-Eintrag mit echtem Item aus dem Inventar ein,

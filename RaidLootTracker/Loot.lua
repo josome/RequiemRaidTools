@@ -347,10 +347,13 @@ function Loot.StartRoll()
             GL.UI.RefreshCountdown(currentItem.rollState.timeLeft)
         end
         if currentItem.rollState.timeLeft <= 0 then
-            currentItem.rollState.timer:Cancel()
+            if currentItem.rollState.timer then
+                currentItem.rollState.timer:Cancel()
+                currentItem.rollState.timer = nil
+            end
             Loot.FinalizeRoll()
         end
-    end, rollSecs)
+    end)
 
     if GL.UI and GL.UI.RefreshLootTab then GL.UI.RefreshLootTab() end
 end
@@ -445,10 +448,13 @@ function Loot.FinalizeRoll()
                 GL.UI.RefreshCountdown(currentItem.rollState.timeLeft)
             end
             if currentItem.rollState.timeLeft <= 0 then
-                currentItem.rollState.timer:Cancel()
+                if currentItem.rollState.timer then
+                    currentItem.rollState.timer:Cancel()
+                    currentItem.rollState.timer = nil
+                end
                 Loot.FinalizeRoll()
             end
-        end, rollSecs)
+        end)
     else
         -- Gewinner vorschlagen (LM bestätigt)
         currentItem.winner = topRoller
