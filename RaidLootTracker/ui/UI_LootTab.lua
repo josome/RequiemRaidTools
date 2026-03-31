@@ -143,6 +143,15 @@ function UI.BuildLootPanel(parent)
     panel.pendingContent = pendingContent
     panel.pendingScroll  = pendingScroll
 
+    -- Empty-State: Schatztruhe wenn keine Items pending
+    local emptyTex = pendingScroll:CreateTexture(nil, "BACKGROUND")
+    emptyTex:SetTexture("Interface\\Icons\\INV_Misc_Chest_Special")
+    emptyTex:SetSize(64, 64)
+    emptyTex:SetPoint("CENTER", pendingScroll, "CENTER", 0, 0)
+    emptyTex:SetAlpha(0.12)
+    emptyTex:Hide()
+    panel.pendingEmptyTex = emptyTex
+
     -- ── HAUPT-BEREICH ─────────────────────────────────────────
     local main = CreateFrame("Frame", nil, panel)
     main:SetPoint("TOPLEFT",     panel,   "TOPLEFT",   4,  -2)
@@ -442,6 +451,15 @@ function UI.RefreshLootTab()
 
     local totalH = math.max(1, (#items * (ROW_H + 2)) + 8)
     pf:SetHeight(totalH)
+
+    -- Empty-State Textur
+    if UI.lootPanel.pendingEmptyTex then
+        if #items == 0 and not isTrashed then
+            UI.lootPanel.pendingEmptyTex:Show()
+        else
+            UI.lootPanel.pendingEmptyTex:Hide()
+        end
+    end
 
     -- Aktives Item
     if ci.link then
