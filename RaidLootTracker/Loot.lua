@@ -573,7 +573,10 @@ end
 
 function Loot.ResetCurrentItem()
     if not GL.IsMasterLooter() then return end
+    local itemLink = currentItem.link
     Loot.ClearCurrentItem()
+    if GL.Comm then GL.Comm.SendItemClear() end
+    GL.Print("Item reset: " .. (itemLink or "?"))
     if GL.UI and GL.UI.RefreshLootTab then GL.UI.RefreshLootTab() end
 end
 
@@ -598,6 +601,7 @@ function Loot.RemovePendingItem(link)
     end
     if currentItem.link == link then
         Loot.ClearCurrentItem()
+        if GL.Comm then GL.Comm.SendItemClear() end
     end
 end
 
@@ -631,6 +635,7 @@ function Loot.TrashActiveItem()
     local link = currentItem.link
     if not link then return end
     Loot.ClearCurrentItem()
+    if GL.Comm then GL.Comm.SendItemClear() end
     Loot.RemovePendingItem(link)
     if GL.UI and GL.UI.RefreshLootTab then GL.UI.RefreshLootTab() end
 end

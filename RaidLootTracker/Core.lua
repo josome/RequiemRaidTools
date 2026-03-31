@@ -286,9 +286,10 @@ function GL.StartRaid(tier)
     raid.lootLog    = {}
     GL.LoadRaidRoster()
     raid.mlName = NormalizeName(UnitName("player")) or ""
+    GuildLootDB.settings.isMasterLooter = true
     GL.Print("Raid started: " .. raid.tier .. ". " .. #raid.participants .. " players loaded.")
     if GL.Comm and GL.Comm.SendRaidStart then
-        GL.Comm.SendRaidStart(raid.tier, raid.difficulty, raid.id, raid.startedAt)
+        GL.Comm.SendRaidStart(raid.tier, raid.difficulty, raid.id, raid.startedAt, UnitName("player"))
     end
     if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
     if GL.UI and GL.UI.ShowTab then GL.UI.ShowTab(GL.UI.TAB_LOOT) end
@@ -337,8 +338,15 @@ end
 -- Observer-Handler (empfangen Comm-Nachrichten vom ML)
 -- ============================================================
 
-function GL.OnCommRaidStart(tier, difficulty, id, startedAt, sender)
-    if GL.IsMasterLooter() then return end
+function GL.OnCommRaidStart(tier, difficulty, id, startedAt, sender, mlName)
+    if GL.IsMasterLooter() then
+        -- Jemand anderes sendet RAID_START → er ist der aktuelle ML, wir wurden abgelöst
+        GuildLootDB.settings.isMasterLooter = false
+        GL._pendingMLClaim = nil
+        if GL._mlClaimTimer then GL._mlClaimTimer:Cancel(); GL._mlClaimTimer = nil end
+        if GL.UI and GL.UI.RefreshMLButton then GL.UI.RefreshMLButton() end
+        -- kein return → Raid-State normal synchronisieren
+    end
     local raid = GuildLootDB.currentRaid
     -- Gleicher Raid bereits aktiv → nur Roster neu laden (Late-Joiner-Refresh)
     if raid.active and raid.id == id then
@@ -363,7 +371,8 @@ function GL.OnCommRaidStart(tier, difficulty, id, startedAt, sender)
     raid.id          = id or ""
     raid.startedAt   = startedAt or 0
     raid.resumed     = (histIdx ~= nil)
-    raid.mlName      = NormalizeName(sender) or ""
+    -- mlName explizit aus Nachricht bevorzugen, sender als Fallback
+    raid.mlName      = (mlName and mlName ~= "") and mlName or NormalizeName(sender) or ""
     raid.lootLog     = restoredLog
     raid.pendingLoot = {}
     if histIdx then
@@ -376,6 +385,13 @@ function GL.OnCommRaidStart(tier, difficulty, id, startedAt, sender)
         GL.Print("Raid synced from ML: " .. (tier or "?"))
     end
     if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
+end
+
+function GL.OnCommRaidQuery(sender)
+    if not GL.IsMasterLooter() then return end
+    local raid = GuildLootDB.currentRaid
+    if not raid.active then return end
+    GL.Comm.SendRaidStart(raid.tier, raid.difficulty, raid.id, raid.startedAt, UnitName("player"))
 end
 
 function GL.OnCommRaidEnd(raidID)
@@ -410,6 +426,8 @@ function GL.OnCommRaidEnd(raidID)
 end
 
 function GL.OnCommMLAnnounce(newMLName)
+    -- Laufenden Claim-Timer abbrechen (Claim wurde bestätigt oder jemand anderes wurde ML)
+    if GL._mlClaimTimer then GL._mlClaimTimer:Cancel(); GL._mlClaimTimer = nil end
     local myName    = NormalizeName(UnitName("player")) or ""
     local normalNew = NormalizeName(newMLName or "") or ""
     GuildLootDB.currentRaid.mlName = normalNew   -- immer realm-qualifiziert speichern
@@ -422,18 +440,27 @@ end
 
 function GL.OnCommMLRequest(claimantName, sender)
     if not GL.IsMasterLooter() then return end
+    -- Race Condition: nur einen Claim gleichzeitig erlauben
+    local normalClaim = NormalizeName(claimantName or "") or ""
+    if GL._pendingMLClaim and GL._pendingMLClaim ~= normalClaim then
+        if GL.Comm then GL.Comm.SendMLDeny(claimantName) end
+        return
+    end
+    GL._pendingMLClaim = normalClaim
     StaticPopupDialogs["RLT_ML_REQUEST"] = {
         text         = (GL.ShortName(claimantName or "") .. " möchte Master Looter werden. Übergeben?"),
         button1      = "Ja",
         button2      = "Nein",
         OnAccept     = function()
+            GL._pendingMLClaim = nil
             GuildLootDB.settings.isMasterLooter = false
             if GL.Comm then GL.Comm.SendMLAnnounce(claimantName) end
         end,
         OnCancel     = function()
+            GL._pendingMLClaim = nil
             if GL.Comm then GL.Comm.SendMLDeny(claimantName) end
         end,
-        timeout      = 30,
+        timeout      = 15,
         whileDead    = false,
         hideOnEscape = true,
     }
@@ -443,6 +470,9 @@ end
 function GL.OnCommMLDeny(claimantName)
     local myName = NormalizeName(UnitName("player")) or ""
     if myName ~= NormalizeName(claimantName or "") then return end
+    -- Laufenden Claim-Timer abbrechen; Flag setzen falls Timer gerade noch läuft
+    GL._mlDenied = true
+    if GL._mlClaimTimer then GL._mlClaimTimer:Cancel(); GL._mlClaimTimer = nil end
     GuildLootDB.settings.isMasterLooter = false
     GL.Print("|cffff4444ML-Anfrage abgelehnt.|r")
     if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
@@ -492,7 +522,7 @@ function GL.ResumeRaid(idx)
     GL.Print("Raid resumed: " .. (raid.tier ~= "" and raid.tier or "?")
              .. " (" .. #raid.participants .. " players, " .. #raid.lootLog .. " loot entries restored).")
     if GL.Comm and GL.Comm.SendRaidStart then
-        GL.Comm.SendRaidStart(raid.tier, raid.difficulty, raid.id, raid.startedAt)
+        GL.Comm.SendRaidStart(raid.tier, raid.difficulty, raid.id, raid.startedAt, UnitName("player"))
     end
     if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
     if GL.UI and GL.UI.ShowTab then GL.UI.ShowTab(GL.UI.TAB_LOOT) end
@@ -602,10 +632,18 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 
     elseif event == "RAID_ROSTER_UPDATE" or event == "GROUP_ROSTER_UPDATE" then
         GL.SyncRoster()
-        -- Late-Joiner: aktiven Raid-State an Gruppe broadcasten
+        -- Late-Joiner: aktiven Raid-State an Gruppe broadcasten (ML-Push)
         local _raid = GuildLootDB.currentRaid
         if _raid.active and GL.IsMasterLooter() and GL.Comm and GL.Comm.SendRaidStart then
-            GL.Comm.SendRaidStart(_raid.tier, _raid.difficulty, _raid.id, _raid.startedAt)
+            GL.Comm.SendRaidStart(_raid.tier, _raid.difficulty, _raid.id, _raid.startedAt, UnitName("player"))
+        end
+        -- Observer ohne aktiven Raid → aktiv nach Raid fragen (max. 1x alle 5s)
+        if not GL.IsMasterLooter() and not _raid.active then
+            local now = time()
+            if not GL._lastRaidQuery or (now - GL._lastRaidQuery) > 5 then
+                GL._lastRaidQuery = now
+                if GL.Comm and GL.Comm.SendRaidQuery then GL.Comm.SendRaidQuery() end
+            end
         end
 
     elseif event == "ENCOUNTER_END" then
@@ -738,6 +776,14 @@ SlashCmdList["RAIDLOOTTRACKER"] = function(input)
     elseif cmd == "simmlrequest" then
         GL.OnCommMLRequest("FakeObs1", "FakeObs1")
         GL.Print("Simulated ML_REQUEST from FakeObs1.")
+
+    elseif cmd == "simmlannounce" then
+        GL.OnCommMLAnnounce("FakeML2")
+        GL.Print("Simulated ML_ANNOUNCE: FakeML2 ist jetzt ML.")
+
+    elseif cmd == "simraidquery" then
+        GL.OnCommRaidQuery(UnitName("player") or "")
+        GL.Print("Simulated RAID_QUERY (als eigener Sender).")
 
     elseif cmd == "loopback" then
         local s = GuildLootDB.settings

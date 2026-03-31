@@ -58,9 +58,15 @@ function Comm.SendAssign(playerName, difficulty, itemLink, category, quality)
 end
 
 --- ML hat Raid gestartet (auch bei GROUP_ROSTER_UPDATE → Late-Joiner-Sync)
-function Comm.SendRaidStart(tier, difficulty, id, startedAt)
+function Comm.SendRaidStart(tier, difficulty, id, startedAt, mlName)
     SendToGroup("RAID_START" .. SEP .. (tier or "") .. SEP .. (difficulty or "")
-                             .. SEP .. (id or "") .. SEP .. tostring(startedAt or 0))
+                             .. SEP .. (id or "") .. SEP .. tostring(startedAt or 0)
+                             .. SEP .. (GL.NormalizeName(mlName or "") or ""))
+end
+
+--- Observer fragt nach aktivem Raid (Late-Joiner Pull)
+function Comm.SendRaidQuery()
+    SendToGroup("RAID_QUERY")
 end
 
 --- ML hat Raid beendet
@@ -90,7 +96,9 @@ end
 function Comm.OnMessage(msg, sender)
     -- Eigene Nachrichten ignorieren (ML hat bereits lokal verarbeitet)
     -- Ausnahme: commLoopback-Flag für Tests
-    if sender == UnitName("player") then
+    -- Sender ist realm-qualifiziert ("Name-Realm"), UnitName nicht → NormalizeName verwenden
+    local myName = (GL.NormalizeName and GL.NormalizeName(UnitName("player") or "")) or UnitName("player") or ""
+    if sender == myName then
         if not (GuildLootDB and GuildLootDB.settings and GuildLootDB.settings.commLoopback) then
             return
         end
@@ -134,10 +142,13 @@ function Comm.OnMessage(msg, sender)
         end
 
     elseif cmd == "RAID_START" then
-        local tier, difficulty, id, startedAt = parts[2], parts[3], parts[4], parts[5]
+        local tier, difficulty, id, startedAt, mlName = parts[2], parts[3], parts[4], parts[5], parts[6]
         if GL.OnCommRaidStart then
-            GL.OnCommRaidStart(tier, difficulty, id, tonumber(startedAt) or 0, sender)
+            GL.OnCommRaidStart(tier, difficulty, id, tonumber(startedAt) or 0, sender, mlName)
         end
+
+    elseif cmd == "RAID_QUERY" then
+        if GL.OnCommRaidQuery then GL.OnCommRaidQuery(sender) end
 
     elseif cmd == "RAID_END" then
         if GL.OnCommRaidEnd then

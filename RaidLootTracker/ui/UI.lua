@@ -195,10 +195,23 @@ function UI.BuildMainFrame()
             local currentML = GuildLootDB.currentRaid and GuildLootDB.currentRaid.mlName or ""
             local myName    = GL.ShortName(UnitName("player") or "")
             if currentML ~= "" and GL.ShortName(currentML) ~= myName and GL.IsPlayerInGroup(currentML) then
-                -- Aktueller ML ist noch in der Gruppe → Anfrage stellen
+                -- Aktueller ML ist noch in der Gruppe → Anfrage stellen + Observer-seitiger Timer
                 self:SetChecked(false)  -- noch nicht setzen, erst auf Bestätigung warten
                 if GL.Comm then GL.Comm.SendMLRequest(UnitName("player") or "") end
-                GL.Print("ML-Anfrage an " .. GL.ShortName(currentML) .. " gesendet...")
+                GL.Print("ML-Anfrage an " .. GL.ShortName(currentML) .. " gesendet (15s Timeout)...")
+                -- Nach 15s ohne Antwort automatisch übernehmen
+                GL._mlClaimTimer = C_Timer.NewTimer(15, function()
+                    GL._mlClaimTimer = nil
+                    -- Abbrechen wenn ML_DENY kurz vor Timer-Ablauf ankam
+                    if GL._mlDenied then GL._mlDenied = nil; return end
+                    GuildLootDB.settings.isMasterLooter = true
+                    if GL.Comm and (IsInRaid() or IsInGroup()) then
+                        GL.Comm.SendMLAnnounce(UnitName("player") or "")
+                    end
+                    GL.Print("ML-Übernahme nach Timeout.")
+                    if GL.UI and GL.UI.RefreshMLButton then GL.UI.RefreshMLButton() end
+                    if UI.RefreshLootTab then UI.RefreshLootTab() end
+                end)
                 return
             else
                 -- Kein ML oder ML weg → sofort übernehmen
@@ -486,6 +499,7 @@ end
 function UI.Refresh()
     if not mainFrame then return end
     UI.RefreshSessionBar()
+    UI.RefreshMLButton()
     if UI.activeTab == TAB_LOOT    then UI.RefreshLootTab()    end
     if UI.activeTab == TAB_SPIELER then UI.RefreshSpielerTab() end
     if UI.activeTab == TAB_LOG     then UI.RefreshLogTab()     end
@@ -493,8 +507,18 @@ function UI.Refresh()
 end
 
 function UI.RefreshMLButton()
-    if UI.mlCheck then
-        UI.mlCheck:SetChecked(GuildLootDB.settings.isMasterLooter)
+    if not UI.mlCheck then return end
+    local isML = GuildLootDB.settings.isMasterLooter
+    UI.mlCheck:SetChecked(isML)
+    if isML then
+        UI.mlCheck.text:SetText("ML")
+    else
+        local mlName = GuildLootDB.currentRaid and GuildLootDB.currentRaid.mlName or ""
+        if mlName ~= "" then
+            UI.mlCheck.text:SetText("ML: " .. GL.ShortName(mlName))
+        else
+            UI.mlCheck.text:SetText("ML")
+        end
     end
 end
 
