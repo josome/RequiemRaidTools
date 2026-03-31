@@ -202,6 +202,8 @@ function UI.BuildMainFrame()
                 -- Nach 15s ohne Antwort automatisch übernehmen
                 GL._mlClaimTimer = C_Timer.NewTimer(15, function()
                     GL._mlClaimTimer = nil
+                    -- Abbrechen wenn ML_DENY kurz vor Timer-Ablauf ankam
+                    if GL._mlDenied then GL._mlDenied = nil; return end
                     GuildLootDB.settings.isMasterLooter = true
                     if GL.Comm and (IsInRaid() or IsInGroup()) then
                         GL.Comm.SendMLAnnounce(UnitName("player") or "")

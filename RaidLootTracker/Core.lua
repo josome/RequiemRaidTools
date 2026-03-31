@@ -286,6 +286,7 @@ function GL.StartRaid(tier)
     raid.lootLog    = {}
     GL.LoadRaidRoster()
     raid.mlName = NormalizeName(UnitName("player")) or ""
+    GuildLootDB.settings.isMasterLooter = true
     GL.Print("Raid started: " .. raid.tier .. ". " .. #raid.participants .. " players loaded.")
     if GL.Comm and GL.Comm.SendRaidStart then
         GL.Comm.SendRaidStart(raid.tier, raid.difficulty, raid.id, raid.startedAt, UnitName("player"))
@@ -342,6 +343,7 @@ function GL.OnCommRaidStart(tier, difficulty, id, startedAt, sender, mlName)
         -- Jemand anderes sendet RAID_START → er ist der aktuelle ML, wir wurden abgelöst
         GuildLootDB.settings.isMasterLooter = false
         GL._pendingMLClaim = nil
+        if GL._mlClaimTimer then GL._mlClaimTimer:Cancel(); GL._mlClaimTimer = nil end
         if GL.UI and GL.UI.RefreshMLButton then GL.UI.RefreshMLButton() end
         -- kein return → Raid-State normal synchronisieren
     end
@@ -468,7 +470,8 @@ end
 function GL.OnCommMLDeny(claimantName)
     local myName = NormalizeName(UnitName("player")) or ""
     if myName ~= NormalizeName(claimantName or "") then return end
-    -- Laufenden Claim-Timer abbrechen
+    -- Laufenden Claim-Timer abbrechen; Flag setzen falls Timer gerade noch läuft
+    GL._mlDenied = true
     if GL._mlClaimTimer then GL._mlClaimTimer:Cancel(); GL._mlClaimTimer = nil end
     GuildLootDB.settings.isMasterLooter = false
     GL.Print("|cffff4444ML-Anfrage abgelehnt.|r")
@@ -773,6 +776,14 @@ SlashCmdList["RAIDLOOTTRACKER"] = function(input)
     elseif cmd == "simmlrequest" then
         GL.OnCommMLRequest("FakeObs1", "FakeObs1")
         GL.Print("Simulated ML_REQUEST from FakeObs1.")
+
+    elseif cmd == "simmlannounce" then
+        GL.OnCommMLAnnounce("FakeML2")
+        GL.Print("Simulated ML_ANNOUNCE: FakeML2 ist jetzt ML.")
+
+    elseif cmd == "simraidquery" then
+        GL.OnCommRaidQuery(UnitName("player") or "")
+        GL.Print("Simulated RAID_QUERY (als eigener Sender).")
 
     elseif cmd == "loopback" then
         local s = GuildLootDB.settings

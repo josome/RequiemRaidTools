@@ -96,7 +96,9 @@ end
 function Comm.OnMessage(msg, sender)
     -- Eigene Nachrichten ignorieren (ML hat bereits lokal verarbeitet)
     -- Ausnahme: commLoopback-Flag für Tests
-    if sender == UnitName("player") then
+    -- Sender ist realm-qualifiziert ("Name-Realm"), UnitName nicht → NormalizeName verwenden
+    local myName = (GL.NormalizeName and GL.NormalizeName(UnitName("player") or "")) or UnitName("player") or ""
+    if sender == myName then
         if not (GuildLootDB and GuildLootDB.settings and GuildLootDB.settings.commLoopback) then
             return
         end
