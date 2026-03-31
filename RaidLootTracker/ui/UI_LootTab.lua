@@ -144,13 +144,17 @@ function UI.BuildLootPanel(parent)
     panel.pendingScroll  = pendingScroll
 
     -- Empty-State: Schatztruhe wenn keine Items pending
-    local emptyTex = pendingScroll:CreateTexture(nil, "BACKGROUND")
+    local emptyFrame = CreateFrame("Frame", nil, sidebar)
+    emptyFrame:SetPoint("TOPLEFT",     pendingScroll, "TOPLEFT",     0, 0)
+    emptyFrame:SetPoint("BOTTOMRIGHT", pendingScroll, "BOTTOMRIGHT", 0, 0)
+    emptyFrame:SetFrameLevel(pendingScroll:GetFrameLevel() + 2)
+    local emptyTex = emptyFrame:CreateTexture(nil, "ARTWORK")
     emptyTex:SetTexture("Interface\\Icons\\INV_Misc_Chest_Special")
     emptyTex:SetSize(64, 64)
-    emptyTex:SetPoint("CENTER", pendingScroll, "CENTER", 0, 0)
-    emptyTex:SetAlpha(0.12)
-    emptyTex:Hide()
-    panel.pendingEmptyTex = emptyTex
+    emptyTex:SetPoint("CENTER", emptyFrame, "CENTER", 0, 0)
+    emptyTex:SetAlpha(0.35)
+    emptyFrame:Hide()
+    panel.pendingEmptyTex = emptyFrame
 
     -- ── HAUPT-BEREICH ─────────────────────────────────────────
     local main = CreateFrame("Frame", nil, panel)
