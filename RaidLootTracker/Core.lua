@@ -431,7 +431,9 @@ function GL.OnCommMLAnnounce(newMLName)
     local myName    = NormalizeName(UnitName("player")) or ""
     local normalNew = NormalizeName(newMLName or "") or ""
     GuildLootDB.currentRaid.mlName = normalNew   -- immer realm-qualifiziert speichern
-    if myName ~= normalNew then
+    if myName == normalNew then
+        GuildLootDB.settings.isMasterLooter = true
+    else
         GuildLootDB.settings.isMasterLooter = false
     end
     GL.Print(GL.ShortName(newMLName or "") .. " ist jetzt Master Looter.")
