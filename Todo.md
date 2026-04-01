@@ -23,7 +23,19 @@
   - Aktueller Raid zuerst, danach ältere Raids chronologisch absteigend
   - Optional: Limit auf letzte N Raids oder letzte X Items
 
+
+- [ ]Neu **Falls jemand ausversehen eine prio geschrieben hat soll der ML die weg X en können**
+- [ ]Neu **Die Settings des Raids sollten mit übertragen werden, relevant sind hier Loot Seltenheit,Timers **
+- [ ]Neu **Bei lootverteilung mit prio 4 sollen die bervorzugt werden die das item tragen können**
+        Platte aber nur platte und nicht auch stoff, leder und schwere rüstung
+
+- [ ]Neu **Abgleich Discord Raid anmeldungen mit eingeladenen personen**
+
+## Bugs
+- [ ] Neu Bug, ein client der später beitritt bekomme die Raiddaten nicht
+- [ ] Omni Settoken werden nicht berücksichtigt
 ---
+
 
 ### CSV Roundtrip: Google Sheets ↔ Addon
 
@@ -73,3 +85,4 @@
 - [x] Absturz-Warnung in Raid-Statuszeile
 - [x] pendingLoot wird bei CloseRaid im Snapshot gespeichert
 - [x] pendingLoot wird bei ResumeRaid aus Snapshot wiederhergestellt
+
