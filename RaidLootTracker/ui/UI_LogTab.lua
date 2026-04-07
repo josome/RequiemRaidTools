@@ -92,7 +92,7 @@ end
 -- Log-Tab Refresh
 -- ============================================================
 
-local PRIO_LABEL = { [1]="|cffffcc00BIS|r", [2]="|cff88ff88Upg|r", [3]="|cff888888OS|r", [4]="|cff888888Fun|r" }
+local PRIO_LABEL = { [1]="|cffffcc00BIS|r", [2]="|cff6699ffOS|r", [4]="|cff888888Tmog|r" }
 local CAT_LABEL  = { weapons="Weapon", trinket="Trinket", setItems="Set", other="Other" }
 
 local function TrackColor(diff)

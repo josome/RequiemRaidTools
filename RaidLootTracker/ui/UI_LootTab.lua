@@ -225,24 +225,6 @@ function UI.BuildLootPanel(parent)
     trashItemBtn:SetPoint("RIGHT", resetItemBtn, "LEFT", -4, 0)
     trashItemBtn:SetPoint("TOP",   divA, "BOTTOM", 0, -2)
 
-    -- Kandidaten
-    local candLabel = main:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    candLabel:SetPoint("TOPLEFT", activeItemCategoryLabel, "BOTTOMLEFT", 0, -6)
-    candLabel:SetText("|cffffcc00Prio Submissions:|r")
-
-    local candScroll = CreateFrame("ScrollFrame", "GuildLootCandScroll", main, "UIPanelScrollFrameTemplate")
-    candScroll:SetPoint("TOPLEFT",  candLabel, "BOTTOMLEFT", 0, -2)
-    candScroll:SetPoint("TOPRIGHT", main,      "TOPRIGHT",  -22, 0)
-    candScroll:SetHeight(90)
-    local candContent = CreateFrame("Frame", nil, candScroll)
-    candContent:SetSize(candScroll:GetWidth(), 1)
-    candScroll:SetScrollChild(candContent)
-    panel.candContent = candContent
-    panel.candLabel   = candLabel
-    panel.candScroll  = candScroll
-    candLabel:Hide()
-    candScroll:Hide()
-
     -- Buttons: Roll-Aktion + Countdown
     startRollBtn = MakeButton(main, "Release Roll", 130, 24, function()
         GL.Loot.StartRoll()
@@ -467,7 +449,8 @@ function UI.RefreshLootTab()
 
     -- Aktives Item
     if ci.link then
-        activeItemLabel:SetText(ci.link)
+        local countPrefix = (ci.count and ci.count > 1) and (ci.count .. "× ") or ""
+        activeItemLabel:SetText(countPrefix .. ci.link)
         local catNames = { weapons="Weapon", trinket="Trinket", setItems="Set/Token", other="Other" }
         activeItemCategoryLabel:SetText("[" .. (catNames[ci.category] or "?") .. "]")
         resetItemBtn:SetEnabled(isML)
@@ -490,17 +473,23 @@ function UI.RefreshLootTab()
     UI.RefreshCountdown(ci.rollState.timeLeft)
 
     -- Roll-Button: Label + Aktion je nach Phase
-    local hasItem    = ci.link ~= nil
-    local prioActive = ci.prioState and ci.prioState.active
-    local rollActive = ci.rollState.active
-    local hasCands   = next(ci.candidates) ~= nil
-    local hasWinner  = ci.winner ~= nil
+    local hasItem         = ci.link ~= nil
+    local prioActive      = ci.prioState and ci.prioState.active
+    local rollActive      = ci.rollState.active
+    local hasCands        = next(ci.candidates) ~= nil
+    local hasWinner       = ci.winner ~= nil
+    local multiWinners    = ci.winners and #ci.winners > 1
+    local hasAnyWinner    = hasWinner or (ci.winners and #ci.winners > 0)
 
     if rollActive then
         startRollBtn:SetText("Evaluate")
         startRollBtn:SetScript("OnClick", function() GL.Loot.FinalizeRoll() end)
         startRollBtn:SetEnabled(isML)
-    elseif hasWinner then
+    elseif multiWinners then
+        startRollBtn:SetText("Assign All (" .. #ci.winners .. ")")
+        startRollBtn:SetScript("OnClick", function() GL.Loot.AssignAllWinners() end)
+        startRollBtn:SetEnabled(isML)
+    elseif hasAnyWinner then
         startRollBtn:SetText("Evaluate")
         startRollBtn:SetEnabled(false)
     elseif prioActive then
@@ -515,47 +504,25 @@ function UI.RefreshLootTab()
 end
 
 function UI.RefreshCandidates()
-    local ci      = GL.Loot.GetCurrentItem()
-    local content = UI.lootPanel and UI.lootPanel.candContent
-    if not content then GL.Print("[DBG] RefreshCandidates: no content"); return end
-    for _, r in ipairs(candidateRows) do r:Hide() end
-    candidateRows = {}
-
-    local sorted = {}
-    for name, data in pairs(ci.candidates) do
-        table.insert(sorted, { name = name, prio = data.prio })
-    end
-    table.sort(sorted, function(a, b) return a.prio < b.prio end)
-
-    local yOff = 0
-    for _, entry in ipairs(sorted) do
-        local row = CreateFrame("Frame", nil, content)
-        row:SetPoint("TOPLEFT", content, "TOPLEFT", 0, yOff)
-        row:SetPoint("RIGHT",   content, "RIGHT",    0, 0)
-        row:SetHeight(20)
-
-        local nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        nameText:SetPoint("LEFT", row, "LEFT", 4, 0)
-        nameText:SetText(GL.ShortName(entry.name))
-        nameText:SetWidth(180)
-
-        local prioText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        prioText:SetPoint("LEFT", nameText, "RIGHT", 8, 0)
-        prioText:SetText("Prio: |cffffcc00" .. entry.prio .. "|r")
-
-        row:Show()
-        table.insert(candidateRows, row)
-        yOff = yOff - 20
-    end
-    content:SetHeight(math.max(1, -yOff))
+    -- Prio Submissions werden nicht mehr separat angezeigt.
+    -- Alle Kandidaten inkl. X-Button sind in RefreshRollResults sichtbar.
 end
 
 function UI.RefreshRollResults()
     local ci      = GL.Loot.GetCurrentItem()
     local content = UI.lootPanel and UI.lootPanel.resultContent
     if not content then return end
+    -- Content-Breite dynamisch setzen (wie RefreshSessionLoot)
+    local rw = UI.lootPanel.resultScroll and UI.lootPanel.resultScroll:GetWidth() or 0
+    if rw > 10 then content:SetWidth(rw) end
     for _, r in ipairs(rollResultRows) do r:Hide() end
     rollResultRows = {}
+
+    -- Gewinner-Set aufbauen (single winner + multi winners)
+    local winnerSet = {}
+    if ci.winner then winnerSet[ci.winner] = true end
+    for _, w in ipairs(ci.winners or {}) do winnerSet[w] = true end
+    local multiWinners = ci.winners and #ci.winners > 1
 
     local bestPrio = nil
     for _, data in pairs(ci.candidates) do
@@ -567,9 +534,11 @@ function UI.RefreshRollResults()
         local short = GL.ShortName(name)
         table.insert(sorted, {
             name     = short,
+            fullName = name,   -- realm-qualifizierter Key für candidates-Tabelle
             prio     = data.prio,
             roll     = ci.rollState.results[short],
-            eligible = (data.prio == bestPrio),
+            -- Gewinner gelten immer als eligible (auch bei Cross-Tier-Prio)
+            eligible = (data.prio == bestPrio) or (winnerSet[short] == true),
         })
     end
 
@@ -583,10 +552,10 @@ function UI.RefreshRollResults()
 
     local yOff = 0
     for _, entry in ipairs(sorted) do
-        local isWinner = entry.name == ci.winner
+        local isWinner = winnerSet[entry.name]
         local row = CreateFrame("Frame", nil, content)
-        row:SetPoint("TOPLEFT", content, "TOPLEFT", 0, yOff)
-        row:SetPoint("RIGHT",   content, "RIGHT",  -30, 0)
+        row:SetPoint("TOPLEFT",  content, "TOPLEFT",  0, yOff)
+        row:SetPoint("TOPRIGHT", content, "TOPRIGHT", 0, yOff)
         row:SetHeight(24)
 
         if isWinner then
@@ -595,30 +564,51 @@ function UI.RefreshRollResults()
             bg:SetColorTexture(1, 0.8, 0, 0.15)
         end
 
-        local nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        nameText:SetPoint("LEFT", row, "LEFT", 4, 0)
-        nameText:SetWidth(160)
-        if isWinner then
-            nameText:SetText("|cffffcc00★ " .. entry.name .. "|r")
-        elseif not entry.eligible then
-            nameText:SetText("|cff888888" .. entry.name .. "|r")
-        else
-            nameText:SetText(entry.name)
+        -- Layout von rechts aufbauen damit kein Overlap entsteht:
+        -- [name][prio] ... [roll][assign][×]
+        local isML = GL.IsMasterLooter()
+
+        -- X-Button ganz rechts (nur ML), aligned mit Session-Loot
+        local xBtn
+        if isML then
+            local fullName = entry.fullName
+            xBtn = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+            xBtn:SetSize(18, 18)
+            xBtn:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+            xBtn:SetText("×")
+            xBtn:SetScript("OnClick", function()
+                GL.Loot.GetCurrentItem().candidates[fullName] = nil
+                UI.RefreshRollResults()
+            end)
         end
 
-        local prioText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        prioText:SetPoint("LEFT", nameText, "RIGHT", 4, 0)
-        prioText:SetWidth(60)
-        if not entry.eligible then
-            prioText:SetText("|cff888888Prio " .. entry.prio .. "|r")
-        else
-            prioText:SetText("Prio " .. entry.prio)
+        -- Assign-Button links vom X (eligible Spieler, nur bei Einzel-Gewinner)
+        -- Bei mehreren Gewinnern: "Assign All"-Button im Header übernimmt das
+        local assignBtn
+        if entry.eligible and not multiWinners then
+            assignBtn = MakeButton(row, "Assign", 80, 20, function()
+                GL.Loot.AssignLoot(entry.name)
+            end)
+            if xBtn then
+                assignBtn:SetPoint("RIGHT", xBtn, "LEFT", -4, 0)
+            else
+                assignBtn:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+            end
+            assignBtn:SetEnabled(isML and not ci.rollState.active)
         end
 
+        -- Roll-Ergebnis rechts-verankert links vom Assign (eligible, feste Position)
         if entry.eligible then
             local rollText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-            rollText:SetPoint("LEFT", prioText, "RIGHT", 4, 0)
-            rollText:SetWidth(60)
+            rollText:SetWidth(36)
+            rollText:SetJustifyH("RIGHT")
+            if assignBtn then
+                rollText:SetPoint("RIGHT", assignBtn, "LEFT", -6, 0)
+            elseif xBtn then
+                rollText:SetPoint("RIGHT", xBtn, "LEFT", -6, 0)
+            else
+                rollText:SetPoint("RIGHT", row, "RIGHT", -6, 0)
+            end
             if entry.roll then
                 rollText:SetText("|cff00ff00" .. entry.roll .. "|r")
             else
@@ -626,12 +616,31 @@ function UI.RefreshRollResults()
             end
         end
 
-        if entry.eligible then
-            local assignBtn = MakeButton(row, "Assign", 80, 20, function()
-                GL.Loot.AssignLoot(entry.name)
-            end)
-            assignBtn:SetPoint("RIGHT", row, "RIGHT", 0, 0)
-            assignBtn:SetEnabled(GL.IsMasterLooter() and not ci.rollState.active)
+        -- Name links
+        local nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        nameText:SetPoint("LEFT", row, "LEFT", 4, 0)
+        nameText:SetWidth(130)
+        if isWinner then
+            local winIdx = 0
+            for i, w in ipairs(ci.winners or {}) do
+                if w == entry.name then winIdx = i; break end
+            end
+            local prefix = (winIdx > 0) and (winIdx .. ". ★ ") or "★ "
+            nameText:SetText("|cffffcc00" .. prefix .. entry.name .. "|r")
+        elseif not entry.eligible then
+            nameText:SetText("|cff888888" .. entry.name .. "|r")
+        else
+            nameText:SetText(entry.name)
+        end
+
+        -- Prio links vom Namen
+        local prioText = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        prioText:SetPoint("LEFT", nameText, "RIGHT", 4, 0)
+        prioText:SetWidth(50)
+        if not entry.eligible then
+            prioText:SetText("|cff888888Prio " .. entry.prio .. "|r")
+        else
+            prioText:SetText("Prio " .. entry.prio)
         end
 
         row:Show()

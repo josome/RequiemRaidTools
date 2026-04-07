@@ -540,8 +540,24 @@ function UI.Toggle()
     end
 end
 
+-- Wird von Core.lua bei PLAYER_ENTERING_WORLD aufgerufen.
+-- Versteckt das Addon in Dungeons/Delves, zeigt es in Raids/Open World.
+function UI.OnZoneChanged()
+    if GL.IsValidZone() then
+        -- Gültige Zone: Dock-Tab anzeigen falls minimiert
+        if dockTab and GuildLootDB.settings.minimized then
+            dockTab:Show()
+        end
+    else
+        -- Dungeon / Delve / Arena: UI komplett ausblenden
+        if mainFrame then mainFrame:Hide() end
+        if dockTab then dockTab:Hide() end
+    end
+end
+
 function UI.AutoExpand()
-    -- Nur für ML: Bei Boss-Kill Dock öffnen und Loot-Tab zeigen
+    -- Nur für ML in gültiger Zone: Bei Boss-Kill Dock öffnen und Loot-Tab zeigen
+    if not GL.IsValidZone() then return end
     if GuildLootDB.settings.minimized then
         UI.Undock()
     elseif mainFrame and not mainFrame:IsShown() then
@@ -557,7 +573,8 @@ end
 
 local difficultyPopup
 
-function UI.ShowDifficultyPopup(recipientShortName)
+-- callback (optional): function(diff) — wird statt AssignLootConfirm aufgerufen (z.B. für AssignAllWinners)
+function UI.ShowDifficultyPopup(recipientShortName, callback)
     if difficultyPopup then difficultyPopup:Hide() end
 
     local popup = CreateFrame("Frame", "GuildLootDiffPopup", UIParent, "BackdropTemplate")
@@ -574,7 +591,11 @@ function UI.ShowDifficultyPopup(recipientShortName)
     local function MakeDiffBtn(text, diff, xPos)
         local btn = MakeButton(popup, text, 60, 24, function()
             popup:Hide()
-            GL.Loot.AssignLootConfirm(recipientShortName, diff)
+            if callback then
+                callback(diff)
+            else
+                GL.Loot.AssignLootConfirm(recipientShortName, diff)
+            end
         end)
         btn:SetPoint("BOTTOM", popup, "BOTTOM", xPos, 12)
         return btn
@@ -607,7 +628,7 @@ function UI.LoadPosition()
         mainFrame:Hide()
         UI.BuildDockTab()
         UI.RefreshDockTab()
-        dockTab:Show()
+        if GL.IsValidZone() then dockTab:Show() end
     else
         -- Position wiederherstellen
         local sz = GuildLootDB.settings.frameSize

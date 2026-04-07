@@ -10,6 +10,10 @@ local Loot = GL.Loot
 -- Modul-lokaler Zustand (nicht persistent)
 -- ============================================================
 
+-- Offene Handelszuweisungen: { { itemID=N, shortName="X" }, ... }
+-- Wird befüllt wenn ML ein Item zuweist; bei TRADE_SHOW abgeglichen.
+Loot._pendingTrades = {}
+
 -- pendingLoot wird direkt aus GuildLootDB gelesen (überlebt Reloads)
 local function pendingLoot() return GuildLootDB.currentRaid.pendingLoot end
 local function trashedLoot() return GuildLootDB.currentRaid.trashedLoot or {} end
@@ -32,7 +36,10 @@ local currentItem  = {
         timer    = nil,
         timeLeft = 0,
     },
-    winner = nil,
+    winner     = nil,
+    count      = 1,    -- Anzahl verfügbarer Kopien dieses Items
+    winners    = {},   -- { shortName, ... } bei count > 1
+    _tieReRoll = nil,  -- { confirmedWinners={}, spotsNeeded=N } während Tie-Re-Roll
 }
 
 local function PRIO_SECONDS() return GuildLootDB.settings.prioSeconds or 15 end
@@ -209,12 +216,23 @@ function Loot.ActivateItem(link, name, iLevel, equipLoc, quality)
     currentItem.category   = GL.GetItemCategory(itemID, equipLoc or "", quality or 0)
     currentItem.candidates = {}
     currentItem.winner     = nil
+    currentItem.winners    = {}
+    currentItem._tieReRoll = nil
     currentItem.prioState  = { active=false, timeLeft=0, timer=nil }
     currentItem.rollState  = { active=false, players={}, results={}, timer=nil, timeLeft=0 }
 
+    -- Anzahl der Kopien dieses Items in pendingLoot ermitteln (per itemID)
+    local copyCount = 0
+    for _, p in ipairs(pendingLoot()) do
+        local pid = tonumber(p.link:match("item:(%d+)"))
+        if pid == itemID then copyCount = copyCount + 1 end
+    end
+    currentItem.count = (copyCount > 0) and copyCount or 1
+
     -- Prio-Sammel-Timer starten
     local prioSecs = PRIO_SECONDS()
-    GL.PostRaidWarn("Loot: " .. link .. " -- Post your prio (" .. prioSecs .. " sec): 1=BIS, 2=Upgrade, 3=OS, 4=Fun")
+    local warnPrefix = (currentItem.count > 1) and (currentItem.count .. "x ") or ""
+    GL.PostRaidWarn(warnPrefix .. "Loot: " .. link .. " -- Post your prio (" .. prioSecs .. " sec): 1=BIS, 2=OS, 4=Transmog")
     currentItem.prioState.active   = true
     currentItem.prioState.timeLeft = prioSecs
     currentItem.prioState.timer = C_Timer.NewTicker(1, function()
@@ -308,25 +326,39 @@ function Loot.StartRoll()
     end
     currentItem.prioState.active = false
 
-    local lowestPrio = GetLowestPrio(currentItem.candidates)
-    if not lowestPrio then
+    if not next(currentItem.candidates) then
         GL.Print("No prio submissions received.")
         return
     end
 
-    -- Spieler mit niedrigster Prio
+    local needed = currentItem.count  -- Anzahl zu vergebender Kopien
+
+    -- Prio-Tiers (1=BIS, 2=OS, 4=Transmog) der Reihe nach aufzählen
+    -- bis genug Spieler für alle Kopien gesammelt sind (Cross-Tier-Logik)
     local rollPlayers = {}
-    for name, data in pairs(currentItem.candidates) do
-        if data.prio == lowestPrio then
-            table.insert(rollPlayers, GL.ShortName(name))
-            currentItem.rollState.players[GL.ShortName(name)] = true
+    currentItem.rollState.players = {}
+    for _, prio in ipairs({1, 2, 4}) do
+        for name, data in pairs(currentItem.candidates) do
+            if data.prio == prio then
+                local short = GL.ShortName(name)
+                table.insert(rollPlayers, short)
+                currentItem.rollState.players[short] = true
+            end
         end
+        if #rollPlayers >= needed then break end
     end
 
-    -- Nur ein Spieler mit bester Prio → kein Roll nötig
-    if #rollPlayers == 1 then
-        currentItem.winner = rollPlayers[1]
-        GL.PostToRaid(rollPlayers[1] .. " is the only Prio " .. lowestPrio .. " player — no roll needed.")
+    -- Alle Kandidaten passen auf die Kopien → kein Roll nötig
+    if #rollPlayers <= needed then
+        currentItem.winners = rollPlayers
+        if needed == 1 then currentItem.winner = rollPlayers[1] end
+        local msg
+        if #rollPlayers == 1 then
+            msg = rollPlayers[1] .. " is the only eligible player — no roll needed."
+        else
+            msg = "All " .. #rollPlayers .. " eligible players win — no roll needed."
+        end
+        GL.PostToRaid(msg)
         if GL.UI and GL.UI.RefreshLootTab then GL.UI.RefreshLootTab() end
         return
     end
@@ -335,9 +367,12 @@ function Loot.StartRoll()
     currentItem.rollState.active   = true
     currentItem.rollState.results  = {}
     currentItem.rollState.timeLeft = rollSecs
+    currentItem._tieReRoll = nil
 
     local playerList = table.concat(rollPlayers, ", ")
-    GL.PostToRaid("Please /roll now! " .. rollSecs .. " seconds: " .. playerList)
+    local rollMsg = "Please /roll now! " .. rollSecs .. " seconds"
+    if needed > 1 then rollMsg = rollMsg .. " (" .. needed .. " winners)" end
+    GL.PostToRaid(rollMsg .. ": " .. playerList)
     if GL.Comm then GL.Comm.SendRollStart(rollSecs, rollPlayers) end
 
     -- Countdown in UI
@@ -412,31 +447,73 @@ function Loot.FinalizeRoll()
         return
     end
 
-    -- Höchste Zahl ermitteln
-    local topRoller, topValue = nil, -1
-    for name, val in pairs(results) do
-        if val > topValue then
-            topValue  = val
-            topRoller = name
+    -- Kontext: initiale Runde oder Tie-Re-Roll?
+    local confirmedWinners = {}
+    local spotsNeeded = currentItem.count
+    if currentItem._tieReRoll then
+        for _, w in ipairs(currentItem._tieReRoll.confirmedWinners) do
+            table.insert(confirmedWinners, w)
+        end
+        spotsNeeded = currentItem._tieReRoll.spotsNeeded
+    end
+
+    -- Prio eines Kurznamens aus candidates nachschlagen
+    local function getPrio(shortName)
+        for fullName, data in pairs(currentItem.candidates) do
+            if GL.ShortName(fullName) == shortName then return data.prio end
+        end
+        return 99
+    end
+
+    -- Alle Roll-Ergebnisse rangieren: Prio aufsteigend, Roll absteigend
+    local ranked = {}
+    for name, rollVal in pairs(results) do
+        table.insert(ranked, { name = name, roll = rollVal, prio = getPrio(name) })
+    end
+    table.sort(ranked, function(a, b)
+        if a.prio ~= b.prio then return a.prio < b.prio end
+        return a.roll > b.roll
+    end)
+
+    -- Weniger Ergebnisse als benötigte Spots: alle gewinnen
+    if #ranked <= spotsNeeded then
+        for _, r in ipairs(ranked) do table.insert(confirmedWinners, r.name) end
+        currentItem.winners    = confirmedWinners
+        currentItem._tieReRoll = nil
+        if currentItem.count == 1 then currentItem.winner = confirmedWinners[1] end
+        if GL.UI and GL.UI.RefreshLootTab then GL.UI.RefreshLootTab() end
+        return
+    end
+
+    -- Boundary (Platz N) ermitteln und Spieler klassifizieren
+    local boundaryPrio = ranked[spotsNeeded].prio
+    local boundaryRoll = ranked[spotsNeeded].roll
+
+    local clearWinners  = {}  -- eindeutig besser als Boundary
+    local boundaryGroup = {}  -- auf demselben Rang wie Boundary
+    for _, r in ipairs(ranked) do
+        if r.prio < boundaryPrio or (r.prio == boundaryPrio and r.roll > boundaryRoll) then
+            table.insert(clearWinners, r.name)
+        elseif r.prio == boundaryPrio and r.roll == boundaryRoll then
+            table.insert(boundaryGroup, r.name)
         end
     end
 
-    -- Gleichstand?
-    local tied = {}
-    for name, val in pairs(results) do
-        if val == topValue then
-            table.insert(tied, name)
-        end
-    end
+    local spotsForBoundary = spotsNeeded - #clearWinners
 
-    if #tied > 1 then
-        -- Erneuter Roll für Gleichstand-Spieler
-        GL.Print("Tie! Rolling again: " .. table.concat(tied, ", "))
-        GL.PostToRaid("Tie at " .. topValue .. "! Roll again: " .. table.concat(tied, ", "))
-        -- Neue Roll-Runde nur für Gleichstand-Spieler
+    if #boundaryGroup > spotsForBoundary then
+        -- Gleichstand am Grenzplatz → Re-Roll nur für boundaryGroup
+        local newConfirmed = {}
+        for _, w in ipairs(confirmedWinners) do table.insert(newConfirmed, w) end
+        for _, w in ipairs(clearWinners)     do table.insert(newConfirmed, w) end
+
+        GL.Print("Tie! Rolling again: " .. table.concat(boundaryGroup, ", "))
+        GL.PostToRaid("Tie at " .. boundaryRoll .. "! Roll again: " .. table.concat(boundaryGroup, ", "))
+
+        currentItem._tieReRoll = { confirmedWinners = newConfirmed, spotsNeeded = spotsForBoundary }
         currentItem.rollState.results = {}
         currentItem.rollState.players = {}
-        for _, name in ipairs(tied) do
+        for _, name in ipairs(boundaryGroup) do
             currentItem.rollState.players[name] = true
         end
         local rollSecs = ROLL_SECONDS()
@@ -454,10 +531,14 @@ function Loot.FinalizeRoll()
                 end
                 Loot.FinalizeRoll()
             end
-        end)
+        end, rollSecs)
     else
-        -- Gewinner vorschlagen (LM bestätigt)
-        currentItem.winner = topRoller
+        -- Kein Gleichstand: alle Gruppen zusammenführen
+        for _, w in ipairs(confirmedWinners)  do table.insert(clearWinners, w) end
+        for _, w in ipairs(boundaryGroup)     do table.insert(clearWinners, w) end
+        currentItem.winners    = clearWinners
+        currentItem._tieReRoll = nil
+        if currentItem.count == 1 then currentItem.winner = clearWinners[1] end
     end
 
     if GL.UI and GL.UI.RefreshLootTab then GL.UI.RefreshLootTab() end
@@ -470,6 +551,7 @@ end
 function Loot.AssignLoot(recipientShortName)
     if not GL.IsMasterLooter() then return end
     if not currentItem.link then return end
+    if not recipientShortName then return end
 
     -- Vollständigen Namen finden
     local fullName = nil
@@ -496,9 +578,13 @@ function Loot.AssignLoot(recipientShortName)
     Loot.AssignLootConfirm(fullName, diff)
 end
 
-function Loot.AssignLootConfirm(fullName, diff)
+-- clearAfter: ob currentItem nach Zuweisung geleert wird (default true; false bei Multi-Assign)
+function Loot.AssignLootConfirm(fullName, diff, clearAfter)
+    if not fullName then GL.Print("Fehler: kein Spielername bei Zuweisung"); return end
+    if clearAfter == nil then clearAfter = true end
     local category = currentItem.category or "other"
     local link     = currentItem.link
+    local itemID   = currentItem.itemID
     local ts       = GL.GetTimestamp()
 
     -- Prio des Gewinners aus der Kandidaten-Liste (key ist realm-qualifiziert, Fallback auf ShortName)
@@ -535,21 +621,65 @@ function Loot.AssignLootConfirm(fullName, diff)
     -- Raid-Chat
     GL.PostToRaid(GL.ShortName(fullName) .. " receives " .. link .. " - please pick up from the loot master.")
 
-    -- Item aus Pending entfernen
+    -- Item aus Pending entfernen (per Link; Fallback per itemID für abweichende Tracks)
     local pl = pendingLoot()
     for i, p in ipairs(pl) do
-        if p.link == link then
+        local pid = tonumber(p.link:match("item:(%d+)"))
+        if p.link == link or pid == itemID then
             table.remove(pl, i)
             break
         end
     end
 
+    -- Ausstehenden Handel vormerken (ML legt Item bei nächstem Handel automatisch rein)
+    if GL.IsMasterLooter() then
+        table.insert(Loot._pendingTrades, { itemID = itemID, shortName = GL.ShortName(fullName) })
+    end
+
     -- Observer informieren (fullName ist bereits realm-qualifiziert)
     if GL.Comm then GL.Comm.SendAssign(fullName, diff, link, category, currentItem.quality) end
 
-    -- Zustand zurücksetzen
-    Loot.ClearCurrentItem()
-    if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
+    -- Zustand zurücksetzen (nur wenn letzte Zuweisung)
+    if clearAfter then
+        Loot.ClearCurrentItem()
+        if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
+    end
+end
+
+-- Alle Gewinner (bei Mehrfach-Drop) auf einmal zuweisen
+function Loot.AssignAllWinners()
+    if not GL.IsMasterLooter() then return end
+    local winners = {}
+    for _, w in ipairs(currentItem.winners or {}) do
+        table.insert(winners, w)  -- Kopie vor Mutation
+    end
+    if #winners == 0 then return end
+
+    local function doAssign(diff)
+        for i, shortName in ipairs(winners) do
+            local fullName = shortName
+            for _, name in ipairs(GuildLootDB.currentRaid.participants) do
+                if GL.ShortName(name) == shortName or name == shortName then
+                    fullName = name
+                    break
+                end
+            end
+            local isLast = (i == #winners)
+            Loot.AssignLootConfirm(fullName, diff, isLast)
+        end
+        if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
+    end
+
+    local diff = GL.DetectDifficulty()
+    if not diff then
+        -- Difficulty unbekannt (nicht in Instanz) → Popup mit Callback
+        if GL.UI and GL.UI.ShowDifficultyPopup then
+            GL.UI.ShowDifficultyPopup(nil, doAssign)
+        end
+        return
+    end
+
+    doAssign(diff)
 end
 
 function Loot.ClearCurrentItem()
@@ -568,7 +698,83 @@ function Loot.ClearCurrentItem()
     currentItem.category   = nil
     currentItem.candidates = {}
     currentItem.winner     = nil
+    currentItem.count      = 1
+    currentItem.winners    = {}
+    currentItem._tieReRoll = nil
     pendingActivation      = nil
+end
+
+-- Wird bei TRADE_SHOW aufgerufen: legt alle zugewiesenen Items automatisch in den Handel,
+-- wenn der Handelspartner ein bekannter Gewinner ist (bis zu 6 Slots).
+-- Fix: Gesamte Logik um 0.1s verzögert (TRADE_SHOW kann vor Frame-Befüllung feuern).
+-- Fix: CursorHasItem()-Guard entfernt (WoW ignoriert ClickTradeButton mit leerem Cursor).
+-- Fix: strtrim() auf Partner-Namen (Whitespace-Schutz).
+-- Fix: Cross-Realm-Suffix "(*)"-Stripping (RCLootCouncil-Pattern).
+function Loot.OnTradeShow()
+    if not GL.IsMasterLooter() then return end
+    if #Loot._pendingTrades == 0 then return end
+
+    C_Timer.After(0.1, function()
+        -- Re-Check nach Delay
+        if #Loot._pendingTrades == 0 then return end
+
+        -- Handelspartner-Name aus dem Trade-Frame lesen
+        local recipientFrame = TradeFrameRecipientNameText
+        if not recipientFrame then return end
+        -- WoW-Farbcodes entfernen + Whitespace trimmen
+        local rawText = strtrim(recipientFrame:GetText() or "")
+        local cleanText = strtrim(rawText:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""))
+        -- Cross-Realm-Suffix entfernen: "Name(*)" oder "Name (Realm)" → "Name"
+        -- (RCLootCouncil-Pattern: TRADE_SHOW liefert bei Cross-Realm "Name(*)" statt "Name-Realm")
+        cleanText = strtrim(cleanText:gsub("%s*%(.*%)$", ""))
+        local partnerName = GL.ShortName(cleanText)
+        if partnerName == "" then return end
+
+        -- Alle offenen Zuweisungen für diesen Spieler sammeln und aus Liste entfernen
+        local itemIDs = {}
+        for i = #Loot._pendingTrades, 1, -1 do
+            local pt = Loot._pendingTrades[i]
+            if pt.shortName == partnerName then
+                table.insert(itemIDs, pt.itemID)
+                table.remove(Loot._pendingTrades, i)
+            end
+        end
+        if #itemIDs == 0 then return end
+
+        -- Nächsten freien Handelsslot finden (Hilfsfunktion)
+        local function nextFreeTradeSlot()
+            for i = 1, 6 do
+                local slotName = GetTradePlayerItemInfo(i)
+                if not slotName or slotName == "" then return i end
+            end
+            return nil
+        end
+
+        -- Jedes Item in den Taschen suchen und mit Delay in einen freien Handelsslot legen
+        local delay = 0
+        for _, itemID in ipairs(itemIDs) do
+            local capturedID    = itemID
+            local capturedDelay = delay
+            delay = delay + 0.1
+
+            C_Timer.After(capturedDelay, function()
+                local tradeSlot = nextFreeTradeSlot()
+                if not tradeSlot then return end
+
+                for bag = 0, 4 do
+                    for slot = 1, C_Container.GetContainerNumSlots(bag) do
+                        local info = C_Container.GetContainerItemInfo(bag, slot)
+                        if info and info.itemID == capturedID then
+                            ClearCursor()
+                            C_Container.PickupContainerItem(bag, slot)
+                            ClickTradeButton(tradeSlot)
+                            return
+                        end
+                    end
+                end
+            end)
+        end
+    end)
 end
 
 function Loot.ResetCurrentItem()
@@ -658,6 +864,9 @@ function Loot.OnCommItemActivate(link, category)
     currentItem.category   = category
     currentItem.candidates = {}
     currentItem.winner     = nil
+    currentItem.winners    = {}
+    currentItem.count      = 1
+    currentItem._tieReRoll = nil
     currentItem.prioState  = { active = true,  timeLeft = 0, timer = nil }
     currentItem.rollState  = { active = false, players  = {}, results = {}, timer = nil, timeLeft = 0 }
     -- Item auch in lokale pendingLoot einfügen damit die Sidebar es anzeigt

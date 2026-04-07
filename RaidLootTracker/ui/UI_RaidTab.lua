@@ -51,7 +51,8 @@ function UI.BuildRaidPanel(parent)
     end)
     tierBox:SetScript("OnEditFocusGained", function(self)
         if self:GetText() == "" then
-            local mapInfo = C_Map.GetMapInfo(C_Map.GetBestMapForUnit("player"))
+            local bestMap = C_Map.GetBestMapForUnit("player")
+            local mapInfo = bestMap and C_Map.GetMapInfo(bestMap)
             local zoneName = (mapInfo and mapInfo.name and mapInfo.name ~= "") and mapInfo.name or GetRealZoneText()
             if zoneName and zoneName ~= "" then
                 self:SetText(zoneName .. " (" .. date("%d.%m.%Y") .. ")")
@@ -283,7 +284,8 @@ function UI.RefreshRaidTab()
         if raid.active then
             UI.tierBox:SetText(raid.tier or "")
         else
-            local mapInfo = C_Map.GetMapInfo(C_Map.GetBestMapForUnit("player"))
+            local bestMap = C_Map.GetBestMapForUnit("player")
+            local mapInfo = bestMap and C_Map.GetMapInfo(bestMap)
             local zoneName = (mapInfo and mapInfo.name and mapInfo.name ~= "") and mapInfo.name or GetRealZoneText()
             if zoneName and zoneName ~= "" then
                 UI.tierBox:SetText(zoneName .. " (" .. date("%d.%m.%Y") .. ")")

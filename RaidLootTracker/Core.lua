@@ -289,7 +289,9 @@ function GL.StartRaid(tier)
     GuildLootDB.settings.isMasterLooter = true
     GL.Print("Raid started: " .. raid.tier .. ". " .. #raid.participants .. " players loaded.")
     if GL.Comm and GL.Comm.SendRaidStart then
-        GL.Comm.SendRaidStart(raid.tier, raid.difficulty, raid.id, raid.startedAt, UnitName("player"))
+        local s = GuildLootDB.settings
+        GL.Comm.SendRaidStart(raid.tier, raid.difficulty, raid.id, raid.startedAt, UnitName("player"),
+                              s.minQuality, s.prioSeconds, s.rollSeconds)
     end
     if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
     if GL.UI and GL.UI.ShowTab then GL.UI.ShowTab(GL.UI.TAB_LOOT) end
@@ -338,8 +340,17 @@ end
 -- Observer-Handler (empfangen Comm-Nachrichten vom ML)
 -- ============================================================
 
-function GL.OnCommRaidStart(tier, difficulty, id, startedAt, sender, mlName)
+function GL.OnCommRaidStart(tier, difficulty, id, startedAt, sender, mlName, minQuality, prioSeconds, rollSeconds)
     if GL.IsMasterLooter() then
+        -- Prüfen ob die Nachricht vom eigenen Client stammt (Self-Filter-Fallback).
+        -- Beide Seiten nutzen NormalizeName → gleiche Formatierung → zuverlässiger Vergleich
+        -- auch wenn WoW-Sender und GetRealmName() unterschiedliche Realm-Schreibweisen liefern.
+        local myNormalName = GL.NormalizeName(UnitName("player") or "") or ""
+        local senderML     = GL.NormalizeName(mlName or "") or ""
+        if senderML == myNormalName then
+            -- Eigene RAID_START-Broadcast empfangen (Self-Filter in Comm hat versagt) → ignorieren
+            return
+        end
         -- Jemand anderes sendet RAID_START → er ist der aktuelle ML, wir wurden abgelöst
         GuildLootDB.settings.isMasterLooter = false
         GL._pendingMLClaim = nil
@@ -379,6 +390,17 @@ function GL.OnCommRaidStart(tier, difficulty, id, startedAt, sender, mlName)
         table.remove(history, histIdx)
     end
     GL.LoadRaidRoster()
+    -- Settings des ML übernehmen (nur gültige Werte)
+    local s = GuildLootDB.settings
+    if minQuality and (minQuality == 3 or minQuality == 4 or minQuality == 5) then
+        s.minQuality = minQuality
+    end
+    if prioSeconds and prioSeconds >= 5 and prioSeconds <= 120 then
+        s.prioSeconds = prioSeconds
+    end
+    if rollSeconds and rollSeconds >= 5 and rollSeconds <= 120 then
+        s.rollSeconds = rollSeconds
+    end
     if histIdx then
         GL.Print("Raid resumed from ML: " .. (tier or "?") .. " (" .. #restoredLog .. " loot entries restored).")
     else
@@ -391,7 +413,9 @@ function GL.OnCommRaidQuery(sender)
     if not GL.IsMasterLooter() then return end
     local raid = GuildLootDB.currentRaid
     if not raid.active then return end
-    GL.Comm.SendRaidStart(raid.tier, raid.difficulty, raid.id, raid.startedAt, UnitName("player"))
+    local s = GuildLootDB.settings
+    GL.Comm.SendRaidStart(raid.tier, raid.difficulty, raid.id, raid.startedAt, UnitName("player"),
+                          s.minQuality, s.prioSeconds, s.rollSeconds)
 end
 
 function GL.OnCommRaidEnd(raidID)
@@ -524,7 +548,9 @@ function GL.ResumeRaid(idx)
     GL.Print("Raid resumed: " .. (raid.tier ~= "" and raid.tier or "?")
              .. " (" .. #raid.participants .. " players, " .. #raid.lootLog .. " loot entries restored).")
     if GL.Comm and GL.Comm.SendRaidStart then
-        GL.Comm.SendRaidStart(raid.tier, raid.difficulty, raid.id, raid.startedAt, UnitName("player"))
+        local s = GuildLootDB.settings
+        GL.Comm.SendRaidStart(raid.tier, raid.difficulty, raid.id, raid.startedAt, UnitName("player"),
+                              s.minQuality, s.prioSeconds, s.rollSeconds)
     end
     if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
     if GL.UI and GL.UI.ShowTab then GL.UI.ShowTab(GL.UI.TAB_LOOT) end
@@ -608,6 +634,8 @@ eventFrame:RegisterEvent("CHAT_MSG_INSTANCE_CHAT_LEADER")
 eventFrame:RegisterEvent("CHAT_MSG_SYSTEM")
 eventFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
 eventFrame:RegisterEvent("CHAT_MSG_ADDON")
+eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+eventFrame:RegisterEvent("TRADE_SHOW")
 
 eventFrame:SetScript("OnEvent", function(self, event, ...)
     if event == "ADDON_LOADED" then
@@ -627,17 +655,34 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
             end
         end
         if GL.UI and GL.UI.Init then GL.UI.Init() end
+        -- Delayed RAID_QUERY: Gruppe/Raid-API ist bei Login noch nicht sofort bereit.
+        -- C_Timer stellt sicher, dass GROUP_ROSTER_UPDATE schon gefeuert hat.
+        C_Timer.After(3, function()
+            local r = GuildLootDB.currentRaid
+            if not GL.IsMasterLooter() and not r.active then
+                GL._lastRaidQuery = time()
+                if GL.Comm and GL.Comm.SendRaidQuery then GL.Comm.SendRaidQuery() end
+            end
+        end)
 
     elseif event == "PLAYER_LOGOUT" then
         GuildLootDB.lastLogout = time()
         if GL.UI and GL.UI.SavePosition then GL.UI.SavePosition() end
+
+    elseif event == "PLAYER_ENTERING_WORLD" then
+        if GL.UI and GL.UI.OnZoneChanged then GL.UI.OnZoneChanged() end
+
+    elseif event == "TRADE_SHOW" then
+        if GL.Loot and GL.Loot.OnTradeShow then GL.Loot.OnTradeShow() end
 
     elseif event == "RAID_ROSTER_UPDATE" or event == "GROUP_ROSTER_UPDATE" then
         GL.SyncRoster()
         -- Late-Joiner: aktiven Raid-State an Gruppe broadcasten (ML-Push)
         local _raid = GuildLootDB.currentRaid
         if _raid.active and GL.IsMasterLooter() and GL.Comm and GL.Comm.SendRaidStart then
-            GL.Comm.SendRaidStart(_raid.tier, _raid.difficulty, _raid.id, _raid.startedAt, UnitName("player"))
+            local s = GuildLootDB.settings
+            GL.Comm.SendRaidStart(_raid.tier, _raid.difficulty, _raid.id, _raid.startedAt, UnitName("player"),
+                                  s.minQuality, s.prioSeconds, s.rollSeconds)
         end
         -- Observer ohne aktiven Raid → aktiv nach Raid fragen (max. 1x alle 5s)
         if not GL.IsMasterLooter() and not _raid.active then
@@ -675,25 +720,29 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         end
 
     elseif event == "LOOT_OPENED" then
-        if GL.Loot and GL.Loot.OnLootOpened then GL.Loot.OnLootOpened() end
+        if GL.IsValidZone() and GL.Loot and GL.Loot.OnLootOpened then GL.Loot.OnLootOpened() end
 
     elseif event == "LOOT_SLOT_CHANGED" then
         -- In Group Loot kommen Items asynchron nach LOOT_OPENED
         -- OnLootOpened erneut aufrufen – Dedup verhindert doppelte Einträge
-        if GL.Loot and GL.Loot.OnLootOpened then GL.Loot.OnLootOpened() end
+        if GL.IsValidZone() and GL.Loot and GL.Loot.OnLootOpened then GL.Loot.OnLootOpened() end
 
     elseif event == "LOOT_CLOSED" then
-        if GL.Loot and GL.Loot.OnLootClosed then GL.Loot.OnLootClosed() end
+        if GL.IsValidZone() and GL.Loot and GL.Loot.OnLootClosed then GL.Loot.OnLootClosed() end
 
     elseif event == "CHAT_MSG_RAID" or event == "CHAT_MSG_RAID_LEADER"
         or event == "CHAT_MSG_PARTY" or event == "CHAT_MSG_PARTY_LEADER"
         or event == "CHAT_MSG_INSTANCE_CHAT" or event == "CHAT_MSG_INSTANCE_CHAT_LEADER" then
-        local msg, sender = ...
-        if GL.Loot and GL.Loot.OnChatMessage then GL.Loot.OnChatMessage(msg, sender) end
+        if GL.IsValidZone() then
+            local msg, sender = ...
+            if GL.Loot and GL.Loot.OnChatMessage then GL.Loot.OnChatMessage(msg, sender) end
+        end
 
     elseif event == "CHAT_MSG_SYSTEM" then
-        local msg = ...
-        if GL.Loot and GL.Loot.OnSystemMessage then GL.Loot.OnSystemMessage(msg) end
+        if GL.IsValidZone() then
+            local msg = ...
+            if GL.Loot and GL.Loot.OnSystemMessage then GL.Loot.OnSystemMessage(msg) end
+        end
 
     elseif event == "CHAT_MSG_ADDON" then
         local prefix, msg, _, sender = ...
@@ -752,6 +801,13 @@ SlashCmdList["RAIDLOOTTRACKER"] = function(input)
             GL.Print("Test mode not loaded.")
         end
 
+    elseif cmd == "testprio" then
+        if GL.Test and GL.Test.SimulatePrio then
+            GL.Test.SimulatePrio()
+        else
+            GL.Print("Test mode not loaded.")
+        end
+
     elseif cmd == "testroll" then
         if GL.Test and GL.Test.SimulateRoll then
             GL.Test.SimulateRoll()
@@ -762,6 +818,13 @@ SlashCmdList["RAIDLOOTTRACKER"] = function(input)
     elseif cmd == "testentry" then
         if GL.Test and GL.Test.AddLootEntry then
             GL.Test.AddLootEntry()
+        else
+            GL.Print("Test mode not loaded.")
+        end
+
+    elseif cmd == "testmulti" then
+        if GL.Test and GL.Test.SimulateMultiRoll then
+            GL.Test.SimulateMultiRoll(arg ~= "" and arg or nil)
         else
             GL.Print("Test mode not loaded.")
         end
@@ -812,6 +875,6 @@ SlashCmdList["RAIDLOOTTRACKER"] = function(input)
         if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
 
     else
-        GL.Print("Commands: /rlt | /rlt start [tier] | /rlt history [name] | /rlt reset | /rlt ml | /rlt cleanup | /rlt test | /rlt testroll | /rlt testentry")
+        GL.Print("Commands: /rlt | /rlt start [tier] | /rlt history [name] | /rlt reset | /rlt ml | /rlt cleanup | /rlt test | /rlt testprio | /rlt testroll | /rlt testentry")
     end
 end

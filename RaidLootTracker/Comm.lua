@@ -58,10 +58,14 @@ function Comm.SendAssign(playerName, difficulty, itemLink, category, quality)
 end
 
 --- ML hat Raid gestartet (auch bei GROUP_ROSTER_UPDATE → Late-Joiner-Sync)
-function Comm.SendRaidStart(tier, difficulty, id, startedAt, mlName)
+--- Überträgt auch relevante Settings an Observer: minQuality, prioSeconds, rollSeconds
+function Comm.SendRaidStart(tier, difficulty, id, startedAt, mlName, minQuality, prioSeconds, rollSeconds)
     SendToGroup("RAID_START" .. SEP .. (tier or "") .. SEP .. (difficulty or "")
                              .. SEP .. (id or "") .. SEP .. tostring(startedAt or 0)
-                             .. SEP .. (GL.NormalizeName(mlName or "") or ""))
+                             .. SEP .. (GL.NormalizeName(mlName or "") or "")
+                             .. SEP .. tostring(minQuality or 0)
+                             .. SEP .. tostring(prioSeconds or 0)
+                             .. SEP .. tostring(rollSeconds or 0))
 end
 
 --- Observer fragt nach aktivem Raid (Late-Joiner Pull)
@@ -97,8 +101,12 @@ function Comm.OnMessage(msg, sender)
     -- Eigene Nachrichten ignorieren (ML hat bereits lokal verarbeitet)
     -- Ausnahme: commLoopback-Flag für Tests
     -- Sender ist realm-qualifiziert ("Name-Realm"), UnitName nicht → NormalizeName verwenden
-    local myName = (GL.NormalizeName and GL.NormalizeName(UnitName("player") or "")) or UnitName("player") or ""
-    if sender == myName then
+    local myName      = (GL.NormalizeName and GL.NormalizeName(UnitName("player") or "")) or UnitName("player") or ""
+    local myShortName = (GL.ShortName and GL.ShortName(myName)) or myName
+    local senderShort = (GL.ShortName and GL.ShortName(sender or "")) or (sender or "")
+    -- Exakter Vergleich ODER Kurzname-Vergleich als Fallback für Realm-Formatierungs-Unterschiede
+    -- (GetRealmName() kann Leerzeichen enthalten, WoW-Sender-Format nicht immer identisch)
+    if sender == myName or senderShort == myShortName then
         if not (GuildLootDB and GuildLootDB.settings and GuildLootDB.settings.commLoopback) then
             return
         end
@@ -143,8 +151,10 @@ function Comm.OnMessage(msg, sender)
 
     elseif cmd == "RAID_START" then
         local tier, difficulty, id, startedAt, mlName = parts[2], parts[3], parts[4], parts[5], parts[6]
+        local minQuality, prioSeconds, rollSeconds = parts[7], parts[8], parts[9]
         if GL.OnCommRaidStart then
-            GL.OnCommRaidStart(tier, difficulty, id, tonumber(startedAt) or 0, sender, mlName)
+            GL.OnCommRaidStart(tier, difficulty, id, tonumber(startedAt) or 0, sender, mlName,
+                               tonumber(minQuality), tonumber(prioSeconds), tonumber(rollSeconds))
         end
 
     elseif cmd == "RAID_QUERY" then

@@ -21,6 +21,8 @@ Get-ChildItem $dst -Recurse -Include *.lua, *.toc | ForEach-Object {
     $content = Get-Content $_.FullName -Raw -Encoding UTF8
     $content = $content -replace 'GuildLootDB', 'GuildLootDBTest'
     $content = $content -replace '\bGuildLoot\b', 'GuildLootTest'
+    # Frame-Namen in String-Literalen: "GuildLoot..." → "GuildLootTest..." (Regex \b greift nicht vor Großbuchstaben)
+    $content = $content -replace '"GuildLoot', '"GuildLootTest'
     Set-Content $_.FullName $content -Encoding UTF8 -NoNewline
 }
 Write-Host "Replaced namespaces in Lua/TOC files"
@@ -32,6 +34,7 @@ Rename-Item "$dst\RaidLootTracker.toc" "RaidLootTracker_Test.toc"
 $toc = Get-Content "$dst\RaidLootTracker_Test.toc" -Raw -Encoding UTF8
 $toc = $toc -replace '(## Title:)[^\r\n]*', '## Title: RLT Observer (Test)'
 $toc = $toc -replace '(## SavedVariables:)[^\r\n]*', '## SavedVariables: GuildLootDBTest'
+## Version wird direkt aus dem Stable-TOC übernommen (enthält bereits -beta)
 Set-Content "$dst\RaidLootTracker_Test.toc" $toc -Encoding UTF8 -NoNewline
 
 Write-Host "TOC updated."

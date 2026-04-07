@@ -14,7 +14,7 @@ local ColorDiff   = UI._H.ColorDiff
 local playerRows      = {}
 local expandedPlayers = {}   -- expandedPlayers[fullName] = true/nil
 
-local PRIO_LABEL = { [1]="|cffffcc00BIS|r", [2]="|cff88ff88Upg|r", [3]="|cff888888OS|r", [4]="|cff888888Fun|r" }
+local PRIO_LABEL = { [1]="|cffffcc00BIS|r", [2]="|cff6699ffOS|r", [4]="|cff888888Tmog|r" }
 local CAT_LABEL  = { weapons="Weapon", trinket="Trinket", setItems="Set", other="Other" }
 local SUB_ROW_H  = 20
 local SUB_INDENT = 22   -- Einrückung der Sub-Rows
