@@ -51,6 +51,9 @@ local pendingActivation = nil   -- itemLink
 -- Items aus OnLootOpened die noch auf GetItemInfo warten
 local deferredPendingItems = {}
 
+-- Bereits verarbeitete Roll-IDs (verhindert Doppelverarbeitung bei mehrfachem Event-Fire)
+local processedRolls = {}
+
 -- ============================================================
 -- Zugriffs-Helfer
 -- ============================================================
@@ -132,6 +135,39 @@ end
 
 function Loot.OnLootClosed()
     -- pendingLoot einfrieren — Liste bleibt erhalten bis alle Items vergeben sind
+    if GL.UI and GL.UI.RefreshLootTab then GL.UI.RefreshLootTab() end
+end
+
+-- Wird bei START_LOOT_ROLL aufgerufen: erkennt Items aus WoW's Group-Loot-Roll-Fenster
+-- und fügt sie zu pendingLoot hinzu — auch wenn der ML die Leiche nie selbst geöffnet hat.
+function Loot.OnLootRollStart(rollID)
+    if not GL.IsMasterLooter() then return end
+    if not GuildLootDB.currentRaid.active then return end
+    if processedRolls[rollID] then return end
+    processedRolls[rollID] = true
+
+    local link = GetLootRollItemLink(rollID)
+    if not link then return end
+
+    local itemID = tonumber(link:match("item:(%d+)"))
+    if not itemID then return end
+
+    -- Qualitätsfilter: GetLootRollItemInfo gibt u.a. quality zurück
+    local minQ = GuildLootDB.settings.minQuality or 4
+    local _, name, _, quality = GetLootRollItemInfo(rollID)
+    if not quality or quality < minQ then return end
+
+    -- equipLoc für Kategorie-Erkennung (GetItemInfo ist gecacht wenn Item bekannt)
+    local _, _, _, _, _, _, _, _, equipLoc = GetItemInfo(link)
+    local item = { link = link, name = name or "?", itemID = itemID, quality = quality }
+
+    if equipLoc ~= nil then
+        Loot.TryAddPendingItem(item, equipLoc)
+    else
+        -- GetItemInfo noch nicht verfügbar → deferred (GET_ITEM_INFO_RECEIVED löst aus)
+        table.insert(deferredPendingItems, item)
+    end
+
     if GL.UI and GL.UI.RefreshLootTab then GL.UI.RefreshLootTab() end
 end
 

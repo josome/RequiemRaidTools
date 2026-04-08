@@ -625,6 +625,7 @@ eventFrame:RegisterEvent("ENCOUNTER_END")
 eventFrame:RegisterEvent("LOOT_OPENED")
 eventFrame:RegisterEvent("LOOT_SLOT_CHANGED")
 eventFrame:RegisterEvent("LOOT_CLOSED")
+eventFrame:RegisterEvent("START_LOOT_ROLL")
 eventFrame:RegisterEvent("CHAT_MSG_RAID")
 eventFrame:RegisterEvent("CHAT_MSG_RAID_LEADER")
 eventFrame:RegisterEvent("CHAT_MSG_PARTY")
@@ -717,6 +718,12 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
             if GL.IsMasterLooter() then
                 if GL.UI and GL.UI.AutoExpand then GL.UI.AutoExpand() end
             end
+        end
+
+    elseif event == "START_LOOT_ROLL" then
+        if GL.IsValidZone() and GL.Loot and GL.Loot.OnLootRollStart then
+            local rollID = ...
+            GL.Loot.OnLootRollStart(rollID)
         end
 
     elseif event == "LOOT_OPENED" then
