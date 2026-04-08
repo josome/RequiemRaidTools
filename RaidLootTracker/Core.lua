@@ -638,6 +638,8 @@ eventFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
 eventFrame:RegisterEvent("CHAT_MSG_ADDON")
 eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 eventFrame:RegisterEvent("TRADE_SHOW")
+eventFrame:RegisterEvent("TRADE_CLOSED")
+eventFrame:RegisterEvent("TRADE_ACCEPT_UPDATE")
 
 eventFrame:SetScript("OnEvent", function(self, event, ...)
     if event == "ADDON_LOADED" then
@@ -676,6 +678,15 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 
     elseif event == "TRADE_SHOW" then
         if GL.Loot and GL.Loot.OnTradeShow then GL.Loot.OnTradeShow() end
+
+    elseif event == "TRADE_CLOSED" then
+        if GL.Loot and GL.Loot.OnTradeClosed then GL.Loot.OnTradeClosed() end
+
+    elseif event == "TRADE_ACCEPT_UPDATE" then
+        local playerAccepted, targetAccepted = ...
+        if GL.Loot and GL.Loot.OnTradeAcceptUpdate then
+            GL.Loot.OnTradeAcceptUpdate(playerAccepted, targetAccepted)
+        end
 
     elseif event == "RAID_ROSTER_UPDATE" or event == "GROUP_ROSTER_UPDATE" then
         GL.SyncRoster()

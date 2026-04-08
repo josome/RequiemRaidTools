@@ -14,6 +14,11 @@ local Loot = GL.Loot
 -- Wird befüllt wenn ML ein Item zuweist; bei TRADE_SHOW abgeglichen.
 Loot._pendingTrades = {}
 
+-- Items die gerade im Handelsfenster liegen (Staging).
+-- Werden erst bei erfolgreichem Handel endgültig verworfen; bei Abbruch zurück in _pendingTrades.
+Loot._inTradeItems = {}
+local _tradeAccepted = false
+
 -- pendingLoot wird direkt aus GuildLootDB gelesen (überlebt Reloads)
 local function pendingLoot() return GuildLootDB.currentRaid.pendingLoot end
 local function trashedLoot() return GuildLootDB.currentRaid.trashedLoot or {} end
@@ -771,16 +776,19 @@ function Loot.OnTradeShow()
         local partnerName = GL.ShortName(cleanText)
         if partnerName == "" then return end
 
-        -- Alle offenen Zuweisungen für diesen Spieler sammeln und aus Liste entfernen
-        local itemIDs = {}
+        -- Bis zu 6 Zuweisungen für diesen Spieler in Staging verschieben (WoW-Limit: 6 Slots).
+        -- Rest bleibt in _pendingTrades für das nächste Handelsfenster.
+        Loot._inTradeItems = {}
+        _tradeAccepted = false
         for i = #Loot._pendingTrades, 1, -1 do
+            if #Loot._inTradeItems >= 6 then break end
             local pt = Loot._pendingTrades[i]
             if pt.shortName == partnerName then
-                table.insert(itemIDs, pt.itemID)
+                table.insert(Loot._inTradeItems, pt)
                 table.remove(Loot._pendingTrades, i)
             end
         end
-        if #itemIDs == 0 then return end
+        if #Loot._inTradeItems == 0 then return end
 
         -- Nächsten freien Handelsslot finden (Hilfsfunktion)
         local function nextFreeTradeSlot()
@@ -793,8 +801,8 @@ function Loot.OnTradeShow()
 
         -- Jedes Item in den Taschen suchen und mit Delay in einen freien Handelsslot legen
         local delay = 0
-        for _, itemID in ipairs(itemIDs) do
-            local capturedID    = itemID
+        for _, pt in ipairs(Loot._inTradeItems) do
+            local capturedID    = pt.itemID
             local capturedDelay = delay
             delay = delay + 0.1
 
@@ -813,9 +821,37 @@ function Loot.OnTradeShow()
                         end
                     end
                 end
+                -- Item nicht im Inventar gefunden (verkauft/gelöscht/bereits getradet)
+                for i2, inPt in ipairs(Loot._inTradeItems) do
+                    if inPt.itemID == capturedID then
+                        table.remove(Loot._inTradeItems, i2)
+                        GL.Print("|cffff4444[RLT] Item " .. capturedID .. " nicht im Inventar — wurde es verkauft oder gelöscht?|r")
+                        break
+                    end
+                end
             end)
         end
     end)
+end
+
+-- Beide Seiten haben den Handel bestätigt → Flag setzen
+function Loot.OnTradeAcceptUpdate(playerAccepted, targetAccepted)
+    if playerAccepted == 1 and targetAccepted == 1 then
+        _tradeAccepted = true
+    end
+end
+
+-- Handelsfenster geschlossen: Erfolg → Staging leeren; Abbruch → Items zurück in Queue
+function Loot.OnTradeClosed()
+    if _tradeAccepted then
+        Loot._inTradeItems = {}
+    else
+        for _, pt in ipairs(Loot._inTradeItems) do
+            table.insert(Loot._pendingTrades, pt)
+        end
+        Loot._inTradeItems = {}
+    end
+    _tradeAccepted = false
 end
 
 function Loot.ResetCurrentItem()
