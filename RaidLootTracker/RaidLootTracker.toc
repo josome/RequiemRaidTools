@@ -2,7 +2,7 @@
 ## Title: RaidLootTracker
 ## Notes: Raid-Loot-Tracking fuer Gilden-Offiziere
 ## Category: Raid
-## Version: 0.3.2.0-beta
+## Version: 0.4.0.0
 ## SavedVariables: GuildLootDB
 
 Util.lua
