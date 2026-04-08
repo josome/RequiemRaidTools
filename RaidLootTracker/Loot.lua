@@ -657,6 +657,11 @@ function Loot.AssignLootConfirm(fullName, diff, clearAfter)
     -- Raid-Chat
     GL.PostToRaid(GL.ShortName(fullName) .. " receives " .. link .. " - please pick up from the loot master.")
 
+    -- Gewinner anflüstern
+    if GuildLootDB.settings.whisperWinner and GL.IsMasterLooter() then
+        SendChatMessage("Congratulations! You received " .. link .. " - please pick it up from the loot master.", "WHISPER", nil, GL.NormalizeName(fullName))
+    end
+
     -- Item aus Pending entfernen (per Link; Fallback per itemID für abweichende Tracks)
     local pl = pendingLoot()
     for i, p in ipairs(pl) do

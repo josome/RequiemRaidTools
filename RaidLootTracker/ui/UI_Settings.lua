@@ -208,6 +208,7 @@ function UI.BuildSettingsPanel(parent)
     y = y - 30
 
     MakeCheck("Announce item start as raid warning", "raidWarnItem")
+    MakeCheck("Whisper winner on assign", "whisperWinner")
 
     -- Export Format Dropdown
     local expFmtLbl = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
