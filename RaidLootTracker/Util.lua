@@ -55,7 +55,7 @@ function GL.GetItemCategory(itemID, itemEquipLoc, quality)
     end
 
     -- 2. Nicht-ausrüstbare Token (kein Equip-Slot, Epic+)
-    if (itemEquipLoc == "" or itemEquipLoc == "INVTYPE_NON_EQUIP_IGNORE") and quality >= 4 then
+    if (itemEquipLoc == "" or itemEquipLoc == "INVTYPE_NON_EQUIP_IGNORE" or itemEquipLoc == "INVTYPE_NON_EQUIP") and quality >= 4 then
         -- 2a. Omni-Settoken: Name enthält "Curio" (EN) oder "Kuriosit" (DE)
         local itemName = GetItemInfo(itemID)
         if itemName and (itemName:find("Curio") or itemName:find("Kuriosit")) then
