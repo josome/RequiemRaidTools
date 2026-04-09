@@ -11,7 +11,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Prepare addon structure
-        run: cp -a RequiemRaidTools/. .
+        run: |
+          cp RequiemRaidTools/*.lua .
+          cp RequiemRaidTools/*.toc .
+          cp RequiemRaidTools/.pkgmeta .
+          cp -r RequiemRaidTools/ui .
+          rm -rf RequiemRaidTools
       - uses: BigWigsMods/packager@v2
         env:
           CF_API_KEY: ${{ secrets.CF_API_KEY }}
