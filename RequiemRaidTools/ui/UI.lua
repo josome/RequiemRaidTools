@@ -509,6 +509,16 @@ end
 
 function UI.RefreshMLButton()
     if not UI.mlCheck then return end
+    -- Nur Raid-Leader oder Assistent sehen den Checkbox
+    local canBeML = not (IsInRaid() or IsInGroup())
+                 or UnitIsGroupLeader("player")
+                 or UnitIsRaidOfficer("player")
+    if canBeML then
+        UI.mlCheck:Show()
+    else
+        UI.mlCheck:Hide()
+        return
+    end
     local isML = GuildLootDB.settings.isMasterLooter
     UI.mlCheck:SetChecked(isML)
     if isML then
