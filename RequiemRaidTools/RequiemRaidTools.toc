@@ -1,9 +1,10 @@
 ## Interface: 120001
-## Title: RaidLootTracker
+## Title: RequiemRaidTools
 ## Notes: Raid-Loot-Tracking fuer Gilden-Offiziere
 ## Category: Raid
 ## Version: 0.4.2.0-beta
 ## SavedVariables: GuildLootDB
+## X-Curse-Project-ID: 1502142
 
 Util.lua
 Core.lua

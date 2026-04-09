@@ -148,8 +148,8 @@ function UI.BuildMainFrame()
     end)
 
     -- Titelzeile
-    local version = C_AddOns.GetAddOnMetadata("RaidLootTracker", "Version") or "?"
-    mainFrame.TitleText:SetText("RaidLootTracker v" .. version)
+    local version = C_AddOns.GetAddOnMetadata("RequiemRaidTools", "Version") or "?"
+    mainFrame.TitleText:SetText("RequiemRaidTools v" .. version)
 
     -- Settings-Button (Zahnrad-Icon)
     local settingsBtn = CreateFrame("Button", nil, mainFrame)

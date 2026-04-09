@@ -644,9 +644,9 @@ eventFrame:RegisterEvent("TRADE_ACCEPT_UPDATE")
 eventFrame:SetScript("OnEvent", function(self, event, ...)
     if event == "ADDON_LOADED" then
         local addonName = ...
-        if addonName == "RaidLootTracker" then
+        if addonName == "RequiemRaidTools" then
             GL.InitDB()
-            GL.Print("Loaded. /rlt to open the main window.")
+            GL.Print("Loaded. /reqrt to open the main window.")
         end
 
     elseif event == "PLAYER_LOGIN" then
@@ -781,9 +781,9 @@ end)
 -- Slash-Commands
 -- ============================================================
 
-SLASH_RAIDLOOTTRACKER1 = "/rlt"
-SLASH_RAIDLOOTTRACKER2 = "/raidloottracker"
-SlashCmdList["RAIDLOOTTRACKER"] = function(input)
+SLASH_REQUIEMRAIDTOOLS1 = "/reqrt"
+SLASH_REQUIEMRAIDTOOLS2 = "/requiemraidtools"
+SlashCmdList["REQUIEMRAIDTOOLS"] = function(input)
     local cmd, arg = input:match("^(%S*)%s*(.*)")
     cmd = cmd:lower()
 

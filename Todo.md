@@ -43,12 +43,18 @@ Erledigte Items werden mit zwei Checkboxen markiert:
       [] Prio: 3 = <> Description: <>
       [x] Prio: 4 = <Tmog> Description: <Transmog>
       [] Prio: 5 = <> Description: <>
-      Problem, inkosistenz mit alten Raids, aber da diese Ergebnisse im Raid gespeichert werden sind sie weiterhin ansehbar
+      Problem, inkosistenz mit alten Raids, aber da diese Ergebnisse im Raid gespeichert werden sind sie weiterhin ansehbar  
 - [ ] OBS sollte die Itemliste bekommen, damit er sieht wie weit die Lootvergabe fortgeschritten ist
 - [ ] wie kann gehandelt werden das unbefugte die das Item über CurseForge runtergeladen haben sich den Masterlooter im raid erschleichen? Password, oder ML sieht alle OBS und kann diese ausschließen?
-- erledigt: [x] getestet: [ ] whisper an gewinner
+- erledigt: [x] getestet: [x] whisper an gewinner
+- [ ] Spezial Items wie Baupläne und Rezepte müssten verteilt werden
+- [ ] Einfügen von Items im inventar in die Pending List (für spezielle Items die vom Addon nicht erkannt werden)
 ## Bugs
- 
+- [ ] Wenn das Lootverteilen abgebrochen wurde dann geht bei erneuten anhandeln die automatische Verteilung nicht mehr
+- [ ] bei mehr als 6 items werden die ersten 6 ins handelnsfenster gelegt, beim erneuten anhandeln bleibt das fenster leer, die restlichen items müssen manuel verteilt werden
+- [ ] Warbound items erscheinen auch in der Liste, das ist nicht optimal
+- [ ] Omnitoken mit "Chiming void Curio" oder "Läuternde Leerenkuriosität" im Namen weiterhin nicht in Lootliste, spezieller Filter notwendig
+
 - Prio 4 [ ] Prio wird dem OBS nicht mit übertragen,
 
 - Prio 2 [ ] Token werden nicht zuverlässig getradet
@@ -101,6 +107,14 @@ Erledigte Items werden mit zwei Checkboxen markiert:
 ---
 
 ### Sonstiges
+
+- [ ] **Loot.lua modularisieren**
+  Datei ist zu groß — aufteilen in:
+  - `Loot.lua` — Kern: Pending-Loot, Kategorisierung, `TryAddPendingItem`
+  - `Loot_Roll.lua` — Roll-Logik: Prio-Phase, Roll-Phase, Timer, Kandidaten
+  - `Loot_Trade.lua` — Auto-Handel: `_pendingTrades`, `OnTradeShow`, Staging
+  - `Loot_Assign.lua` — Zuweisung: `AssignLoot`, `AssignLootConfirm`, `AssignAllWinners`
+  TOC entsprechend erweitern.
 
 - [ ] **Lokalisierung (i18n)**
   Aktuell ~40+ gestreute Strings, gemischt Deutsch/Englisch, kein L[]-System.

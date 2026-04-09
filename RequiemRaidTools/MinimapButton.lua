@@ -17,7 +17,7 @@ local function UpdateMinimapPos(b)
 end
 
 -- ── Button erstellen ──────────────────────────────────────────────────────────
-local btn = CreateFrame("Button", "RaidLootTrackerMinimapButton", Minimap)
+local btn = CreateFrame("Button", "RequiemRaidToolsMinimapButton", Minimap)
 btn:SetSize(32, 32)
 btn:SetFrameStrata("MEDIUM")
 btn:EnableMouse(true)
@@ -64,7 +64,7 @@ end)
 -- ── Tooltip ──────────────────────────────────────────────────────────────────
 btn:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-    GameTooltip:AddLine("RaidLootTracker", 1, 0.8, 0)
+    GameTooltip:AddLine("RequiemRaidTools", 1, 0.8, 0)
     GameTooltip:AddLine("Left-click: Open/close window", 0.9, 0.9, 0.9)
     GameTooltip:AddLine("Drag: Change position", 0.9, 0.9, 0.9)
     GameTooltip:Show()
