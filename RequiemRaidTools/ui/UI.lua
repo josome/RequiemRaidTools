@@ -168,6 +168,7 @@ function UI.BuildMainFrame()
             if settingsPanel:IsShown() then
                 settingsPanel:Hide()
             else
+                if UI.dropPanel then UI.dropPanel:Hide() end
                 settingsPanel:Show()
             end
         end
@@ -310,6 +311,80 @@ function UI.BuildMainFrame()
     settingsPanel:SetClampedToScreen(true)
     settingsPanel:SetFrameStrata("DIALOG")
     settingsPanel:Hide()
+    UI.settingsPanel = settingsPanel
+
+    -- Drop-Panel (manuell Item hinzufügen)
+    local dropPanel = CreateFrame("Frame", "RLTDropPanel", UIParent, "BasicFrameTemplateWithInset")
+    dropPanel:SetSize(180, 110)
+    dropPanel:SetPoint("TOPLEFT", mainFrame, "TOPRIGHT", 4, 0)
+    dropPanel:SetFrameStrata("DIALOG")
+    dropPanel:SetClampedToScreen(true)
+    dropPanel:Hide()
+    dropPanel.TitleText:SetText("Item hinzufügen")
+
+    -- Drop-Zone innen
+    local dropZone = CreateFrame("Button", nil, dropPanel, "BackdropTemplate")
+    dropZone:SetPoint("TOPLEFT",     dropPanel, "TOPLEFT",     8, -28)
+    dropZone:SetPoint("BOTTOMRIGHT", dropPanel, "BOTTOMRIGHT", -8,   8)
+    dropZone:SetBackdrop({
+        bgFile   = "Interface\\DialogFrame\\UI-DialogBox-Background-Dark",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        edgeSize = 10,
+        insets   = { left = 3, right = 3, top = 3, bottom = 3 },
+    })
+    dropZone:SetBackdropColor(0.05, 0.05, 0.1, 1)
+    dropZone:SetBackdropBorderColor(0.4, 0.4, 0.6, 1)
+    dropZone:EnableMouse(true)
+    dropZone:RegisterForDrag("LeftButton")
+
+    -- Icon
+    local dropIcon = dropZone:CreateTexture(nil, "ARTWORK")
+    dropIcon:SetSize(32, 32)
+    dropIcon:SetPoint("CENTER", dropZone, "CENTER", 0, 10)
+    dropIcon:SetTexture("Interface\\Buttons\\UI-GuildButton-OfficerNote-Up")
+    dropIcon:SetAlpha(0.5)
+
+    local dropHint = dropZone:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    dropHint:SetPoint("CENTER", dropZone, "CENTER", 0, -12)
+    dropHint:SetText("|cff888888Item hier ablegen|r")
+
+    -- Hover: aufleuchten
+    dropZone:SetScript("OnEnter", function(self)
+        self:SetBackdropColor(0.1, 0.1, 0.25, 1)
+        self:SetBackdropBorderColor(1, 0.8, 0, 1)
+        dropIcon:SetAlpha(1)
+    end)
+    dropZone:SetScript("OnLeave", function(self)
+        self:SetBackdropColor(0.05, 0.05, 0.1, 1)
+        self:SetBackdropBorderColor(0.4, 0.4, 0.6, 1)
+        dropIcon:SetAlpha(0.5)
+    end)
+
+    local function tryDrop()
+        local infoType, _, itemLink = GetCursorInfo()
+        if infoType == "item" and itemLink then
+            ClearCursor()
+            GL.Loot.AddItemManually(itemLink)
+            -- kurz grün aufleuchten
+            dropZone:SetBackdropBorderColor(0, 1, 0, 1)
+            C_Timer.After(0.5, function()
+                dropZone:SetBackdropBorderColor(0.4, 0.4, 0.6, 1)
+                dropPanel:Hide()
+            end)
+        end
+    end
+    dropZone:SetScript("OnReceiveDrag", tryDrop)
+    dropZone:SetScript("OnClick",       tryDrop)
+
+    UI.dropPanel = dropPanel
+
+    -- Settings-Panel schließen wenn Hauptfenster versteckt wird
+    -- (bereits durch OnHide oben abgedeckt — Drop-Panel auch schließen)
+    local origOnHide = mainFrame:GetScript("OnHide")
+    mainFrame:SetScript("OnHide", function(self)
+        if origOnHide then origOnHide(self) end
+        if UI.dropPanel then UI.dropPanel:Hide() end
+    end)
 
     UI.ShowStartupTab()
 end

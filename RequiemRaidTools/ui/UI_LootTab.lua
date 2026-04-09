@@ -133,6 +133,31 @@ function UI.BuildLootPanel(parent)
     panel.tabPending = tabPending
     panel.tabTrash   = tabTrash
 
+    -- >> Button: öffnet Drop-Panel zum manuellen Hinzufügen (nur für ML)
+    local addItemBtn = CreateFrame("Button", nil, sidebar, "UIPanelButtonTemplate")
+    addItemBtn:SetSize(26, 18)
+    addItemBtn:SetText(">>")
+    addItemBtn:SetPoint("LEFT", tabTrash, "RIGHT", 5, 0)
+    addItemBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+        GameTooltip:SetText("Item manuell hinzufügen", 1, 1, 1)
+        GameTooltip:AddLine("Item aus Inventar auf das Drop-Feld ziehen", 0.7, 0.7, 0.7, true)
+        GameTooltip:Show()
+    end)
+    addItemBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    addItemBtn:SetScript("OnClick", function()
+        if UI.dropPanel then
+            local show = not UI.dropPanel:IsShown()
+            UI.dropPanel:SetShown(show)
+            -- Mutual exclusive: Settings-Panel schließen
+            if show and UI.settingsPanel and UI.settingsPanel:IsShown() then
+                UI.settingsPanel:Hide()
+            end
+        end
+    end)
+    addItemBtn:Hide()
+    panel.addItemBtn = addItemBtn
+
     local pendingScroll = CreateFrame("ScrollFrame", "GuildLootPendingScroll", sidebar, "UIPanelScrollFrameTemplate")
     pendingScroll:SetPoint("TOPLEFT",     sidebar, "TOPLEFT",    0,  -34)
     pendingScroll:SetPoint("BOTTOMRIGHT", sidebar, "BOTTOMRIGHT", -22,  4)
@@ -307,6 +332,11 @@ function UI.RefreshLootTab()
 
     local ci    = GL.Loot.GetCurrentItem()
     local isML  = GL.IsMasterLooter()
+
+    -- >> Button nur für ML sichtbar
+    if UI.lootPanel.addItemBtn then
+        UI.lootPanel.addItemBtn:SetShown(isML)
+    end
     local isTrashed = (pendingActiveTab == "trash")
     local items = isTrashed and GL.Loot.GetTrashedLoot() or GL.Loot.GetPendingLoot()
 

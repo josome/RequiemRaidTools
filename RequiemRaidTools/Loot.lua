@@ -67,6 +67,25 @@ function Loot.GetPendingLoot()  return pendingLoot()  end
 function Loot.GetTrashedLoot()  return trashedLoot()  end
 function Loot.GetCurrentItem()  return currentItem  end
 
+-- Fügt ein Item manuell zur pendingLoot hinzu (bypass filter)
+function Loot.AddItemManually(link)
+    local itemID = tonumber(link:match("item:(%d+)"))
+    if not itemID then return end
+
+    local name, _, quality, _, _, _, _, _, equipLoc = GetItemInfo(link)
+    if not name then
+        -- Item-Info noch nicht gecacht → deferred
+        table.insert(deferredPendingItems, { link = link, itemID = itemID, quality = 0, name = "?", manual = true })
+        return
+    end
+
+    local category = GL.GetItemCategory(itemID, equipLoc or "", quality or 0)
+    local item = { link = link, name = name, itemID = itemID, quality = quality or 0, category = category }
+    table.insert(pendingLoot(), item)
+    if GL.UI and GL.UI.RefreshLootTab then GL.UI.RefreshLootTab() end
+    GL.Print("Item manuell hinzugefügt: " .. link)
+end
+
 -- Prüft Loot-Filter und fügt Item ggf. in pendingLoot ein
 function Loot.TryAddPendingItem(item, equipLoc)
     local s = GuildLootDB.settings
@@ -225,9 +244,15 @@ function Loot.OnItemInfoReceived(itemID)
     for i = #deferredPendingItems, 1, -1 do
         local di = deferredPendingItems[i]
         if di.itemID == itemID then
-            local _, _, _, _, _, _, _, _, equipLoc = GetItemInfo(di.link)
+            local name, _, quality, _, _, _, _, _, equipLoc = GetItemInfo(di.link)
             if equipLoc ~= nil then
-                Loot.TryAddPendingItem(di, equipLoc)
+                if di.manual then
+                    local category = GL.GetItemCategory(di.itemID, equipLoc, quality or 0)
+                    table.insert(pendingLoot(), { link = di.link, name = name or "?", itemID = di.itemID, quality = quality or 0, category = category })
+                    GL.Print("Item manuell hinzugefügt: " .. di.link)
+                else
+                    Loot.TryAddPendingItem(di, equipLoc)
+                end
                 table.remove(deferredPendingItems, i)
                 refreshNeeded = true
             end
