@@ -4,7 +4,6 @@
 # Ausfuehren: bash test/make_test_addon.sh
 
 SRC="$(dirname "$0")/../src"
-TOCFILE="$(dirname "$0")/../RequiemRaidTools.toc"
 DST="$(dirname "$0")/../RequiemRaidTools_Test"
 
 echo "Source: $SRC"
@@ -18,7 +17,6 @@ fi
 
 # Kopieren
 cp -r "$SRC/." "$DST"
-cp "$TOCFILE" "$DST/RequiemRaidTools.toc"
 echo "Copied source to $DST"
 
 # TOC-Pfade anpassen: src/ und test/ Prefixe entfernen (Test-Addon hat flache Struktur)

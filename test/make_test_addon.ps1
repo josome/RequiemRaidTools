@@ -3,7 +3,6 @@
 # Ausfuehren: powershell -ExecutionPolicy Bypass -File test\make_test_addon.ps1
 
 $src = "$PSScriptRoot\..\src"
-$tocFile = "$PSScriptRoot\..\RequiemRaidTools.toc"
 $dst = "$PSScriptRoot\..\RequiemRaidTools_Test"
 
 Write-Host "Source: $src"
@@ -15,7 +14,6 @@ if (Test-Path $dst) {
 }
 
 Copy-Item "$src\*" $dst -Recurse
-Copy-Item $tocFile "$dst\RequiemRaidTools.toc"
 Write-Host "Copied source to $dst"
 
 # TOC-Pfade anpassen: src/ und test/ Prefixe entfernen (Test-Addon hat flache Struktur)
