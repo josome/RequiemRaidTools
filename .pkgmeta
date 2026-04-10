@@ -1,10 +1,10 @@
 package-as: RequiemRaidTools
 
 ignore:
-  - RaidLootTracker_Test
-  - tools
+  - RequiemRaidTools_Test
+  - test
+  - docs
   - analyzer
   - Screenshots
   - .github
   - "*.md"
-  - Todo.md

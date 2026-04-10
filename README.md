@@ -1,12 +1,12 @@
-# RaidLootTracker (RLT)
+# RequiemRaidTools (RLT)
 
 Ein World of Warcraft Addon für Gilden-Offiziere und Raid-Leader zur strukturierten Loot-Verteilung im Raid — mit Prio-System, automatischer Roll-Auswertung und Echtzeit-Synchronisation zwischen allen Raid-Mitgliedern.
 
 ---
 
-## Was ist RaidLootTracker?
+## Was ist RequiemRaidTools?
 
-In WoW-Raids übernimmt der **Master Looter (ML)** die Kontrolle darüber, wer welches Item bekommt. RaidLootTracker unterstützt den ML dabei: Items werden automatisch erkannt, Spieler melden ihren Bedarf per Chat, und das Addon wertet Rolls aus, ermittelt Gewinner und legt das Item beim nächsten Handelsfenster automatisch in die Trade-Slots.
+In WoW-Raids übernimmt der **Master Looter (ML)** die Kontrolle darüber, wer welches Item bekommt. RequiemRaidTools unterstützt den ML dabei: Items werden automatisch erkannt, Spieler melden ihren Bedarf per Chat, und das Addon wertet Rolls aus, ermittelt Gewinner und legt das Item beim nächsten Handelsfenster automatisch in die Trade-Slots.
 
 Alle Raid-Mitglieder mit installiertem Addon sehen denselben Stand wie der ML — in Echtzeit, ohne manuellen Abgleich.
 
@@ -23,7 +23,7 @@ Alle Raid-Mitglieder mit installiertem Addon sehen denselben Stand wie der ML �
 
 ## Installation
 
-1. Ordner `RaidLootTracker` in `World of Warcraft/_retail_/Interface/AddOns/` kopieren
+1. Ordner `RequiemRaidTools` in `World of Warcraft/_retail_/Interface/AddOns/` kopieren
 2. WoW neu starten oder `/reload` eingeben
 3. `/rlt` zum Öffnen des Fensters
 
