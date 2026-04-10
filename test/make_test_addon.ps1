@@ -16,11 +16,7 @@ if (Test-Path $dst) {
 Copy-Item "$src\*" $dst -Recurse
 Write-Host "Copied source to $dst"
 
-# TOC-Pfade anpassen: src/ und test/ Prefixe entfernen (Test-Addon hat flache Struktur)
-$toc = Get-Content "$dst\RequiemRaidTools.toc" -Raw -Encoding UTF8
-$toc = $toc -replace '(?m)^src/', ''
-$toc = $toc -replace '(?m)^test/', ''
-Set-Content "$dst\RequiemRaidTools.toc" $toc -Encoding UTF8 -NoNewline
+# TOC-Pfade: sind bereits relativ (kein Prefix noetig, da .toc in src/ liegt)
 
 # Lua + TOC: Namespace und DB-Name ersetzen
 Get-ChildItem $dst -Recurse -Include *.lua, *.toc | ForEach-Object {

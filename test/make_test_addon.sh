@@ -19,10 +19,6 @@ fi
 cp -r "$SRC/." "$DST"
 echo "Copied source to $DST"
 
-# TOC-Pfade anpassen: src/ und test/ Prefixe entfernen (Test-Addon hat flache Struktur)
-sed -i 's|^src/||g' "$DST/RequiemRaidTools.toc"
-sed -i 's|^test/||g' "$DST/RequiemRaidTools.toc"
-
 # Lua + TOC: alle Namen ersetzen die WoW-weit eindeutig sein muessen
 find "$DST" -type f \( -name "*.lua" -o -name "*.toc" \) | while read -r file; do
     # SavedVariables und Lua-Namespace
@@ -54,7 +50,7 @@ sed -i 's/## SavedVariables:.*/## SavedVariables: GuildLootDBTest/' "$DST/Requie
 
 # Test.lua im Observer nicht benötigt
 rm -f "$DST/Test.lua"
-sed -i '/Test.lua/d' "$DST/RequiemRaidTools_Test.toc"
+sed -i '/^Test\.lua/d' "$DST/RequiemRaidTools_Test.toc"
 echo "Removed Test.lua from Observer addon"
 
 echo "TOC updated."
