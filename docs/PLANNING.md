@@ -1,4 +1,4 @@
-# RaidLootTracker – Planungsdokument
+# RequiemRaidTools – Planungsdokument
 
 ## Übersicht
 WoW Retail Addon (Interface 120001 / The War Within) für faire und strukturierte Raid-Loot-Verteilung.
@@ -234,8 +234,8 @@ GuildLootDB = {
 ## Dateistruktur
 
 ```
-RaidLootTracker/
-├── RaidLootTracker.toc   – Addon-Manifest (Interface 120001)
+RequiemRaidTools/
+├── RequiemRaidTools.toc   – Addon-Manifest (Interface 120001)
 ├── Util.lua              – Hilfsfunktionen, JSON-Export
 ├── Core.lua              – Initialisierung, Events, Raid-Lifecycle
 ├── Comm.lua              – Multi-User Sync (AddonMessage) ✅

@@ -1,4 +1,4 @@
-# RaidLootTracker – Todo
+# RequiemRaidTools – Todo
 
 > **Geplant (nach PR-Merge):** Addon-Rename zu **RequiemRaidTools** (Abk. `Reqrt`) + Versionierung auf `Major.Minor.Patch.Build` (Stable) / `Major.Minor.Patch.Build-beta` (Test-Addon)
 
