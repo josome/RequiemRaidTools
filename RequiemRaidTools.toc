@@ -6,15 +6,15 @@
 ## SavedVariables: GuildLootDB
 ## X-Curse-Project-ID: 1502142
 
-Util.lua
-Core.lua
-Comm.lua
-Loot.lua
-MinimapButton.lua
-ui/UI.lua
-ui/UI_Settings.lua
-ui/UI_LootTab.lua
-ui/UI_SpielerTab.lua
-ui/UI_LogTab.lua
-ui/UI_RaidTab.lua
-Test.lua
+src/Util.lua
+src/Core.lua
+src/Comm.lua
+src/Loot.lua
+src/MinimapButton.lua
+src/ui/UI.lua
+src/ui/UI_Settings.lua
+src/ui/UI_LootTab.lua
+src/ui/UI_SpielerTab.lua
+src/ui/UI_LogTab.lua
+src/ui/UI_RaidTab.lua
+src/Test.lua

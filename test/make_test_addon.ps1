@@ -3,6 +3,7 @@
 # Ausfuehren: powershell -ExecutionPolicy Bypass -File test\make_test_addon.ps1
 
 $src = "$PSScriptRoot\..\src"
+$tocFile = "$PSScriptRoot\..\RequiemRaidTools.toc"
 $dst = "$PSScriptRoot\..\RequiemRaidTools_Test"
 
 Write-Host "Source: $src"
@@ -14,9 +15,13 @@ if (Test-Path $dst) {
 }
 
 Copy-Item "$src\*" $dst -Recurse
+Copy-Item $tocFile "$dst\RequiemRaidTools.toc"
 Write-Host "Copied source to $dst"
 
-# TOC-Pfade: sind bereits relativ (kein Prefix noetig, da .toc in src/ liegt)
+# TOC-Pfade anpassen: src/ Prefix entfernen (Test-Addon hat flache Struktur)
+$toc = Get-Content "$dst\RequiemRaidTools.toc" -Raw -Encoding UTF8
+$toc = $toc -replace '(?m)^src/', ''
+Set-Content "$dst\RequiemRaidTools.toc" $toc -Encoding UTF8 -NoNewline
 
 # Lua + TOC: Namespace und DB-Name ersetzen
 Get-ChildItem $dst -Recurse -Include *.lua, *.toc | ForEach-Object {

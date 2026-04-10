@@ -1,0 +1,10 @@
+package-as: RequiemRaidTools
+
+ignore:
+  - RequiemRaidTools_Test
+  - test
+  - docs
+  - analyzer
+  - Screenshots
+  - .github
+  - "*.md"

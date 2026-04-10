@@ -4,6 +4,7 @@
 # Ausfuehren: bash test/make_test_addon.sh
 
 SRC="$(dirname "$0")/../src"
+TOCFILE="$(dirname "$0")/../RequiemRaidTools.toc"
 DST="$(dirname "$0")/../RequiemRaidTools_Test"
 
 echo "Source: $SRC"
@@ -17,7 +18,11 @@ fi
 
 # Kopieren
 cp -r "$SRC/." "$DST"
+cp "$TOCFILE" "$DST/RequiemRaidTools.toc"
 echo "Copied source to $DST"
+
+# TOC-Pfade anpassen: src/ Prefix entfernen (Test-Addon hat flache Struktur)
+sed -i 's|^src/||g' "$DST/RequiemRaidTools.toc"
 
 # Lua + TOC: alle Namen ersetzen die WoW-weit eindeutig sein muessen
 find "$DST" -type f \( -name "*.lua" -o -name "*.toc" \) | while read -r file; do
