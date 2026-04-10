@@ -23,7 +23,7 @@ Erledigte Items werden mit zwei Checkboxen markiert:
   - Zebra-Stripe-Fix: separater `zebraIdx`-Zähler statt `#playerRows % 2`
   - Nur `UI_SpielerTab.lua` betroffen, keine anderen Dateien
 
-- [ ] **Loot-Historie aus alten Raids anzeigen**
+- [ ] **Loot-Historie aus alten Raids anzeigen** ⚠️ Konzept erforderlich — zurückgestellt
   Aufgeklappte Spieler-Rows zeigen zusätzlich Loot aus `raidHistory` (abgeschlossene Raids),
   gruppiert nach Raid mit Separator-Header (Raid-Name + Datum).
   - Scan über alle `raidHistory[i].lootLog` nach `entry.player == GL.ShortName(fullName)`
@@ -37,28 +37,35 @@ Erledigte Items werden mit zwei Checkboxen markiert:
 - [x] **wenn zwei mal das identische Item droppt sollten beide (oder mehr) Items mit einem gang verrollt werden können**
 
 - [ ] NEW **Startet der ML einen Raid soll es einen broadcast an alle OBS geben, diese bekommen eine Meldung das ein Raid gestartet wurde**
-- [ ] Einstellen der Prioritäten 1-5 über settings mit [] für aktiv und mit Freitext für Name, und Beschreibung 
+      Nur Observer mit Raid-Leader oder Raid-Assist Rolle erhalten den Broadcast (nur Spieler die theoretisch ML sein könnten)
+- [ ] Alle Prioritäten 1-5 über Settings konfigurierbar — jeweils: aktiv/inaktiv, Kurzname, Beschreibung
+      Aktuell vorkonfiguriert: 1=BIS, 2=OS, 4=Tmog — alle sollen frei anpassbar sein
       [x] Prio: 1 = <BIS> Description: <Best in Slot>
       [x] Prio: 2 = <OS> Description: <Offspec>
       [] Prio: 3 = <> Description: <>
       [x] Prio: 4 = <Tmog> Description: <Transmog>
       [] Prio: 5 = <> Description: <>
-      Problem, inkosistenz mit alten Raids, aber da diese Ergebnisse im Raid gespeichert werden sind sie weiterhin ansehbar  
-- [ ] OBS sollte die Itemliste bekommen, damit er sieht wie weit die Lootvergabe fortgeschritten ist
-- erledigt: [x] getestet: [ ] ML-Checkbox nur für Raid-Leader/Assistenten sichtbar — verhindert unbefugten ML-Claim
+      Problem: Inkonsistenz mit alten Raids — da Ergebnisse im Raid gespeichert werden, bleiben sie weiterhin lesbar
+- [ ] **Drei UI-Ebenen**
+  - **ML** — volle Kontrolle (bereits vorhanden)
+  - **Observer** (Raid-Leader/Assist) — read-only, komplette Ansicht: Pending Loot, aktives Item, Roll-Ergebnisse, Session Log
+  - **Player** — optionales minimales Popup für alle Raid-Mitglieder: poppt automatisch auf sobald der ML ein Item auswählt, zeigt aktuelles Item, Prio-Buttons (Klick postet automatisch ins Chat), Roll-Button (führt `/roll` aus)
+- erledigt: [x] getestet: [x] ML-Checkbox nur für Raid-Leader/Assistenten sichtbar — verhindert unbefugten ML-Claim
 - erledigt: [x] getestet: [x] whisper an gewinner
-- [ ] Spezial Items wie Baupläne und Rezepte müssten verteilt werden
 - erledigt: [x] getestet: [x] Einfügen von Items im inventar in die Pending List (Drag & Drop auf >> Button)
 ## Bugs
 - erledigt: [x] getestet: [x] Wenn das Lootverteilen abgebrochen wurde dann geht bei erneuten anhandeln die automatische Verteilung nicht mehr
 - erledigt: [x] getestet: [x] bei mehr als 6 items werden die ersten 6 ins handelnsfenster gelegt, beim erneuten anhandeln bleibt das fenster leer, die restlichen items müssen manuel verteilt werden
-- [ ] Warbound items erscheinen auch in der Liste, das ist nicht optimal
+- [ ] Warbound Items aus der Pending Loot Liste rausfiltern — nicht tradebar, daher nutzlos im Tool
 - erledigt: [x] getestet: [x] Omnitoken mit "Chiming void Curio" oder "Läuternde Leerenkuriosität" im Namen weiterhin nicht in Lootliste, spezieller Filter notwendig
 
-- Prio 4 [ ] Prio wird dem OBS nicht mit übertragen,
+- Prio 4 [ ] Prio wird dem Observer nicht übertragen — im Session Log des Observers fehlt mit welcher Prio ein Item gewonnen wurde
 
-- Prio 2 [ ] Token werden nicht zuverlässig getradet
-- Prio 3 [ ] ML übergabe alter ML steht noch in Leiste
+- Prio 5 [ ] Token werden nicht zuverlässig getradet — tritt aktuell nicht auf, beobachten
+- Prio 3 [ ] ML-Übergabe: UI wird nach Bestätigung nicht aktualisiert
+      - Beim Observer: alter ML-Name steht noch im Fenster, erst Fenster schließen/öffnen zeigt neuen ML
+      - Beim alten ML: ML-Checkbox bleibt aktiv obwohl Rolle übergeben wurde
+      → UI-Refresh nach erfolgreicher Übergabe auf beiden Seiten fehlt
 - erledigt: [x] getestet: [x] wenn der ML den boss nicht looten kann weil items schon verrollt erscheinen diese nicht im Addon unter Pending Loot
 
 
@@ -67,19 +74,19 @@ Erledigte Items werden mit zwei Checkboxen markiert:
 
 ## Erledigt
 
-- erledigt: [x] getestet: [ ] **Prio löschen per X-Button** — ML kann versehentliche Prios entfernen
+- erledigt: [x] getestet: [x] **Prio löschen per X-Button** — ML kann versehentliche Prios entfernen
 - erledigt: [x] getestet: [ ] **Settings-Sync via RAID_START** — minQuality, prioSeconds, rollSeconds werden übertragen
-- erledigt: [x] getestet: [ ] **Prios umbenannt** — 1=BIS, 2=OS, 4=Transmog
-- erledigt: [x] getestet: [ ] **Doppel-Item gleichzeitig rollen** — Multi-Winner Roll mit Assign All
+- erledigt: [x] getestet: [x] **Prios umbenannt** — 1=BIS, 2=OS, 4=Transmog
+- erledigt: [x] getestet: [x] **Doppel-Item gleichzeitig rollen** — Multi-Winner Roll mit Assign All
 - erledigt: [x] getestet: [ ] **Bug: Late-Join Sync** — Client der später beitritt bekommt Raiddaten
 - erledigt: [x] getestet: [ ] **Bug: Omni-Token-Erkennung** — Set-Token werden korrekt erkannt
-- erledigt: [x] getestet: [ ] **Bug: Addon in Dungeons & Tiefen deaktiviert** — kein Loot-Tracking, UI versteckt sich
-- erledigt: [x] getestet: [ ] **Auto-Handel** — Item wird automatisch ins Handelsfenster gelegt (auch mehrere Items)
+- erledigt: [x] getestet: [x] **Bug: Addon in Dungeons & Tiefen deaktiviert** — kein Loot-Tracking, UI versteckt sich
+- erledigt: [x] getestet: [x] **Auto-Handel** — Item wird automatisch ins Handelsfenster gelegt (auch mehrere Items)
 - ~~**Abgleich Discord Raid anmeldungen mit eingeladenen personen**~~ — verworfen (Discord-Namen ≠ WoW-Namen)
 
 ---
 
-### CSV Roundtrip: Google Sheets ↔ Addon
+### CSV Roundtrip: Google Sheets ↔ Addon ⚠️ zurückgestellt bis Loot-Historie-Konzept steht
 
 - [ ] **CSV um `ItemID` und `Quality` erweitern**
   Aktuelle Spalten: `RaidID, Tier, Difficulty, Track, Date, Status, Player, Item, Category, Prio, Timestamp`
@@ -116,7 +123,7 @@ Erledigte Items werden mit zwei Checkboxen markiert:
   - `Loot_Assign.lua` — Zuweisung: `AssignLoot`, `AssignLootConfirm`, `AssignAllWinners`
   TOC entsprechend erweitern.
 
-- [ ] **Lokalisierung (i18n)**
+- [ ] **Lokalisierung (i18n)** ⚠️ niedrige Priorität — zurückgestellt
   Aktuell ~40+ gestreute Strings, gemischt Deutsch/Englisch, kein L[]-System.
   → `Locales/deDE.lua` + `Locales/enUS.lua` anlegen, alle UI-Strings durch `L["key"]` ersetzen, TOC um Locale-Dateien erweitern.
 
