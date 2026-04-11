@@ -147,7 +147,12 @@ function UI.RefreshLogTab()
         prioLbl:SetWidth(52)
         prioLbl:SetText(entry.winnerPrio and ("|cffaaaaaa" .. entry.winnerPrio .. "|r " .. (PRIO_LABEL[entry.winnerPrio] or tostring(entry.winnerPrio))) or "|cff555555—|r")
 
-        MakeItemLinkBtn(row, prioLbl, 4, entry.link or entry.item, entry.item or "?")
+        local bossLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        bossLbl:SetPoint("LEFT", prioLbl, "RIGHT", 4, 0)
+        bossLbl:SetWidth(110)
+        bossLbl:SetText(entry.boss and ("|cff888888" .. entry.boss .. "|r") or "|cff555555—|r")
+
+        MakeItemLinkBtn(row, bossLbl, 4, entry.link or entry.item, entry.item or "?")
 
         row:Show()
         table.insert(logRows, row)

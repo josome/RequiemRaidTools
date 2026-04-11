@@ -57,10 +57,14 @@ Erledigte Items werden mit zwei Checkboxen markiert:
 ## Bugs
 - erledigt: [x] getestet: [x] Wenn das Lootverteilen abgebrochen wurde dann geht bei erneuten anhandeln die automatische Verteilung nicht mehr
 - erledigt: [x] getestet: [x] bei mehr als 6 items werden die ersten 6 ins handelnsfenster gelegt, beim erneuten anhandeln bleibt das fenster leer, die restlichen items müssen manuel verteilt werden
-- [ ] Warbound Items aus der Pending Loot Liste rausfiltern — nicht tradebar, daher nutzlos im Tool
+- erledigt: [x] getestet: [ ] Warbound Items aus der Pending Loot Liste rausfiltern — nicht tradebar, daher nutzlos im Tool
 - erledigt: [x] getestet: [x] Omnitoken mit "Chiming void Curio" oder "Läuternde Leerenkuriosität" im Namen weiterhin nicht in Lootliste, spezieller Filter notwendig
 
 - Prio 4 erledigt: [x] getestet: [ ] Prio wird dem Observer nicht übertragen — im Session Log des Observers fehlt mit welcher Prio ein Item gewonnen wurde
+- erledigt: [x] getestet: [ ] Addon-Prefix von [RLT] auf [ReqRT] umbenannt
+- erledigt: [x] getestet: [ ] Boss-Name wird im Loot-Log gespeichert und angezeigt (ML + Observer, Session Log)
+- erledigt: [x] getestet: [ ] Dock-Tab: Titel auf RT geändert, ML-Status und Raid-Status als ☑/☐ angezeigt
+- erledigt: [x] getestet: [ ] ML-Checkbox abwählen sendet Broadcast an Observer ("Kein Master Looter aktiv.")
 
 - Prio 5 [ ] Token werden nicht zuverlässig getradet — tritt aktuell nicht auf, beobachten
 - Prio 3 [ ] ML-Übergabe: UI wird nach Bestätigung nicht aktualisiert

@@ -103,13 +103,18 @@ function Loot.ActivateItem(link, name, iLevel, equipLoc, quality)
     currentItem.prioState  = { active=false, timeLeft=0, timer=nil }
     currentItem.rollState  = { active=false, players={}, results={}, timer=nil, timeLeft=0 }
 
-    -- Anzahl der Kopien dieses Items in pendingLoot ermitteln (per itemID)
+    -- Anzahl der Kopien und Boss-Quelle aus pendingLoot ermitteln (per itemID)
     local copyCount = 0
+    local bossSource = nil
     for _, p in ipairs(Loot.GetPendingLoot()) do
         local pid = tonumber(p.link:match("item:(%d+)"))
-        if pid == itemID then copyCount = copyCount + 1 end
+        if pid == itemID then
+            copyCount = copyCount + 1
+            if p.boss and not bossSource then bossSource = p.boss end
+        end
     end
     currentItem.count = (copyCount > 0) and copyCount or 1
+    currentItem.boss  = bossSource
 
     -- Prio-Sammel-Timer starten
     local prioSecs = GuildLootDB.settings.prioSeconds or 15
@@ -213,6 +218,7 @@ function Loot.AssignLootConfirm(fullName, diff, clearAfter)
         category   = category,
         difficulty = diff,
         winnerPrio = winnerPrio,
+        boss       = currentItem.boss,
         timestamp  = ts,
     })
 
@@ -240,7 +246,7 @@ function Loot.AssignLootConfirm(fullName, diff, clearAfter)
     end
 
     -- Observer informieren (fullName ist bereits realm-qualifiziert)
-    if GL.Comm then GL.Comm.SendAssign(fullName, diff, link, category, currentItem.quality, winnerPrio) end
+    if GL.Comm then GL.Comm.SendAssign(fullName, diff, link, category, currentItem.quality, winnerPrio, currentItem.boss) end
 
     -- Zustand zurücksetzen (nur wenn letzte Zuweisung)
     if clearAfter then
@@ -365,7 +371,7 @@ function Loot.OnCommItemClear()
 end
 
 --- ML hat Loot zugewiesen → Observer aktualisieren Session-Log
-function Loot.OnCommAssign(playerName, diff, link, category, quality, winnerPrio)
+function Loot.OnCommAssign(playerName, diff, link, category, quality, winnerPrio, boss)
     if GL.IsMasterLooter() then return end
     if not playerName or playerName == "" then return end
     -- Name realm-qualifizieren und in participants suchen
@@ -384,6 +390,7 @@ function Loot.OnCommAssign(playerName, diff, link, category, quality, winnerPrio
         quality    = quality or 0,
         difficulty = diff or "",
         winnerPrio = winnerPrio,
+        boss       = boss,
         timestamp  = time(),
     })
     Loot.OnCommItemClear()

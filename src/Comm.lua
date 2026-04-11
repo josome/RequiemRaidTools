@@ -51,11 +51,11 @@ function Comm.SendRollStart(seconds, players)
 end
 
 --- ML hat Loot einem Spieler zugewiesen
-function Comm.SendAssign(playerName, difficulty, itemLink, category, quality, winnerPrio)
+function Comm.SendAssign(playerName, difficulty, itemLink, category, quality, winnerPrio, boss)
     SendToGroup("ASSIGN" .. SEP .. (playerName or "") .. SEP
                          .. (difficulty or "") .. SEP .. (itemLink or "")
                          .. SEP .. (category or "other") .. SEP .. tostring(quality or 0)
-                         .. SEP .. tostring(winnerPrio or 0))
+                         .. SEP .. tostring(winnerPrio or 0) .. SEP .. (boss or ""))
 end
 
 --- ML hat Raid gestartet (auch bei GROUP_ROSTER_UPDATE → Late-Joiner-Sync)
@@ -145,9 +145,9 @@ function Comm.OnMessage(msg, sender)
         end
 
     elseif cmd == "ASSIGN" then
-        local name, diff, link, category, quality, winnerPrio = parts[2], parts[3], parts[4], parts[5], parts[6], parts[7]
+        local name, diff, link, category, quality, winnerPrio, boss = parts[2], parts[3], parts[4], parts[5], parts[6], parts[7], parts[8]
         if GL.Loot and GL.Loot.OnCommAssign then
-            GL.Loot.OnCommAssign(name, diff, link, category, tonumber(quality) or 0, tonumber(winnerPrio) or nil)
+            GL.Loot.OnCommAssign(name, diff, link, category, tonumber(quality) or 0, tonumber(winnerPrio) or nil, boss ~= "" and boss or nil)
         end
 
     elseif cmd == "RAID_START" then

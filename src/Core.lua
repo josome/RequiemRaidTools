@@ -461,7 +461,11 @@ function GL.OnCommMLAnnounce(newMLName)
     else
         GuildLootDB.settings.isMasterLooter = false
     end
-    GL.Print(GL.ShortName(newMLName or "") .. " ist jetzt Master Looter.")
+    if normalNew == "" then
+        GL.Print("Kein Master Looter aktiv.")
+    else
+        GL.Print(GL.ShortName(newMLName or "") .. " ist jetzt Master Looter.")
+    end
     if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
 end
 
@@ -708,8 +712,10 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 
     elseif event == "ENCOUNTER_END" then
         -- arg: encounterID, encounterName, difficultyID, groupSize, success
-        local success = select(5, ...)
+        local encounterName, success = select(2, ...), select(5, ...)
         if success == 1 then
+            -- Boss-Name für Loot-Tracking speichern
+            GuildLootDB.currentRaid.lastBoss = encounterName
             -- Snapshot der aktuellen Gruppe für Loot-Berechtigung
             local kill = {}
             if IsInRaid() then

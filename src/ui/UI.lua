@@ -224,6 +224,9 @@ function UI.BuildMainFrame()
             end
         else
             GuildLootDB.settings.isMasterLooter = false
+            if GL.Comm and (IsInRaid() or IsInGroup()) then
+                GL.Comm.SendMLAnnounce("")
+            end
         end
         GL.Print("Master Looter: " .. (GuildLootDB.settings.isMasterLooter and "|cff00ff00ON|r" or "|cffff4444OFF|r"))
         if UI.RefreshLootTab then UI.RefreshLootTab() end
@@ -421,7 +424,7 @@ function UI.BuildDockTab()
     dockTab:SetScript("OnClick", UI.Undock)
     dockTab:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetText("GuildLoot", 1, 0.8, 0)
+        GameTooltip:SetText("RequiemRaidTools", 1, 0.8, 0)
         local pending = GL.Loot and GL.Loot.GetPendingLoot and #GL.Loot.GetPendingLoot() or 0
         if pending > 0 then
             GameTooltip:AddLine(pending .. " Item(s) warten", 1, 1, 0)
@@ -433,15 +436,19 @@ function UI.BuildDockTab()
 
     local title = dockTab:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     title:SetPoint("TOP", dockTab, "TOP", 0, -8)
-    title:SetText("|cff00ccffG|r")
+    title:SetText("|cff00ccffR|r")
 
     local title2 = dockTab:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     title2:SetPoint("TOP", title, "BOTTOM", 0, -2)
-    title2:SetText("|cff00ccffL|r")
+    title2:SetText("|cff00ccffT|r")
 
     UI.dockLootCount = dockTab:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     UI.dockLootCount:SetPoint("CENTER", dockTab, "CENTER", 0, 0)
     UI.dockLootCount:SetText("")
+
+    UI.dockMLCheck = dockTab:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    UI.dockMLCheck:SetPoint("BOTTOM", dockTab, "BOTTOM", 0, 22)
+    UI.dockMLCheck:SetText("")
 
     UI.dockRaidDot = dockTab:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     UI.dockRaidDot:SetPoint("BOTTOM", dockTab, "BOTTOM", 0, 8)
@@ -459,10 +466,17 @@ function UI.RefreshDockTab()
     else
         UI.dockLootCount:SetText("")
     end
+    if UI.dockMLCheck then
+        if GL.IsMasterLooter() then
+            UI.dockMLCheck:SetText("|cff00ff00☑|r")
+        else
+            UI.dockMLCheck:SetText("|cff555555☐|r")
+        end
+    end
     if GuildLootDB.currentRaid.active then
-        UI.dockRaidDot:SetText("|cff00ff00●|r")
+        UI.dockRaidDot:SetText("|cff00ff00☑|r")
     else
-        UI.dockRaidDot:SetText("|cff888888●|r")
+        UI.dockRaidDot:SetText("|cff555555☐|r")
     end
 end
 
