@@ -53,13 +53,14 @@ Erledigte Items werden mit zwei Checkboxen markiert:
 - erledigt: [x] getestet: [x] ML-Checkbox nur für Raid-Leader/Assistenten sichtbar — verhindert unbefugten ML-Claim
 - erledigt: [x] getestet: [x] whisper an gewinner
 - erledigt: [x] getestet: [x] Einfügen von Items im inventar in die Pending List (Drag & Drop auf >> Button)
+- Readme.md aktualisieren, slash commands z.B.
 ## Bugs
 - erledigt: [x] getestet: [x] Wenn das Lootverteilen abgebrochen wurde dann geht bei erneuten anhandeln die automatische Verteilung nicht mehr
 - erledigt: [x] getestet: [x] bei mehr als 6 items werden die ersten 6 ins handelnsfenster gelegt, beim erneuten anhandeln bleibt das fenster leer, die restlichen items müssen manuel verteilt werden
 - [ ] Warbound Items aus der Pending Loot Liste rausfiltern — nicht tradebar, daher nutzlos im Tool
 - erledigt: [x] getestet: [x] Omnitoken mit "Chiming void Curio" oder "Läuternde Leerenkuriosität" im Namen weiterhin nicht in Lootliste, spezieller Filter notwendig
 
-- Prio 4 [ ] Prio wird dem Observer nicht übertragen — im Session Log des Observers fehlt mit welcher Prio ein Item gewonnen wurde
+- Prio 4 erledigt: [x] getestet: [ ] Prio wird dem Observer nicht übertragen — im Session Log des Observers fehlt mit welcher Prio ein Item gewonnen wurde
 
 - Prio 5 [ ] Token werden nicht zuverlässig getradet — tritt aktuell nicht auf, beobachten
 - Prio 3 [ ] ML-Übergabe: UI wird nach Bestätigung nicht aktualisiert
@@ -115,13 +116,12 @@ Erledigte Items werden mit zwei Checkboxen markiert:
 
 ### Sonstiges
 
-- [ ] **Loot.lua modularisieren**
-  Datei ist zu groß — aufteilen in:
-  - `Loot.lua` — Kern: Pending-Loot, Kategorisierung, `TryAddPendingItem`
-  - `Loot_Roll.lua` — Roll-Logik: Prio-Phase, Roll-Phase, Timer, Kandidaten
-  - `Loot_Trade.lua` — Auto-Handel: `_pendingTrades`, `OnTradeShow`, Staging
-  - `Loot_Assign.lua` — Zuweisung: `AssignLoot`, `AssignLootConfirm`, `AssignAllWinners`
-  TOC entsprechend erweitern.
+- erledigt: [x] getestet: [ ] **Loot.lua modularisiert** — aufgeteilt in `src/loot/`: `Loot.lua`, `Loot_Roll.lua`, `Loot_Assign.lua`, `Loot_Trade.lua`
+
+- [ ] **Chat-Nachrichten farbig hervorheben**
+  WoW unterstützt `|cAARRGGBB...|r` in allen Chat-Typen (Raid, Raid-Warning, Whisper).
+  Aktuell ist nur der lokale `[ReqRT]`-Prefix in Print-Meldungen cyan eingefärbt.
+  → `[ReqRT]`-Prefix auch in `SendChatMessage`-Aufrufen einfärben, ggf. wichtige Meldungen (Winner, Prio-Aufforderung) hervorheben.
 
 - [ ] **Lokalisierung (i18n)** ⚠️ niedrige Priorität — zurückgestellt
   Aktuell ~40+ gestreute Strings, gemischt Deutsch/Englisch, kein L[]-System.

@@ -240,7 +240,7 @@ function Loot.AssignLootConfirm(fullName, diff, clearAfter)
     end
 
     -- Observer informieren (fullName ist bereits realm-qualifiziert)
-    if GL.Comm then GL.Comm.SendAssign(fullName, diff, link, category, currentItem.quality) end
+    if GL.Comm then GL.Comm.SendAssign(fullName, diff, link, category, currentItem.quality, winnerPrio) end
 
     -- Zustand zurücksetzen (nur wenn letzte Zuweisung)
     if clearAfter then
@@ -365,7 +365,7 @@ function Loot.OnCommItemClear()
 end
 
 --- ML hat Loot zugewiesen → Observer aktualisieren Session-Log
-function Loot.OnCommAssign(playerName, diff, link, category, quality)
+function Loot.OnCommAssign(playerName, diff, link, category, quality, winnerPrio)
     if GL.IsMasterLooter() then return end
     if not playerName or playerName == "" then return end
     -- Name realm-qualifizieren und in participants suchen
@@ -383,6 +383,7 @@ function Loot.OnCommAssign(playerName, diff, link, category, quality)
         category   = category or "other",
         quality    = quality or 0,
         difficulty = diff or "",
+        winnerPrio = winnerPrio,
         timestamp  = time(),
     })
     Loot.OnCommItemClear()
