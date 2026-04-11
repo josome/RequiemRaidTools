@@ -82,7 +82,7 @@ function Loot.OnTradeShow()
                 for i2, inPt in ipairs(Loot._inTradeItems) do
                     if inPt.itemID == capturedID then
                         table.remove(Loot._inTradeItems, i2)
-                        GL.Print("|cffff4444[RLT] Item " .. capturedID .. " nicht im Inventar — wurde es verkauft oder gelöscht?|r")
+                        GL.Print("|cffff4444[ReqRT] Item " .. capturedID .. " nicht im Inventar — wurde es verkauft oder gelöscht?|r")
                         break
                     end
                 end
