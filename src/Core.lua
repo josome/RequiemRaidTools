@@ -708,8 +708,10 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 
     elseif event == "ENCOUNTER_END" then
         -- arg: encounterID, encounterName, difficultyID, groupSize, success
-        local success = select(5, ...)
+        local encounterName, success = select(2, ...), select(5, ...)
         if success == 1 then
+            -- Boss-Name für Loot-Tracking speichern
+            GuildLootDB.currentRaid.lastBoss = encounterName
             -- Snapshot der aktuellen Gruppe für Loot-Berechtigung
             local kill = {}
             if IsInRaid() then

@@ -149,7 +149,9 @@ function Loot.OnLootOpened()
     end
 
     if #toAdd > 0 then
+        local boss = GuildLootDB.currentRaid.lastBoss
         for _, item in ipairs(toAdd) do
+            item.boss = boss
             local _, _, _, _, _, _, _, _, equipLoc = GetItemInfo(item.link)
             if equipLoc ~= nil then
                 Loot.TryAddPendingItem(item, equipLoc)
@@ -187,7 +189,7 @@ function Loot.OnLootRollStart(rollID)
 
     -- equipLoc für Kategorie-Erkennung (GetItemInfo ist gecacht wenn Item bekannt)
     local _, _, _, _, _, _, _, _, equipLoc = GetItemInfo(link)
-    local item = { link = link, name = name or "?", itemID = itemID, quality = quality }
+    local item = { link = link, name = name or "?", itemID = itemID, quality = quality, boss = GuildLootDB.currentRaid.lastBoss }
 
     if equipLoc ~= nil then
         Loot.TryAddPendingItem(item, equipLoc)
