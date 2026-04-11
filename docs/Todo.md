@@ -57,7 +57,7 @@ Erledigte Items werden mit zwei Checkboxen markiert:
 ## Bugs
 - erledigt: [x] getestet: [x] Wenn das Lootverteilen abgebrochen wurde dann geht bei erneuten anhandeln die automatische Verteilung nicht mehr
 - erledigt: [x] getestet: [x] bei mehr als 6 items werden die ersten 6 ins handelnsfenster gelegt, beim erneuten anhandeln bleibt das fenster leer, die restlichen items müssen manuel verteilt werden
-- [ ] Warbound Items aus der Pending Loot Liste rausfiltern — nicht tradebar, daher nutzlos im Tool
+- erledigt: [x] getestet: [ ] Warbound Items aus der Pending Loot Liste rausfiltern — nicht tradebar, daher nutzlos im Tool
 - erledigt: [x] getestet: [x] Omnitoken mit "Chiming void Curio" oder "Läuternde Leerenkuriosität" im Namen weiterhin nicht in Lootliste, spezieller Filter notwendig
 
 - Prio 4 erledigt: [x] getestet: [ ] Prio wird dem Observer nicht übertragen — im Session Log des Observers fehlt mit welcher Prio ein Item gewonnen wurde

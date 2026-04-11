@@ -81,9 +81,19 @@ function Loot.AddItemManually(link)
 end
 
 -- Prüft Loot-Filter und fügt Item ggf. in pendingLoot ein
+-- Prüft ob ein Item Warbound ist (nicht tradebar → uninteressant für Loot-Verteilung)
+-- Enum.ItemBind: 8 = ToBnetAccount, 9 = ToBnetAccountUntilEquipped (warcraft.wiki.gg/wiki/Enum.ItemBind)
+local function IsWarboundItem(itemID)
+    local _, _, _, _, _, _, _, _, _, _, _, _, _, bindType = GetItemInfo(itemID)
+    return bindType == 8 or bindType == 9
+end
+
 function Loot.TryAddPendingItem(item, equipLoc)
     local s = GuildLootDB.settings
     local category = GL.GetItemCategory(item.itemID, equipLoc, item.quality)
+
+    -- Filter: Warbound Items (nicht tradebar)
+    if IsWarboundItem(item.itemID) then return end
 
     -- Filter: nicht-ausrüstbare Items (Handwerksmaterialien, Reagenzien, etc.)
     if s.filterNonEquip then
