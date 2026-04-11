@@ -189,8 +189,9 @@ end
 --- Gibt den kürzesten Spielernamen zurück (ohne Realm wenn gleicher Realm)
 function GL.ShortName(fullName)
     if not fullName then return "" end
-    local name = fullName:match("^([^%-]+)")
-    return name or fullName
+    -- pcall guard: sender-Strings aus Chat-Events können WoW-tainted sein
+    local ok, name = pcall(string.match, fullName, "^([^%-]+)")
+    return (ok and name) or fullName
 end
 
 -- ============================================================
