@@ -1,5 +1,7 @@
 package-as: RequiemRaidTools
 
+manual-changelog: CHANGELOG.md
+
 ignore:
   - RequiemRaidTools_Test
   - test
