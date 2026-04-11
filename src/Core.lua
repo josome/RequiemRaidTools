@@ -461,7 +461,11 @@ function GL.OnCommMLAnnounce(newMLName)
     else
         GuildLootDB.settings.isMasterLooter = false
     end
-    GL.Print(GL.ShortName(newMLName or "") .. " ist jetzt Master Looter.")
+    if normalNew == "" then
+        GL.Print("Kein Master Looter aktiv.")
+    else
+        GL.Print(GL.ShortName(newMLName or "") .. " ist jetzt Master Looter.")
+    end
     if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
 end
 
