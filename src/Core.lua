@@ -100,7 +100,7 @@ end
 -- ============================================================
 
 function GL.Print(msg)
-    print("|cff00ccff[RLT]|r " .. tostring(msg))
+    print("|cff00ccff[ReqRT]|r " .. tostring(msg))
 end
 
 function GL.PostToRaid(msg)
@@ -121,7 +121,7 @@ function GL.PostToRaid(msg)
         elseif IsInGroup()                                   then channel = "PARTY"
         else return end
     end
-    SendChatMessage("[RLT] " .. msg, channel)
+    SendChatMessage("[ReqRT] " .. msg, channel)
 end
 
 function GL.PostRaidWarn(msg)
@@ -130,7 +130,7 @@ function GL.PostRaidWarn(msg)
         return
     end
     if UnitIsGroupLeader("player") or UnitIsGroupAssistant("player") then
-        SendChatMessage("[RLT] " .. msg, "RAID_WARNING")
+        SendChatMessage("[ReqRT] " .. msg, "RAID_WARNING")
     else
         GL.PostToRaid(msg)
     end
