@@ -61,6 +61,8 @@ Erledigte Items werden mit zwei Checkboxen markiert:
 - erledigt: [x] getestet: [x] Omnitoken mit "Chiming void Curio" oder "Läuternde Leerenkuriosität" im Namen weiterhin nicht in Lootliste, spezieller Filter notwendig
 
 - Prio 4 erledigt: [x] getestet: [ ] Prio wird dem Observer nicht übertragen — im Session Log des Observers fehlt mit welcher Prio ein Item gewonnen wurde
+- erledigt: [x] getestet: [ ] Addon-Prefix von [RLT] auf [ReqRT] umbenannt
+- erledigt: [x] getestet: [ ] Boss-Name wird im Loot-Log gespeichert und angezeigt (ML + Observer, Session Log)
 
 - Prio 5 [ ] Token werden nicht zuverlässig getradet — tritt aktuell nicht auf, beobachten
 - Prio 3 [ ] ML-Übergabe: UI wird nach Bestätigung nicht aktualisiert
