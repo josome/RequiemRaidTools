@@ -9,7 +9,10 @@
 src/Util.lua
 src/Core.lua
 src/Comm.lua
-src/Loot.lua
+src/loot/Loot.lua
+src/loot/Loot_Roll.lua
+src/loot/Loot_Assign.lua
+src/loot/Loot_Trade.lua
 src/MinimapButton.lua
 src/ui/UI.lua
 src/ui/UI_Settings.lua
