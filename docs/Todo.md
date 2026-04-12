@@ -92,8 +92,14 @@ Erledigte Items werden mit zwei Checkboxen markiert:
       → UI-Refresh nach erfolgreicher Übergabe auf beiden Seiten fehlt
 - erledigt: [x] getestet: [x] wenn der ML den boss nicht looten kann weil items schon verrollt erscheinen diese nicht im Addon unter Pending Loot
 
-
-
+## Raid Sessing Bugs 
+- Anlegen von Session nicht möglich, klick New Sessing -> name eingeben -> Start klicken -> nichts passiert fenster bleibt offen keine neue Session
+  -> Erwarteung:
+    
+- wir hatten besprochen das neue Raids in der Session nur durch neuen loot mit RaidIDs entstehen können, jetzt entstehen sie einfach mit zonenwechsel
+  Also RaidID wird erstellt wenn Loot droppt, auf dem screenshot zu sehen ist aber das beim Zonenwechsel ein raid entsteht. 
+   -> Erwartung:
+    Nur Raid einträge in Session für die es loot gibt.
 ---
 
 ## Erledigt

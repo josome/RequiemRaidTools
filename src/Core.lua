@@ -33,6 +33,7 @@ local DB_DEFAULTS = {
         postToChat     = true,
         chatChannel    = "AUTO",   -- "AUTO", "RAID", "PARTY", "OFF"
         isMasterLooter = false,
+        dungeonMode    = false,
         minQuality     = 4,
         prioSeconds    = 15,
         rollSeconds    = 15,
@@ -215,7 +216,7 @@ function GL.StartContainer(label)
         return
     end
     local ts  = time()
-    local kw  = tonumber(date("%V", ts))   -- ISO-Kalenderwoche
+    local kw  = GL.ISOWeek(ts)
     local yr  = tonumber(date("%Y", ts))
     local finalLabel = (label and label ~= "") and label
                        or string.format("KW %02d %d", kw, yr)
@@ -224,6 +225,7 @@ function GL.StartContainer(label)
         label       = finalLabel,
         startedAt   = ts,
         closedAt    = nil,
+        pendingLoot = {},
         lootLog     = {},
         trashedLoot = {},
         raidMeta    = {},
@@ -329,7 +331,7 @@ function GL.EnsureRaidMeta()
     end
 end
 
---- currentRaid-Kontext zurücksetzen (neue ID, alles leeren außer pendingLoot bleibt).
+--- currentRaid-Kontext zurücksetzen (neue ID, alles leeren).
 function GL.ResetCurrentRaid()
     local cr = GuildLootDB.currentRaid
     cr.id                      = GL.GenerateRaidID("unknown", "", time())
@@ -339,18 +341,18 @@ function GL.ResetCurrentRaid()
     cr.mlName                  = ""
     cr.participants            = {}
     cr.absent                  = {}
+    cr.pendingLoot             = {}
     cr.sessionHidden           = {}
     cr.sessionChecked          = {}
     cr.currentKillParticipants = {}
     cr.lastBoss                = nil
-    -- pendingLoot bleibt erhalten
     if GL.Loot and GL.Loot.ClearCurrentItem then GL.Loot.ClearCurrentItem() end
 end
 
 --- Stellt sicher dass eine Session offen ist; erstellt "Auto KW X" falls keine aktiv.
 function GL.EnsureActiveSession()
     if GuildLootDB.activeContainerIdx then return end
-    local kw = tonumber(date("%V"))  -- ISO-Kalenderwoche
+    local kw = GL.ISOWeek(time())
     GL.StartContainer(string.format("Auto KW %02d", kw))
 end
 
@@ -894,7 +896,6 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
             if GL.Comm and GL.Comm.SendSessionStart then
                 GL.Comm.SendSessionStart(session.id, session.label, session.startedAt)
             end
-            GL.EnsureRaidMeta()
         end
         -- Observer ohne aktive Session → Sync anfordern (max. 1x alle 5s)
         if not GL.IsMasterLooter() and not db.activeContainerIdx then

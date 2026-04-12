@@ -22,8 +22,17 @@ Loot._inTradeItems = {}
 -- Items aus OnLootOpened/AddItemManually die noch auf GetItemInfo warten
 Loot._deferredPendingItems = {}
 
--- pendingLoot wird direkt aus GuildLootDB gelesen (überlebt Reloads)
-local function pendingLoot() return GuildLootDB.currentRaid.pendingLoot end
+-- pendingLoot liegt in der aktiven Session (überlebt Resume); Fallback: currentRaid
+local function pendingLoot()
+    local db  = GuildLootDB
+    local idx = db.activeContainerIdx
+    local s   = idx and db.raidContainers and db.raidContainers[idx]
+    if s then
+        if not s.pendingLoot then s.pendingLoot = {} end
+        return s.pendingLoot
+    end
+    return db.currentRaid.pendingLoot
+end
 local function trashedLoot()
     local db  = GuildLootDB
     local idx = db.activeContainerIdx

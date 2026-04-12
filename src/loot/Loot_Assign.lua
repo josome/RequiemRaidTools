@@ -215,7 +215,7 @@ function Loot.AssignLootConfirm(fullName, diff, clearAfter)
         -- IDs aus pendingLoot-Eintrag übernehmen (wurden beim Bosskill gestempelt)
         local itemRaidID    = db.currentRaid.id or ""
         local itemSessionID = db.raidContainers[idx].id
-        for _, p in ipairs(db.currentRaid.pendingLoot or {}) do
+        for _, p in ipairs(GL.Loot.GetPendingLoot() or {}) do
             local pid = tonumber(p.link and p.link:match("item:(%d+)"))
             if p.link == link or pid == currentItem.itemID then
                 itemRaidID    = p.raidID    or itemRaidID
@@ -270,7 +270,7 @@ function Loot.AssignLootConfirm(fullName, diff, clearAfter)
     if db.activeContainerIdx and db.raidContainers and db.raidContainers[db.activeContainerIdx] then
         sendSessID = db.raidContainers[db.activeContainerIdx].id
     end
-    for _, p in ipairs(db.currentRaid.pendingLoot or {}) do
+    for _, p in ipairs(GL.Loot.GetPendingLoot() or {}) do
         local pid = tonumber(p.link and p.link:match("item:(%d+)"))
         if p.link == link or pid == currentItem.itemID then
             if p.sessionID and p.sessionID ~= "" then sendSessID = p.sessionID end

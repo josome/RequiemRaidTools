@@ -5,6 +5,29 @@ GuildLoot = GuildLoot or {}
 local GL = GuildLoot
 
 -- ============================================================
+-- Datum / Kalenderwoche
+-- ============================================================
+
+--- ISO-8601-Kalenderwoche für einen Timestamp (oder jetzt).
+--- date("%V") ist auf Windows-WoW-Clients nicht zuverlässig.
+function GL.ISOWeek(ts)
+    local d = date("*t", ts)
+    local dow = (d.wday == 1) and 7 or (d.wday - 1)  -- Mo=1 … So=7
+    local w   = math.floor((d.yday - dow + 10) / 7)
+    if w < 1 then
+        -- letzte Woche des Vorjahres
+        local prev = date("*t", time({year=d.year-1, month=12, day=31}))
+        local pdow = (prev.wday == 1) and 7 or (prev.wday - 1)
+        w = math.floor((prev.yday - pdow + 10) / 7)
+    elseif w > 52 then
+        local dec31 = date("*t", time({year=d.year, month=12, day=31}))
+        local ddow  = (dec31.wday == 1) and 7 or (dec31.wday - 1)
+        if math.floor((dec31.yday - ddow + 10) / 7) < w then w = 1 end
+    end
+    return w
+end
+
+-- ============================================================
 -- Kategorie-Erkennung
 -- ============================================================
 
@@ -140,7 +163,13 @@ function GL.NormalizeName(name)
 end
 
 function GL.IsMasterLooter()
-    return GuildLootDB and GuildLootDB.settings and GuildLootDB.settings.isMasterLooter == true
+    if not GuildLootDB or not GuildLootDB.settings then return false end
+    if GuildLootDB.settings.isMasterLooter == true then return true end
+    if GuildLootDB.settings.dungeonMode    == true then return true end
+    -- Auto: solo in einer Raid-Instanz (Legacy-Farming etc.)
+    local _, instanceType = GetInstanceInfo()
+    if instanceType == "raid" and not IsInGroup() then return true end
+    return false
 end
 
 function GL.IsPlayerInGroup(name)

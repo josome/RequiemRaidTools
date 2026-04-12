@@ -59,31 +59,6 @@ function UI.BuildRaidPanel(parent)
             UI.RefreshRaidTab()
             UI.RefreshSessionBar()
         else
-            -- Name-Eingabe via StaticPopup
-            local kw = tonumber(date("%V"))
-            local yr = tonumber(date("%Y"))
-            local defaultName = string.format("KW %02d %d", kw, yr)
-            StaticPopupDialogs["RLT_NEW_SESSION"] = {
-                text         = "Session-Name:",
-                button1      = "Start",
-                button2      = "Abbrechen",
-                hasEditBox   = true,
-                maxLetters   = 48,
-                OnShow       = function(self)
-                    self.editBox:SetText(defaultName)
-                    self.editBox:HighlightText()
-                end,
-                OnAccept     = function(self)
-                    local name = self.editBox:GetText()
-                    GL.StartContainer(name ~= "" and name or nil)
-                    UI.RefreshRaidTab()
-                    UI.RefreshSessionBar()
-                end,
-                timeout      = 0,
-                whileDead    = false,
-                hideOnEscape = true,
-                preferredIndex = 3,
-            }
             StaticPopup_Show("RLT_NEW_SESSION")
         end
     end)
@@ -358,6 +333,10 @@ local function MakeSessionHeader(parent, session, ci, yOff)
     if session.closedAt then
         local dateStr = date("%d.%m.", session.closedAt)
         labelStr = labelStr .. " |cff555555(" .. dateStr .. ")|r"
+    end
+    local plCount = #(session.pendingLoot or {})
+    if plCount > 0 then
+        labelStr = labelStr .. " |cffffcc00[" .. plCount .. " PL]|r"
     end
     local lbl = labelBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     lbl:SetAllPoints()
@@ -726,3 +705,43 @@ function UI.RefreshRaidDetail()
     end
     content:SetHeight(math.max(1, -yOff))
 end
+
+-- ============================================================
+-- StaticPopup-Definitionen (einmalig beim Laden registrieren)
+-- ============================================================
+
+StaticPopupDialogs["RLT_NEW_SESSION"] = {
+    text         = "Session-Name:",
+    button1      = "Start",
+    button2      = "Abbrechen",
+    hasEditBox   = true,
+    maxLetters   = 48,
+    OnShow       = function(self)
+        local now = time()
+        local kw  = GL.ISOWeek(now)
+        local yr  = tonumber(date("%Y", now))
+        self.editBox:SetText(string.format("KW %02d %d", kw, yr))
+        self.editBox:HighlightText()
+    end,
+    OnAccept     = function(self)
+        local name = self.editBox:GetText()
+        GL.StartContainer(name ~= "" and name or nil)
+        if GL.UI then
+            GL.UI.RefreshRaidTab()
+            GL.UI.RefreshSessionBar()
+        end
+    end,
+    EditBoxOnEnterPressed = function(self)
+        local name = self:GetText()
+        GL.StartContainer(name ~= "" and name or nil)
+        StaticPopup_Hide("RLT_NEW_SESSION")
+        if GL.UI then
+            GL.UI.RefreshRaidTab()
+            GL.UI.RefreshSessionBar()
+        end
+    end,
+    timeout        = 0,
+    whileDead      = false,
+    hideOnEscape   = true,
+    preferredIndex = 3,
+}
