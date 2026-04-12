@@ -87,7 +87,10 @@ end
 -- ============================================================
 
 local function BuildItemSubRows(content, fullName, rowW, yOff)
-    local log = GuildLootDB.currentRaid and GuildLootDB.currentRaid.lootLog or {}
+    local db  = GuildLootDB
+    local idx = db.activeContainerIdx
+    local log = (idx and db.raidContainers and db.raidContainers[idx])
+                and db.raidContainers[idx].lootLog or {}
     local shortN = GL.ShortName(fullName)
     local count  = 0
 

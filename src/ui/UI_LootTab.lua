@@ -288,7 +288,10 @@ function UI.BuildLootPanel(parent)
     sessionLabel:SetText("|cffffcc00Session Loot:|r")
 
     local clearSessionBtn = MakeButton(main, "Clear List", 90, 18, function()
-        local log = GuildLootDB.currentRaid.lootLog
+        local db  = GuildLootDB
+        local idx = db.activeContainerIdx
+        local log = (idx and db.raidContainers and db.raidContainers[idx])
+                    and db.raidContainers[idx].lootLog or {}
         for _, entry in ipairs(log) do
             local k = tostring(entry.timestamp) .. (entry.player or "")
             sessionHidden()[k] = true
@@ -689,7 +692,10 @@ function UI.RefreshSessionLoot()
     for _, r in ipairs(sessionLootRows) do r:Hide() end
     sessionLootRows = {}
 
-    local log = GuildLootDB.currentRaid.lootLog
+    local db  = GuildLootDB
+    local idx = db.activeContainerIdx
+    local log = (idx and db.raidContainers and db.raidContainers[idx])
+                and db.raidContainers[idx].lootLog or {}
     local ROW_H = 26
     local yOff  = 0
     local shown = 0

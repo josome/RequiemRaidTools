@@ -50,33 +50,80 @@ function Comm.SendRollStart(seconds, players)
     SendToGroup("ROLL_START" .. SEP .. tostring(seconds) .. SEP .. list)
 end
 
---- ML hat Loot einem Spieler zugewiesen
-function Comm.SendAssign(playerName, difficulty, itemLink, category, quality, winnerPrio, boss)
+--- ML hat Loot einem Spieler zugewiesen (inkl. sessionID + raidID für Observer-Sync)
+function Comm.SendAssign(playerName, difficulty, itemLink, category, quality, winnerPrio, boss, sessionID, raidID)
     SendToGroup("ASSIGN" .. SEP .. (playerName or "") .. SEP
                          .. (difficulty or "") .. SEP .. (itemLink or "")
                          .. SEP .. (category or "other") .. SEP .. tostring(quality or 0)
-                         .. SEP .. tostring(winnerPrio or 0) .. SEP .. (boss or ""))
+                         .. SEP .. tostring(winnerPrio or 0) .. SEP .. (boss or "")
+                         .. SEP .. (sessionID or "") .. SEP .. (raidID or ""))
 end
 
---- ML hat Raid gestartet (auch bei GROUP_ROSTER_UPDATE → Late-Joiner-Sync)
---- Überträgt auch relevante Settings an Observer: minQuality, prioSeconds, rollSeconds
-function Comm.SendRaidStart(tier, difficulty, id, startedAt, mlName, minQuality, prioSeconds, rollSeconds)
-    SendToGroup("RAID_START" .. SEP .. (tier or "") .. SEP .. (difficulty or "")
-                             .. SEP .. (id or "") .. SEP .. tostring(startedAt or 0)
-                             .. SEP .. (GL.NormalizeName(mlName or "") or "")
-                             .. SEP .. tostring(minQuality or 0)
-                             .. SEP .. tostring(prioSeconds or 0)
-                             .. SEP .. tostring(rollSeconds or 0))
+--- Observer fragt nach aktiver Session (Late-Joiner Pull); inCombat = ob OBS gerade im Kampf ist
+function Comm.SendRaidQuery(inCombat)
+    local flag = (inCombat or (UnitAffectingCombat and UnitAffectingCombat("player"))) and "1" or "0"
+    SendToGroup("RAID_QUERY" .. SEP .. flag)
 end
 
---- Observer fragt nach aktivem Raid (Late-Joiner Pull)
-function Comm.SendRaidQuery()
-    SendToGroup("RAID_QUERY")
+-- ---- Session-System ----
+
+--- ML hat eine neue Session gestartet (oder eine geschlossene fortgesetzt)
+function Comm.SendSessionStart(sessionID, label, startedAt)
+    SendToGroup("SESSION_START" .. SEP .. (sessionID or "") .. SEP .. (label or "")
+                                .. SEP .. tostring(startedAt or 0))
 end
 
---- ML hat Raid beendet
-function Comm.SendRaidEnd(raidID)
-    SendToGroup("RAID_END" .. SEP .. (raidID or ""))
+--- ML hat die aktive Session geschlossen
+function Comm.SendSessionEnd(sessionID, closedAt)
+    SendToGroup("SESSION_END" .. SEP .. (sessionID or "") .. SEP .. tostring(closedAt or 0))
+end
+
+--- ML broadcastet raidMeta (nach Boss-Kill oder Late-Joiner-Push)
+function Comm.SendRaidMeta(sessionID, raidID, meta)
+    local parts = table.concat(meta.participants or {}, ",")
+    SendToGroup("RAID_META" .. SEP .. (sessionID or "") .. SEP .. (raidID or "")
+                           .. SEP .. (meta.tier or "") .. SEP .. (meta.difficulty or "")
+                           .. SEP .. tostring(meta.startedAt or 0)
+                           .. SEP .. tostring(meta.closedAt or 0)
+                           .. SEP .. parts)
+end
+
+--- ML schickt komplette Session an einen bestimmten Observer (Late-Join-Sync via Whisper)
+--- Sendet SESSION_START + RAID_META* + LOOT_ASSIGN* als Whisper-Serie
+function Comm.SendSessionSync(session, target)
+    if not session or not target then return end
+    local function Whisper(msg)
+        if C_ChatInfo then
+            C_ChatInfo.SendAddonMessage(PREFIX, msg, "WHISPER", target)
+        end
+    end
+    -- 1. Session-Metadaten
+    Whisper("SESSION_START" .. SEP .. session.id .. SEP .. (session.label or "") .. SEP .. tostring(session.startedAt or 0))
+    -- 2. raidMeta-Einträge
+    for raidID, meta in pairs(session.raidMeta or {}) do
+        local participants = table.concat(meta.participants or {}, ",")
+        Whisper("RAID_META" .. SEP .. session.id .. SEP .. raidID
+                           .. SEP .. (meta.tier or "") .. SEP .. (meta.difficulty or "")
+                           .. SEP .. tostring(meta.startedAt or 0)
+                           .. SEP .. tostring(meta.closedAt or 0)
+                           .. SEP .. participants)
+    end
+    -- 3. Zugewiesener Loot
+    for _, item in ipairs(session.lootLog or {}) do
+        Whisper("ASSIGN" .. SEP .. (item.player or "") .. SEP .. (item.difficulty or "")
+                        .. SEP .. (item.link or "") .. SEP .. (item.category or "other")
+                        .. SEP .. tostring(item.quality or 0)
+                        .. SEP .. tostring(item.winnerPrio or 0)
+                        .. SEP .. (item.boss or "")
+                        .. SEP .. (item.sessionID or session.id)
+                        .. SEP .. (item.raidID or ""))
+    end
+    -- 4. Getrashter Loot
+    for _, item in ipairs(session.trashedLoot or {}) do
+        Whisper("LOOT_TRASH" .. SEP .. (item.link or "")
+                             .. SEP .. (item.sessionID or session.id)
+                             .. SEP .. (item.raidID or ""))
+    end
 end
 
 --- Neuer ML steht fest (direkte Übernahme oder nach Bestätigung)
@@ -146,24 +193,56 @@ function Comm.OnMessage(msg, sender)
 
     elseif cmd == "ASSIGN" then
         local name, diff, link, category, quality, winnerPrio, boss = parts[2], parts[3], parts[4], parts[5], parts[6], parts[7], parts[8]
+        local sessionID, raidID = parts[9], parts[10]
         if GL.Loot and GL.Loot.OnCommAssign then
-            GL.Loot.OnCommAssign(name, diff, link, category, tonumber(quality) or 0, tonumber(winnerPrio) or nil, boss ~= "" and boss or nil)
-        end
-
-    elseif cmd == "RAID_START" then
-        local tier, difficulty, id, startedAt, mlName = parts[2], parts[3], parts[4], parts[5], parts[6]
-        local minQuality, prioSeconds, rollSeconds = parts[7], parts[8], parts[9]
-        if GL.OnCommRaidStart then
-            GL.OnCommRaidStart(tier, difficulty, id, tonumber(startedAt) or 0, sender, mlName,
-                               tonumber(minQuality), tonumber(prioSeconds), tonumber(rollSeconds))
+            GL.Loot.OnCommAssign(name, diff, link, category,
+                                 tonumber(quality) or 0,
+                                 tonumber(winnerPrio) or nil,
+                                 boss ~= "" and boss or nil,
+                                 sessionID ~= "" and sessionID or nil,
+                                 raidID ~= "" and raidID or nil)
         end
 
     elseif cmd == "RAID_QUERY" then
-        if GL.OnCommRaidQuery then GL.OnCommRaidQuery(sender) end
+        local inCombat = (parts[2] == "1")
+        if GL.OnCommRaidQuery then GL.OnCommRaidQuery(sender, inCombat) end
 
-    elseif cmd == "RAID_END" then
-        if GL.OnCommRaidEnd then
-            GL.OnCommRaidEnd(parts[2])
+    elseif cmd == "SESSION_START" then
+        local sessionID, label, startedAt = parts[2], parts[3], tonumber(parts[4]) or 0
+        if GL.OnCommSessionStart then GL.OnCommSessionStart(sessionID, label, startedAt, sender) end
+
+    elseif cmd == "SESSION_END" then
+        local sessionID, closedAt = parts[2], tonumber(parts[3]) or 0
+        if GL.OnCommSessionEnd then GL.OnCommSessionEnd(sessionID, closedAt) end
+
+    elseif cmd == "RAID_META" then
+        local sessionID, raidID = parts[2], parts[3]
+        local tier, diff = parts[4], parts[5]
+        local startedAt  = tonumber(parts[6]) or 0
+        local closedAt   = (parts[7] ~= "" and parts[7] ~= "0") and tonumber(parts[7]) or nil
+        local participants = {}
+        if parts[8] and parts[8] ~= "" then
+            for p in parts[8]:gmatch("[^,]+") do
+                table.insert(participants, p)
+            end
+        end
+        local meta = { tier=tier, difficulty=diff, startedAt=startedAt, closedAt=closedAt, participants=participants }
+        if GL.OnCommRaidMeta then GL.OnCommRaidMeta(sessionID, raidID, meta) end
+
+    elseif cmd == "LOOT_TRASH" then
+        local link, sessionID, raidID = parts[2], parts[3], parts[4]
+        local db = GuildLootDB
+        local targetSession = nil
+        if sessionID and sessionID ~= "" then
+            for _, s in ipairs(db.raidContainers or {}) do
+                if s.id == sessionID then targetSession = s; break end
+            end
+        end
+        if not targetSession and db.activeContainerIdx then
+            targetSession = db.raidContainers[db.activeContainerIdx]
+        end
+        if targetSession and link and link ~= "" then
+            table.insert(targetSession.trashedLoot, { link=link, sessionID=sessionID or "", raidID=raidID or "" })
         end
 
     elseif cmd == "ML_ANNOUNCE" then

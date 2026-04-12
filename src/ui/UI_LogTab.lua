@@ -40,7 +40,7 @@ end
 -- JSON-Export Popup
 -- ============================================================
 
-function UI.ShowExportPopup(raidData)
+function UI.ShowExportPopup(raidData, textOverride)
     if not exportPopup then
         exportPopup = CreateFrame("Frame", "RaidLootExportPopup", UIParent, "BasicFrameTemplateWithInset")
         exportPopup:SetSize(600, 400)
@@ -81,7 +81,8 @@ function UI.ShowExportPopup(raidData)
 
     local fmt = GuildLootDB.settings.exportFormat or "JSON"
     exportPopup.titleText:SetText(fmt .. " Export – press Mark All, then Ctrl+C")
-    local text = (fmt == "CSV") and GL.ExportCSV(raidData) or GL.ExportJSON(raidData)
+    local text = textOverride
+                 or ((fmt == "CSV") and GL.ExportCSV(raidData) or GL.ExportJSON(raidData))
     exportPopup.editBox:SetText(text)
     exportPopup.editBox:HighlightText()
     exportPopup:Show()
@@ -109,7 +110,10 @@ function UI.RefreshLogTab()
     for _, r in ipairs(logRows) do r:Hide() end
     logRows = {}
 
-    local log     = GuildLootDB.currentRaid.lootLog
+    local db  = GuildLootDB
+    local idx = db.activeContainerIdx
+    local log = (idx and db.raidContainers and db.raidContainers[idx])
+                and db.raidContainers[idx].lootLog or {}
     local content = UI.logPanel.content
     local yOff    = 0
 

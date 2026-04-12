@@ -1,4 +1,4 @@
-# RequiemRaidTools (RLT)
+# RequiemRaidTools (ReqRT)
 
 Ein World of Warcraft Addon für Gilden-Offiziere und Raid-Leader zur strukturierten Loot-Verteilung im Raid — mit Prio-System, automatischer Roll-Auswertung und Echtzeit-Synchronisation zwischen allen Raid-Mitgliedern.
 
@@ -11,12 +11,13 @@ In WoW-Raids übernimmt der **Master Looter (ML)** die Kontrolle darüber, wer w
 Alle Raid-Mitglieder mit installiertem Addon sehen denselben Stand wie der ML — in Echtzeit, ohne manuellen Abgleich.
 
 **Kernfunktionen:**
-- Automatische Loot-Erkennung und Pending-Liste
+- Automatische Loot-Erkennung und Pending-Liste (Warbound-Items werden automatisch gefiltert)
 - Prio-System (BIS / OS / Transmog) mit konfigurierbaren Timern
 - Automatische `/roll`-Auswertung mit Tie-Re-Roll
 - Echtzeit-Sync zwischen ML und allen Observern (auch Late-Joiner)
 - Auto-Handel: Item wird beim Öffnen des Handelsfensters automatisch eingelegt
 - Mehrere Kopien desselben Items in einem Roll-Vorgang
+- Session-Log mit Boss-Quelle, Prio und Track pro Item
 - Raid-Historie mit Export als JSON oder CSV
 
 ---
@@ -25,14 +26,14 @@ Alle Raid-Mitglieder mit installiertem Addon sehen denselben Stand wie der ML �
 
 1. Ordner `RequiemRaidTools` in `World of Warcraft/_retail_/Interface/AddOns/` kopieren
 2. WoW neu starten oder `/reload` eingeben
-3. `/rlt` zum Öffnen des Fensters
+3. `/reqrt` zum Öffnen des Fensters
 
 ---
 
 ## Erste Schritte
 
-1. `/rlt` eingeben → Hauptfenster öffnet sich
-2. **ML-Checkbox** oben rechts aktivieren (oder `/rlt ml`) → Master Looter Modus an
+1. `/reqrt` eingeben → Hauptfenster öffnet sich
+2. **ML-Checkbox** oben rechts aktivieren → Master Looter Modus an
 3. Im **Raid-Tab** auf **Start Raid** klicken → Raid beginnt, alle Observer werden automatisch synchronisiert
 4. Boss töten → Loot-Fenster öffnen → Items erscheinen automatisch in der **Pending Loot** Liste
 
@@ -107,7 +108,7 @@ Alle Raid-Mitglieder mit installiertem Addon sehen in Echtzeit:
 - Welches Item gerade verteilt wird
 - Wer welche Prio gemeldet hat
 - Roll-Ergebnisse live
-- Finale Zuweisung
+- Finale Zuweisung inkl. Prio des Gewinners
 
 ### Late-Joiner
 Tritt ein Spieler dem Raid bei, wenn ein Raid bereits aktiv ist:
@@ -134,6 +135,8 @@ Ein Observer möchte die ML-Rolle übernehmen:
 
 Items im Trash sind **nicht verloren** — sie können jederzeit zurück in Pending verschoben werden.
 
+> Items aus dem Inventar können per **Drag & Drop** auf den `>>` Button manuell zur Pending List hinzugefügt werden (z.B. wenn der ML vergessen hat den ML-Modus zu aktivieren).
+
 ---
 
 ## Tabs im Überblick
@@ -142,7 +145,7 @@ Items im Trash sind **nicht verloren** — sie können jederzeit zurück in Pend
 |-----|--------|
 | **Loot** | Aktives Item · Prio-Kandidaten · Roll-Ergebnisse · Session-Log |
 | **Spieler** | Roster mit Loot-Statistiken pro Spieler (Waffe, Trinket, Set, Sonstiges) |
-| **Log** | Chronologisches Protokoll aller Zuweisungen der Session |
+| **Log** | Chronologisches Protokoll aller Zuweisungen: Spieler, Boss, Track, Kategorie, Prio, Item |
 | **Raid** | Raid starten/beenden · Raid-Historie · Export |
 
 ---
@@ -204,28 +207,29 @@ Im Ordner `analyzer/` liegt `analyzer.html` — ein eigenständiges Web-Tool fü
 
 | Befehl | Beschreibung |
 |--------|-------------|
-| `/rlt` | Fenster öffnen/schließen |
-| `/rlt ml` | Master Looter Modus umschalten |
-| `/rlt start [Name]` | Raid starten (optional mit Tier-Name) |
-| `/rlt reset` | Raid zurücksetzen (zweifache Bestätigung) |
-| `/rlt history [Spieler]` | Letzte 10 Items eines Spielers anzeigen |
-| `/rlt cleanup` | Leere/fehlerhafte Einträge aus der Historie entfernen |
+| `/reqrt` | Fenster öffnen/schließen |
+| `/reqrt ml` | Master Looter Modus umschalten |
+| `/reqrt start [Name]` | Raid starten (optional mit Tier-Name) |
+| `/reqrt reset` | Raid zurücksetzen (zweifache Bestätigung) |
+| `/reqrt history [Spieler]` | Letzte 10 Items eines Spielers anzeigen |
+| `/reqrt cleanup` | Leere/fehlerhafte Einträge aus der Historie entfernen |
 
 ### Test-Befehle (Entwicklung)
 
 | Befehl | Beschreibung |
 |--------|-------------|
-| `/rlt test` | Test-Item aus dem Inventar in Pending-Loot einfügen |
-| `/rlt testprio` | Prio-Phase mit Fake-Kandidaten simulieren |
-| `/rlt testroll` | Roll-Phase mit Fake-Kandidaten simulieren |
-| `/rlt testmulti [N]` | Multi-Item-Drop simulieren (N Kopien) |
-| `/rlt testentry` | Fertigen Loot-Log-Eintrag direkt einfügen |
+| `/reqrt test` | Test-Item aus dem Inventar in Pending-Loot einfügen |
+| `/reqrt testprio` | Prio-Phase mit Fake-Kandidaten simulieren |
+| `/reqrt testroll` | Roll-Phase mit Fake-Kandidaten simulieren |
+| `/reqrt testmulti [N]` | Multi-Item-Drop simulieren (N Kopien) |
+| `/reqrt testentry` | Fertigen Loot-Log-Eintrag direkt einfügen |
 
 ---
 
 ## UI
 
 - **Dock-Tab**: Fenster dockt als schmale Leiste am linken Bildschirmrand an (`«`-Button)
+- **Dock-Tab**: zeigt ML-Status (☑/☐) und Raid-Status (☑/☐) auf einen Blick
 - **Dock-Tab ziehbar**: Position am Rand per Drag anpassen (wird gespeichert)
 - **Vollständig skalierbar**: Fenster per Drag (Titelleiste) verschieben, per Grip (unten rechts) in der Größe anpassen
 - **Einstellungen**: Zahnrad-Icon öffnet Panel rechts neben dem Hauptfenster
@@ -237,7 +241,7 @@ Im Ordner `analyzer/` liegt `analyzer.html` — ein eigenständiges Web-Tool fü
 
 - **SavedVariable**: `GuildLootDB`
 - **Addon-Kommunikation**: Prefix `RequiemRLT`
-- **WoW Interface**: 110100
+- **WoW Interface**: 120001
 - **Sprache**: Deutsch
 
 ---

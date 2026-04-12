@@ -12,7 +12,7 @@ local currentItem = Loot.GetCurrentItem()
 -- ============================================================
 
 local function IsParticipant(name)
-    if not GuildLootDB.currentRaid.active then return false end
+    if not GuildLootDB.activeContainerIdx then return false end
     local raid   = GuildLootDB.currentRaid
     local absent = raid.absent
     local short  = GL.ShortName(name)

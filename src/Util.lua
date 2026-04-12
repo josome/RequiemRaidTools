@@ -267,7 +267,11 @@ end
 function GL.ExportJSON(raidData)
     local data = {
         exportedAt = GL.FormatTimestamp(time()),
-        raid       = raidData or GuildLootDB.currentRaid,
+        raid       = raidData or (function()
+            local db  = GuildLootDB
+            local idx = db.activeContainerIdx
+            return (idx and db.raidContainers and db.raidContainers[idx]) or db.currentRaid
+        end)(),
         players    = GuildLootDB.players,
     }
     return JsonVal(data, {})
@@ -276,7 +280,9 @@ end
 --- Exportiert den Loot-Log eines Raids als CSV (Google-Sheets-kompatibel).
 -- Enthält: zugewiesene Items (lootLog) + getrashte Items (trashedLoot).
 function GL.ExportCSV(raidData)
-    local raid = raidData or GuildLootDB.currentRaid
+    local db   = GuildLootDB
+    local idx  = db.activeContainerIdx
+    local raid = raidData or (idx and db.raidContainers and db.raidContainers[idx]) or db.currentRaid
 
     local PRIO_LABEL = { [1]="BIS", [2]="OS", [4]="Transmog" }
     local CAT_LABEL  = { weapons="Weapon", trinket="Trinket", setItems="Set", other="Other" }
@@ -333,4 +339,27 @@ function GL.ExportCSV(raidData)
     end
 
     return table.concat(lines, "\n")
+end
+
+--- Exportiert mehrere Raids als einen CSV-String (ein gemeinsamer Header).
+function GL.ExportMultiCSV(raidsList)
+    local parts = {}
+    for i, raid in ipairs(raidsList) do
+        local csv = GL.ExportCSV(raid)
+        if i > 1 then
+            -- Header-Zeile entfernen
+            csv = csv:match("^[^\n]*\n(.*)$") or ""
+        end
+        if csv ~= "" then table.insert(parts, csv) end
+    end
+    return table.concat(parts, "\n")
+end
+
+--- Exportiert mehrere Raids als JSON-Array.
+function GL.ExportMultiJSON(raidsList)
+    return JsonVal({
+        exportedAt = GL.FormatTimestamp(time()),
+        raids      = raidsList,
+        players    = GuildLootDB.players,
+    }, {})
 end

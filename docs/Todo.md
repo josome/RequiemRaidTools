@@ -50,10 +50,29 @@ Erledigte Items werden mit zwei Checkboxen markiert:
   - **ML** — volle Kontrolle (bereits vorhanden)
   - **Observer** (Raid-Leader/Assist) — read-only, komplette Ansicht: Pending Loot, aktives Item, Roll-Ergebnisse, Session Log
   - **Player** — optionales minimales Popup für alle Raid-Mitglieder: poppt automatisch auf sobald der ML ein Item auswählt, zeigt aktuelles Item, Prio-Buttons (Klick postet automatisch ins Chat), Roll-Button (führt `/roll` aus)
+### Raidverwaltung
+- [ ] **Mehrerer Raids per Multiselect [] links neben Raid auswählen für delete oder export**
+- [ ] **zusammenfassen von einzelnen Raids**
+      Mögliche Stukturen Kalenderwochen, Daten z.B. 
+      unklar wie zuweisen, drag & drop möglich (manuell)
+  
+      -> oder durch Start wird ein Raid Ordner erzeugt (08.04.26 - 14.04.26 / KW 15) und beim Bosskill wird geprüft wo und auf welchem schwierigkeitsgrad man ist? und je nachdem wird ein Raid eintrag im Ordner angelegt bzw falls es den Raid schon gibt der boss dem Raid zugewiesen?
+
+      + 08.04.26 - 14.04.26 / KW 15 (zugeklappt)
+
+      - 08.04.26 - 14.04.26 / KW 15 (aufgeklappt)
+        -> Raid A N
+        -> Raid A H
+        -> Raid B N
+        -> Raid B H
+
+
 - erledigt: [x] getestet: [x] ML-Checkbox nur für Raid-Leader/Assistenten sichtbar — verhindert unbefugten ML-Claim
 - erledigt: [x] getestet: [x] whisper an gewinner
 - erledigt: [x] getestet: [x] Einfügen von Items im inventar in die Pending List (Drag & Drop auf >> Button)
 - Readme.md aktualisieren, slash commands z.B.
+   
+
 ## Bugs
 - erledigt: [x] getestet: [x] Wenn das Lootverteilen abgebrochen wurde dann geht bei erneuten anhandeln die automatische Verteilung nicht mehr
 - erledigt: [x] getestet: [x] bei mehr als 6 items werden die ersten 6 ins handelnsfenster gelegt, beim erneuten anhandeln bleibt das fenster leer, die restlichen items müssen manuel verteilt werden

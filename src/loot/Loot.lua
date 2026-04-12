@@ -24,7 +24,14 @@ Loot._deferredPendingItems = {}
 
 -- pendingLoot wird direkt aus GuildLootDB gelesen (überlebt Reloads)
 local function pendingLoot() return GuildLootDB.currentRaid.pendingLoot end
-local function trashedLoot() return GuildLootDB.currentRaid.trashedLoot or {} end
+local function trashedLoot()
+    local db  = GuildLootDB
+    local idx = db.activeContainerIdx
+    if idx and db.raidContainers and db.raidContainers[idx] then
+        return db.raidContainers[idx].trashedLoot
+    end
+    return {}
+end
 local currentItem  = {
     link       = nil,
     name       = nil,
@@ -66,15 +73,21 @@ function Loot.AddItemManually(link)
     local itemID = tonumber(link:match("item:(%d+)"))
     if not itemID then return end
 
+    local db  = GuildLootDB
+    local idx = db.activeContainerIdx
+    local sid = (idx and db.raidContainers and db.raidContainers[idx])
+                and db.raidContainers[idx].id or ""
     local name, _, quality, _, _, _, _, _, equipLoc = GetItemInfo(link)
     if not name then
         -- Item-Info noch nicht gecacht → deferred
-        table.insert(Loot._deferredPendingItems, { link = link, itemID = itemID, quality = 0, name = "?", manual = true })
+        table.insert(Loot._deferredPendingItems, { link = link, itemID = itemID, quality = 0, name = "?", manual = true,
+                                                   raidID = db.currentRaid.id or "", sessionID = sid })
         return
     end
 
     local category = GL.GetItemCategory(itemID, equipLoc or "", quality or 0)
-    local item = { link = link, name = name, itemID = itemID, quality = quality or 0, category = category }
+    local item = { link = link, name = name, itemID = itemID, quality = quality or 0, category = category,
+                   raidID = db.currentRaid.id or "", sessionID = sid }
     table.insert(pendingLoot(), item)
     if GL.UI and GL.UI.RefreshLootTab then GL.UI.RefreshLootTab() end
     GL.Print("Item manuell hinzugefügt: " .. link)
@@ -106,7 +119,12 @@ function Loot.TryAddPendingItem(item, equipLoc)
     local fc = s.filterCategories
     if fc and fc[category] == false then return end
 
-    item.category = category
+    item.category  = category
+    item.raidID    = item.raidID or GuildLootDB.currentRaid.id or ""
+    local db       = GuildLootDB
+    local idx      = db.activeContainerIdx
+    item.sessionID = (idx and db.raidContainers and db.raidContainers[idx])
+                     and db.raidContainers[idx].id or ""
     table.insert(pendingLoot(), item)
 end
 
@@ -172,7 +190,7 @@ end
 -- und fügt sie zu pendingLoot hinzu — auch wenn der ML die Leiche nie selbst geöffnet hat.
 function Loot.OnLootRollStart(rollID)
     if not GL.IsMasterLooter() then return end
-    if not GuildLootDB.currentRaid.active then return end
+    if not GuildLootDB.activeContainerIdx then return end
     if processedRolls[rollID] then return end
     processedRolls[rollID] = true
 

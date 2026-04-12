@@ -8,8 +8,8 @@ GL.Test = GL.Test or {}
 -- Fügt ein zufälliges episches Ausrüstungs-Item aus dem Inventar in Pending-Loot ein,
 -- damit der komplette Loot-Flow (Prio → Roll → Vergabe) getestet werden kann.
 function GL.Test.AddPendingItem()
-    if not GuildLootDB.currentRaid.active then
-        GL.Print("No active raid. Use /rlt start first.")
+    if not GuildLootDB.activeContainerIdx then
+        GL.Print("No active raid. Use /reqrt start first.")
         return
     end
 
@@ -60,7 +60,7 @@ end
 -- Simuliert die Prio-Sammelphase mit Fake-Kandidaten, damit der X-Button (Prio löschen)
 -- ohne echten Raid getestet werden kann.
 function GL.Test.SimulatePrio()
-    if not GuildLootDB.currentRaid.active then
+    if not GuildLootDB.activeContainerIdx then
         GL.StartRaid("Test-Tier")
     end
 
@@ -126,7 +126,7 @@ end
 -- beibehalten und nur Roll-Ergebnisse + Kandidaten werden ergänzt.
 function GL.Test.SimulateRoll()
     -- Raid sicherstellen
-    if not GuildLootDB.currentRaid.active then
+    if not GuildLootDB.activeContainerIdx then
         GL.StartRaid("Test-Tier")
     end
 
@@ -214,8 +214,8 @@ end
 -- damit der Analyzer/Export mit itemID-verlinkten Einträgen getestet werden kann.
 -- Verhält sich wie ein echter AssignLoot-Eintrag (inkl. itemID, category, difficulty, prio).
 function GL.Test.AddLootEntry()
-    if not GuildLootDB.currentRaid.active then
-        GL.Print("No active raid. Use /rlt start first.")
+    if not GuildLootDB.activeContainerIdx then
+        GL.Print("No active raid. Use /reqrt start first.")
         return
     end
 
@@ -268,7 +268,13 @@ function GL.Test.AddLootEntry()
         timestamp  = time(),
     }
 
-    table.insert(GuildLootDB.currentRaid.lootLog, entry)
+    local db  = GuildLootDB
+    local idx = db.activeContainerIdx
+    if idx and db.raidContainers and db.raidContainers[idx] then
+        entry.raidID    = db.currentRaid.id or ""
+        entry.sessionID = db.raidContainers[idx].id
+        table.insert(db.raidContainers[idx].lootLog, entry)
+    end
     GL.Print("Test loot entry added: " .. chosen.link .. " → " .. GL.ShortName(pick.name))
     if GL.UI and GL.UI.RefreshLogTab  then GL.UI.RefreshLogTab()  end
     if GL.UI and GL.UI.RefreshLootTab then GL.UI.RefreshLootTab() end
@@ -276,7 +282,7 @@ end
 
 -- Simuliert einen Mehrfach-Drop (count > 1) mit Cross-Tier-Kandidaten.
 -- Testet: count-Erkennung, Cross-Tier StartRoll, Top-N FinalizeRoll, Assign All.
--- Verwendung: /rlt testmulti [anzahl]   (default 2)
+-- Verwendung: /reqrt testmulti [anzahl]   (default 2)
 function GL.Test.SimulateMultiRoll(count)
     count = tonumber(count) or 2
     if count < 2 or count > 5 then
@@ -284,7 +290,7 @@ function GL.Test.SimulateMultiRoll(count)
         return
     end
 
-    if not GuildLootDB.currentRaid.active then
+    if not GuildLootDB.activeContainerIdx then
         GL.StartRaid("Test-Tier")
     end
 
@@ -377,4 +383,108 @@ function GL.Test.SimulateMultiRoll(count)
     GL.Loot.FinalizeRoll()
 
     GL.Print("testmulti: " .. count .. "x Drop simuliert — Gewinner bestimmt. 'Assign All (" .. count .. ")' klicken.")
+end
+
+-- Erstellt eine vollständige Test-Session mit zwei Raids und mehreren Loot-Einträgen.
+-- Kein Inventar nötig — verwendet Hard-coded Item-IDs aus Nerub'ar Palace.
+-- Verwendung: /reqrt testsetup
+function GL.Test.SetupTestSession()
+    local db = GuildLootDB
+    if db.activeContainerIdx then
+        GL.Print("testsetup: Erst aktive Session schließen.")
+        return
+    end
+
+    local realm = GetRealmName() or "Realm"
+    local fakeItems = {
+        { link = "|cffa335ee|Hitem:212426::::::::80:::::|h[Ovi'nax's Mercurial Egg]|h|r",   name = "Ovi'nax's Mercurial Egg",   category = "trinket"  },
+        { link = "|cffa335ee|Hitem:212449::::::::80:::::|h[Ansurek's Silken Wraps]|h|r",     name = "Ansurek's Silken Wraps",     category = "other"    },
+        { link = "|cffa335ee|Hitem:212436::::::::80:::::|h[Sikran's Shadow Scepter]|h|r",    name = "Sikran's Shadow Scepter",    category = "weapons"  },
+        { link = "|cffa335ee|Hitem:212429::::::::80:::::|h[Nexus-Princess' Pursuit]|h|r",    name = "Nexus-Princess' Pursuit",    category = "trinket"  },
+        { link = "|cffa335ee|Hitem:212456::::::::80:::::|h[Web-Weaver's Wristguards]|h|r",   name = "Web-Weaver's Wristguards",   category = "other"    },
+        { link = "|cffa335ee|Hitem:212433::::::::80:::::|h[Voidweaver's Astral Bangle]|h|r", name = "Voidweaver's Astral Bangle", category = "other"    },
+    }
+    local fakePlayers = {
+        "Myriella-Malfurion", "Darbolosch-Malfurion", "Borgotho-Antonidas",
+        "Valourstrasz-Silvermoon", "Øneshoot-Malfurion", "Barbossbär-Antonidas",
+    }
+    local bosses1 = { "Ulgrax the Devourer", "The Bloodbound Horror", "Sikran" }
+    local bosses2 = { "Nexus-Princess Ky'veza", "The Silken Court", "Queen Ansurek" }
+
+    -- Raid-ID-Helfer
+    local function fakeRaidID(tier, diff, ts)
+        return string.format("%08x", (ts + #tier + #diff) % 0xFFFFFFFF)
+    end
+
+    -- Session anlegen
+    local ts = time() - 7 * 86400  -- eine Woche her
+    local kw = tonumber(date("%V", ts))
+    local yr = tonumber(date("%Y", ts))
+    local session = {
+        id          = string.format("%04d-W%02d-testdata", yr, kw),
+        label       = string.format("KW %02d %d (Test)", kw, yr),
+        startedAt   = ts,
+        closedAt    = ts + 14400,
+        lootLog     = {},
+        trashedLoot = {},
+        raidMeta    = {},
+    }
+
+    -- Raid 1: Mythic, Nerub'ar Palace
+    local r1id = fakeRaidID("Nerub'ar Palace", "M", ts)
+    session.raidMeta[r1id] = {
+        tier         = "Nerub'ar Palace",
+        difficulty   = "M",
+        startedAt    = ts,
+        closedAt     = ts + 7200,
+        participants = fakePlayers,
+    }
+    for i = 1, 4 do
+        local item   = fakeItems[i]
+        local player = fakePlayers[((i - 1) % #fakePlayers) + 1]
+        table.insert(session.lootLog, {
+            player     = player .. "-" .. realm,
+            item       = item.name,
+            link       = item.link,
+            category   = item.category,
+            difficulty = "M",
+            winnerPrio = (i % 2 == 0) and 2 or 1,
+            boss       = bosses1[((i - 1) % #bosses1) + 1],
+            timestamp  = ts + i * 300,
+            raidID     = r1id,
+            sessionID  = session.id,
+        })
+    end
+
+    -- Raid 2: Heroic, Nerub'ar Palace
+    local r2ts = ts + 86400
+    local r2id = fakeRaidID("Nerub'ar Palace", "H", r2ts)
+    session.raidMeta[r2id] = {
+        tier         = "Nerub'ar Palace",
+        difficulty   = "H",
+        startedAt    = r2ts,
+        closedAt     = r2ts + 5400,
+        participants = fakePlayers,
+    }
+    for i = 5, 6 do
+        local item   = fakeItems[i]
+        local player = fakePlayers[((i - 1) % #fakePlayers) + 1]
+        table.insert(session.lootLog, {
+            player     = player .. "-" .. realm,
+            item       = item.name,
+            link       = item.link,
+            category   = item.category,
+            difficulty = "H",
+            winnerPrio = 1,
+            boss       = bosses2[((i - 1) % #bosses2) + 1],
+            timestamp  = r2ts + (i - 4) * 400,
+            raidID     = r2id,
+            sessionID  = session.id,
+        })
+    end
+
+    table.insert(db.raidContainers, session)
+    GL.Print(string.format("testsetup: Session '%s' mit 2 Raids und %d Loot-Einträgen erstellt.",
+        session.label, #session.lootLog))
+    if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
 end

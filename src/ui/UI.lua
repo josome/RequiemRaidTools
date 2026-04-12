@@ -473,7 +473,7 @@ function UI.RefreshDockTab()
             UI.dockMLCheck:SetText("|cff555555☐|r")
         end
     end
-    if GuildLootDB.currentRaid.active then
+    if GuildLootDB.activeContainerIdx then
         UI.dockRaidDot:SetText("|cff00ff00☑|r")
     else
         UI.dockRaidDot:SetText("|cff555555☐|r")
@@ -515,8 +515,7 @@ end
 -- ============================================================
 
 function UI.ShowStartupTab()
-    local raid = GuildLootDB.currentRaid
-    if not raid.active then
+    if not GuildLootDB.activeContainerIdx then
         UI.ShowTab(TAB_RAID)
     else
         local last = GuildLootDB.settings.lastTab
@@ -565,20 +564,19 @@ end
 
 function UI.RefreshSessionBar()
     if not UI.sessionStatusLbl then return end
-    local raid = GuildLootDB.currentRaid
-    if raid.active then
+    local db  = GuildLootDB
+    local idx = db.activeContainerIdx
+    if idx and db.raidContainers and db.raidContainers[idx] then
+        local session = db.raidContainers[idx]
+        local raid    = db.currentRaid
         local tierStr = (raid.tier and raid.tier ~= "") and (" – " .. raid.tier) or ""
         local count   = #raid.participants
-        UI.sessionStatusLbl:SetText("|cff00ff00Raid active|r" .. tierStr .. "  |cffffcc00" .. count .. " players|r")
-        if UI.sessionCrashWarnLbl then UI.sessionCrashWarnLbl:Show() end
-        if UI.tierBox      then UI.tierBox:SetText(raid.tier or "") end
-        if UI.startRaidBtn then UI.startRaidBtn:SetText("Reload Roster") end
+        UI.sessionStatusLbl:SetText("|cff00ff00Session: " .. (session.label or "?") .. "|r"
+                                    .. tierStr .. "  |cffffcc00" .. count .. " players|r")
     else
-        UI.sessionStatusLbl:SetText("|cff888888No active raid|r")
-        if UI.sessionCrashWarnLbl then UI.sessionCrashWarnLbl:Hide() end
-        if UI.startRaidBtn then UI.startRaidBtn:SetText("Start Raid") end
+        UI.sessionStatusLbl:SetText("|cff888888No active session|r")
     end
-    UI.UpdateEndResumeBtn()
+    if UI.UpdateEndResumeBtn then UI.UpdateEndResumeBtn() end
     UI.RefreshDockTab()
 end
 

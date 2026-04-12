@@ -20,8 +20,8 @@ function Loot.ReleaseItem(itemLink)
         GL.Print("|cffff4444Release failed:|r ML checkbox not enabled.")
         return
     end
-    if not GuildLootDB.currentRaid.active then
-        GL.Print("|cffff4444Release failed:|r No active raid. Press 'Start Raid' first.")
+    if not GuildLootDB.activeContainerIdx then
+        GL.Print("|cffff4444Release failed:|r No active session. Press 'New Session' first.")
         return
     end
 
@@ -208,19 +208,36 @@ function Loot.AssignLootConfirm(fullName, diff, clearAfter)
         playerData.lastDifficulty[category] = diff
     end
 
-    -- Session-Log
-    table.insert(GuildLootDB.currentRaid.lootLog, {
-        player     = fullName,
-        item       = link,
-        link       = link,
-        itemID     = currentItem.itemID,
-        quality    = currentItem.quality,
-        category   = category,
-        difficulty = diff,
-        winnerPrio = winnerPrio,
-        boss       = currentItem.boss,
-        timestamp  = ts,
-    })
+    -- Session-Log: direkt in aktive Session schreiben
+    local db  = GuildLootDB
+    local idx = db.activeContainerIdx
+    if idx and db.raidContainers and db.raidContainers[idx] then
+        -- IDs aus pendingLoot-Eintrag übernehmen (wurden beim Bosskill gestempelt)
+        local itemRaidID    = db.currentRaid.id or ""
+        local itemSessionID = db.raidContainers[idx].id
+        for _, p in ipairs(db.currentRaid.pendingLoot or {}) do
+            local pid = tonumber(p.link and p.link:match("item:(%d+)"))
+            if p.link == link or pid == currentItem.itemID then
+                itemRaidID    = p.raidID    or itemRaidID
+                itemSessionID = p.sessionID or itemSessionID
+                break
+            end
+        end
+        table.insert(db.raidContainers[idx].lootLog, {
+            player     = fullName,
+            item       = link,
+            link       = link,
+            itemID     = currentItem.itemID,
+            quality    = currentItem.quality,
+            category   = category,
+            difficulty = diff,
+            winnerPrio = winnerPrio,
+            boss       = currentItem.boss,
+            timestamp  = ts,
+            raidID     = itemRaidID,
+            sessionID  = itemSessionID,
+        })
+    end
 
     -- Raid-Chat
     GL.PostToRaid(GL.ShortName(fullName) .. " receives " .. link .. " - please pick up from the loot master.")
@@ -246,7 +263,22 @@ function Loot.AssignLootConfirm(fullName, diff, clearAfter)
     end
 
     -- Observer informieren (fullName ist bereits realm-qualifiziert)
-    if GL.Comm then GL.Comm.SendAssign(fullName, diff, link, category, currentItem.quality, winnerPrio, currentItem.boss) end
+    -- sessionID/raidID aus dem pendingLoot-Eintrag holen (wurden beim Bosskill gestempelt)
+    local db         = GuildLootDB
+    local sendSessID = ""
+    local sendRaidID = db.currentRaid.id or ""
+    if db.activeContainerIdx and db.raidContainers and db.raidContainers[db.activeContainerIdx] then
+        sendSessID = db.raidContainers[db.activeContainerIdx].id
+    end
+    for _, p in ipairs(db.currentRaid.pendingLoot or {}) do
+        local pid = tonumber(p.link and p.link:match("item:(%d+)"))
+        if p.link == link or pid == currentItem.itemID then
+            if p.sessionID and p.sessionID ~= "" then sendSessID = p.sessionID end
+            if p.raidID   and p.raidID   ~= "" then sendRaidID = p.raidID   end
+            break
+        end
+    end
+    if GL.Comm then GL.Comm.SendAssign(fullName, diff, link, category, currentItem.quality, winnerPrio, currentItem.boss, sendSessID, sendRaidID) end
 
     -- Zustand zurücksetzen (nur wenn letzte Zuweisung)
     if clearAfter then
@@ -370,11 +402,10 @@ function Loot.OnCommItemClear()
     if GL.UI and GL.UI.RefreshLootTab then GL.UI.RefreshLootTab() end
 end
 
---- ML hat Loot zugewiesen → Observer aktualisieren Session-Log
-function Loot.OnCommAssign(playerName, diff, link, category, quality, winnerPrio, boss)
+--- ML hat Loot zugewiesen → Observer aktualisiert Session-Log
+function Loot.OnCommAssign(playerName, diff, link, category, quality, winnerPrio, boss, sessionID, raidID)
     if GL.IsMasterLooter() then return end
     if not playerName or playerName == "" then return end
-    -- Name realm-qualifizieren und in participants suchen
     playerName = GL.NormalizeName(playerName) or playerName
     local fullName = playerName
     for _, p in ipairs(GuildLootDB.currentRaid.participants) do
@@ -382,17 +413,32 @@ function Loot.OnCommAssign(playerName, diff, link, category, quality, winnerPrio
             fullName = p; break
         end
     end
-    table.insert(GuildLootDB.currentRaid.lootLog, {
-        player     = fullName,
-        item       = link or "",
-        link       = link or "",
-        category   = category or "other",
-        quality    = quality or 0,
-        difficulty = diff or "",
-        winnerPrio = winnerPrio,
-        boss       = boss,
-        timestamp  = time(),
-    })
+    -- In korrekte Session schreiben (per sessionID, Fallback auf aktive Session)
+    local db = GuildLootDB
+    local targetSession = nil
+    if sessionID and sessionID ~= "" then
+        for _, s in ipairs(db.raidContainers or {}) do
+            if s.id == sessionID then targetSession = s; break end
+        end
+    end
+    if not targetSession and db.activeContainerIdx then
+        targetSession = db.raidContainers[db.activeContainerIdx]
+    end
+    if targetSession then
+        table.insert(targetSession.lootLog, {
+            player     = fullName,
+            item       = link or "",
+            link       = link or "",
+            category   = category or "other",
+            quality    = quality or 0,
+            difficulty = diff or "",
+            winnerPrio = winnerPrio,
+            boss       = boss,
+            timestamp  = time(),
+            sessionID  = sessionID or "",
+            raidID     = raidID or db.currentRaid.id or "",
+        })
+    end
     Loot.OnCommItemClear()
     if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
 end
