@@ -940,12 +940,29 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
             end
             GuildLootDB.currentRaid.currentKillParticipants = kill
             if GL.IsMasterLooter() then
-                -- difficultyID direkt aus Event → zuverlässiger als GetInstanceInfo()
+                -- difficultyID direkt aus Event → 100% zuverlässig
                 local eventDiff = GL.DiffIDToString(eventDiffID)
-                local cr = GuildLootDB.currentRaid
-                cr.tier       = cr.tier ~= "" and cr.tier or AutoTierName()
-                cr.difficulty = eventDiff or cr.difficulty ~= "" and cr.difficulty or (GL.DetectDifficulty() or "")
-                cr.startedAt  = cr.startedAt ~= 0 and cr.startedAt or time()
+                local cr        = GuildLootDB.currentRaid
+                local newTier   = AutoTierName()
+                local db        = GuildLootDB
+                -- Neue Raid-ID wenn Tier oder Difficulty sich geändert hat
+                local diffChanged = eventDiff and eventDiff ~= "" and eventDiff ~= cr.difficulty
+                local tierChanged = newTier ~= "" and newTier ~= cr.tier and cr.tier ~= ""
+                if diffChanged or tierChanged then
+                    -- Alten raidMeta-Eintrag schließen
+                    local session = db.raidContainers[db.activeContainerIdx]
+                    if session and session.raidMeta and cr.id and cr.id ~= "" and session.raidMeta[cr.id] then
+                        session.raidMeta[cr.id].closedAt = time()
+                    end
+                    cr.id         = GL.GenerateRaidID(newTier, eventDiff or "", time())
+                    cr.tier       = newTier
+                    cr.difficulty = eventDiff or ""
+                    cr.startedAt  = time()
+                else
+                    cr.tier       = cr.tier ~= "" and cr.tier or newTier
+                    cr.difficulty = eventDiff or cr.difficulty or ""
+                    cr.startedAt  = cr.startedAt ~= 0 and cr.startedAt or time()
+                end
                 GL.EnsureRaidMeta()
                 if GL.UI and GL.UI.AutoExpand then GL.UI.AutoExpand() end
             end
