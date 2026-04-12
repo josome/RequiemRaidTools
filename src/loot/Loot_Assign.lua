@@ -167,11 +167,17 @@ function Loot.AssignLoot(recipientShortName)
     -- Fallback: Kurzname als Key
     if not fullName then fullName = recipientShortName end
 
-    -- Difficulty ermitteln
-    local diff = GL.DetectDifficulty()
+    -- Difficulty: aus pendingLoot-Eintrag (beim Bosskill gestempelt), Fallback: aktuelle Zone
+    local diff = nil
+    for _, p in ipairs(GL.Loot.GetPendingLoot() or {}) do
+        local pid = tonumber(p.link and p.link:match("item:(%d+)"))
+        if p.link == currentItem.link or pid == currentItem.itemID then
+            if p.difficulty and p.difficulty ~= "" then diff = p.difficulty end
+            break
+        end
+    end
+    if not diff then diff = GL.DetectDifficulty() end
     if not diff then
-        -- UI zeigt Popup → wird in UI.lua behandelt
-        -- AssignLootConfirm wird danach aufgerufen
         if GL.UI and GL.UI.ShowDifficultyPopup then
             GL.UI.ShowDifficultyPopup(fullName)
         end

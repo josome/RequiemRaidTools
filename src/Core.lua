@@ -380,7 +380,10 @@ function GL.PostToRaid(msg)
         if     IsInRaid()                                    then channel = "RAID"
         elseif IsInGroup(LE_PARTY_CATEGORY_INSTANCE)         then channel = "INSTANCE_CHAT"
         elseif IsInGroup()                                   then channel = "PARTY"
-        else return end
+        else
+            local _, instanceType = GetInstanceInfo()
+            if instanceType == "raid" then channel = "SAY" else return end
+        end
     end
     SendChatMessage("[ReqRT] " .. msg, channel)
 end
@@ -509,6 +512,12 @@ end
 
 --- Hilfsfunktion: Instanzname + Datum als Tier-String
 local function AutoTierName()
+    -- In einer Instanz: GetInstanceInfo() liefert den korrekten Raid-/Dungeonname
+    local instanceName, instanceType = GetInstanceInfo()
+    if instanceName and instanceName ~= "" and instanceType ~= "none" then
+        return instanceName .. " (" .. date("%d.%m.%Y") .. ")"
+    end
+    -- Außerhalb: Karten-API oder Zone als Fallback
     local bestMap = C_Map.GetBestMapForUnit("player")
     local mapInfo = bestMap and C_Map.GetMapInfo(bestMap)
     local zoneName = (mapInfo and mapInfo.name and mapInfo.name ~= "") and mapInfo.name or GetRealZoneText()
@@ -803,6 +812,7 @@ eventFrame:RegisterEvent("CHAT_MSG_PARTY")
 eventFrame:RegisterEvent("CHAT_MSG_PARTY_LEADER")
 eventFrame:RegisterEvent("CHAT_MSG_INSTANCE_CHAT")
 eventFrame:RegisterEvent("CHAT_MSG_INSTANCE_CHAT_LEADER")
+eventFrame:RegisterEvent("CHAT_MSG_SAY")
 eventFrame:RegisterEvent("CHAT_MSG_SYSTEM")
 eventFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
 eventFrame:RegisterEvent("CHAT_MSG_ADDON")
@@ -983,6 +993,14 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         or event == "CHAT_MSG_PARTY" or event == "CHAT_MSG_PARTY_LEADER"
         or event == "CHAT_MSG_INSTANCE_CHAT" or event == "CHAT_MSG_INSTANCE_CHAT_LEADER" then
         if GL.IsValidZone() then
+            local msg, sender = ...
+            if GL.Loot and GL.Loot.OnChatMessage then GL.Loot.OnChatMessage(msg, sender) end
+        end
+
+    elseif event == "CHAT_MSG_SAY" then
+        -- SAY nur verarbeiten wenn solo in Raid-Instanz (kein echter Raid/Party)
+        local _, instanceType = GetInstanceInfo()
+        if GL.IsValidZone() and instanceType == "raid" and not IsInGroup() then
             local msg, sender = ...
             if GL.Loot and GL.Loot.OnChatMessage then GL.Loot.OnChatMessage(msg, sender) end
         end

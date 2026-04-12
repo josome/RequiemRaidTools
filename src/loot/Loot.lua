@@ -96,7 +96,8 @@ function Loot.AddItemManually(link)
 
     local category = GL.GetItemCategory(itemID, equipLoc or "", quality or 0)
     local item = { link = link, name = name, itemID = itemID, quality = quality or 0, category = category,
-                   raidID = db.currentRaid.id or "", sessionID = sid }
+                   raidID = db.currentRaid.id or "", sessionID = sid,
+                   difficulty = db.currentRaid.difficulty or "" }
     table.insert(pendingLoot(), item)
     if GL.UI and GL.UI.RefreshLootTab then GL.UI.RefreshLootTab() end
     GL.Print("Item manuell hinzugefügt: " .. link)
@@ -128,8 +129,9 @@ function Loot.TryAddPendingItem(item, equipLoc)
     local fc = s.filterCategories
     if fc and fc[category] == false then return end
 
-    item.category  = category
-    item.raidID    = item.raidID or GuildLootDB.currentRaid.id or ""
+    item.category   = category
+    item.raidID     = item.raidID     or GuildLootDB.currentRaid.id         or ""
+    item.difficulty = item.difficulty or GuildLootDB.currentRaid.difficulty or ""
     local db       = GuildLootDB
     local idx      = db.activeContainerIdx
     item.sessionID = (idx and db.raidContainers and db.raidContainers[idx])

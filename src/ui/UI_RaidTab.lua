@@ -718,9 +718,10 @@ StaticPopupDialogs["RLT_NEW_SESSION"] = {
     maxLetters   = 48,
     OnShow       = function(self)
         local now = time()
-        local kw  = GL.ISOWeek(now)
-        local yr  = tonumber(date("%Y", now))
-        self.editBox:SetText(string.format("KW %02d %d", kw, yr))
+        local d   = date("*t", now)
+        local dow = (d.wday == 1) and 7 or (d.wday - 1)
+        local kw  = math.floor((d.yday - dow + 10) / 7)
+        self.editBox:SetText(string.format("KW %02d %d", kw, d.year))
         self.editBox:HighlightText()
     end,
     OnAccept     = function(self)
