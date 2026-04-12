@@ -445,8 +445,18 @@ function UI.RefreshLootTab()
         pendingIcon:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
         local rightAnchor = rightBtn
+
+        -- Difficulty-Badge (N/H/M in Farbe)
+        local diffBadge = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        diffBadge:SetPoint("LEFT", pendingIcon, "RIGHT", 4, 0)
+        if item.difficulty and item.difficulty ~= "" then
+            diffBadge:SetText(ColorDiff(item.difficulty))
+        else
+            diffBadge:SetText("")
+        end
+
         local linkBtn = CreateFrame("Frame", nil, row)
-        linkBtn:SetPoint("LEFT",  pendingIcon, "RIGHT", 4, 0)
+        linkBtn:SetPoint("LEFT",  diffBadge, "RIGHT", 2, 0)
         linkBtn:SetPoint("RIGHT", rightAnchor, "LEFT", -4, 0)
         linkBtn:SetHeight(ROW_H)
         linkBtn:EnableMouse(true)

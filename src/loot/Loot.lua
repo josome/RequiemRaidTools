@@ -22,6 +22,26 @@ Loot._inTradeItems = {}
 -- Items aus OnLootOpened/AddItemManually die noch auf GetItemInfo warten
 Loot._deferredPendingItems = {}
 
+--- Liefert die raidID + difficulty die zum aktuellen Loot-Fenster gehört.
+--- Sucht in raidMeta nach dem offenen Eintrag der zur Instanz-Difficulty passt.
+local function getRaidIDForCurrentLoot()
+    local db   = GuildLootDB
+    local cr   = db.currentRaid
+    local diff = GL.DetectDifficulty()
+    if diff then
+        local idx = db.activeContainerIdx
+        local s   = idx and db.raidContainers and db.raidContainers[idx]
+        if s then
+            for rid, meta in pairs(s.raidMeta or {}) do
+                if meta.difficulty == diff and not meta.closedAt then
+                    return rid, diff
+                end
+            end
+        end
+    end
+    return cr.id or "", cr.difficulty or ""
+end
+
 -- pendingLoot liegt in der aktiven Session (überlebt Resume); Fallback: currentRaid
 local function pendingLoot()
     local db  = GuildLootDB
@@ -129,9 +149,12 @@ function Loot.TryAddPendingItem(item, equipLoc)
     local fc = s.filterCategories
     if fc and fc[category] == false then return end
 
-    item.category   = category
-    item.raidID     = item.raidID     or GuildLootDB.currentRaid.id         or ""
-    item.difficulty = item.difficulty or GuildLootDB.currentRaid.difficulty or ""
+    item.category = category
+    if not item.raidID or item.raidID == "" or not item.difficulty or item.difficulty == "" then
+        local rid, diff = getRaidIDForCurrentLoot()
+        item.raidID     = item.raidID     ~= "" and item.raidID     or rid
+        item.difficulty = item.difficulty ~= "" and item.difficulty or diff
+    end
     local db       = GuildLootDB
     local idx      = db.activeContainerIdx
     item.sessionID = (idx and db.raidContainers and db.raidContainers[idx])

@@ -103,18 +103,35 @@ function Loot.ActivateItem(link, name, iLevel, equipLoc, quality)
     currentItem.prioState  = { active=false, timeLeft=0, timer=nil }
     currentItem.rollState  = { active=false, players={}, results={}, timer=nil, timeLeft=0 }
 
-    -- Anzahl der Kopien und Boss-Quelle aus pendingLoot ermitteln (per itemID)
+    -- Anzahl der Kopien, Boss-Quelle und raidID/difficulty aus pendingLoot
     local copyCount = 0
-    local bossSource = nil
+    local bossSource, raidID, difficulty, sessionID
     for _, p in ipairs(Loot.GetPendingLoot()) do
         local pid = tonumber(p.link:match("item:(%d+)"))
         if pid == itemID then
             copyCount = copyCount + 1
-            if p.boss and not bossSource then bossSource = p.boss end
+            if not bossSource and p.boss       then bossSource = p.boss       end
+            -- Ersten passenden Eintrag für raidID/difficulty merken
+            -- (exakter Link-Match hat Vorrang, damit N/H/M-Duplikate korrekt landen)
+            if not raidID then
+                raidID     = p.raidID
+                difficulty = p.difficulty
+                sessionID  = p.sessionID
+            end
+            if p.link == link then
+                -- exakter Match → überschreiben (korrekteste Quelle)
+                raidID     = p.raidID
+                difficulty = p.difficulty
+                sessionID  = p.sessionID
+                break
+            end
         end
     end
-    currentItem.count = (copyCount > 0) and copyCount or 1
-    currentItem.boss  = bossSource
+    currentItem.count      = (copyCount > 0) and copyCount or 1
+    currentItem.boss       = bossSource
+    currentItem.raidID     = raidID     or ""
+    currentItem.difficulty = difficulty or ""
+    currentItem.sessionID  = sessionID  or ""
 
     -- Prio-Sammel-Timer starten
     local prioSecs = GuildLootDB.settings.prioSeconds or 15
@@ -167,27 +184,9 @@ function Loot.AssignLoot(recipientShortName)
     -- Fallback: Kurzname als Key
     if not fullName then fullName = recipientShortName end
 
-    -- Difficulty: aus pendingLoot → raidMeta → DetectDifficulty → Popup
-    local diff = nil
-    local db = GuildLootDB
-    for _, p in ipairs(GL.Loot.GetPendingLoot() or {}) do
-        local pid = tonumber(p.link and p.link:match("item:(%d+)"))
-        if p.link == currentItem.link or pid == currentItem.itemID then
-            if p.difficulty and p.difficulty ~= "" then
-                diff = p.difficulty
-            elseif p.raidID and p.raidID ~= "" then
-                -- Fallback: difficulty aus raidMeta des Items
-                local idx = db.activeContainerIdx
-                local s   = idx and db.raidContainers and db.raidContainers[idx]
-                local meta = s and s.raidMeta and s.raidMeta[p.raidID]
-                if meta and meta.difficulty and meta.difficulty ~= "" then
-                    diff = meta.difficulty
-                end
-            end
-            break
-        end
-    end
-    if not diff then diff = GL.DetectDifficulty() end
+    -- Difficulty: direkt aus currentItem (wurde bei ActivateItem aus pendingLoot gestempelt)
+    local diff = (currentItem.difficulty and currentItem.difficulty ~= "") and currentItem.difficulty
+                 or GL.DetectDifficulty()
     if not diff then
         if GL.UI and GL.UI.ShowDifficultyPopup then
             GL.UI.ShowDifficultyPopup(fullName)
@@ -229,17 +228,9 @@ function Loot.AssignLootConfirm(fullName, diff, clearAfter)
     local db  = GuildLootDB
     local idx = db.activeContainerIdx
     if idx and db.raidContainers and db.raidContainers[idx] then
-        -- IDs aus pendingLoot-Eintrag übernehmen (wurden beim Bosskill gestempelt)
-        local itemRaidID    = db.currentRaid.id or ""
-        local itemSessionID = db.raidContainers[idx].id
-        for _, p in ipairs(GL.Loot.GetPendingLoot() or {}) do
-            local pid = tonumber(p.link and p.link:match("item:(%d+)"))
-            if p.link == link or pid == currentItem.itemID then
-                itemRaidID    = p.raidID    or itemRaidID
-                itemSessionID = p.sessionID or itemSessionID
-                break
-            end
-        end
+        -- raidID/sessionID direkt aus currentItem (bei ActivateItem aus pendingLoot gestempelt)
+        local itemRaidID    = (currentItem.raidID    and currentItem.raidID    ~= "") and currentItem.raidID    or db.currentRaid.id or ""
+        local itemSessionID = (currentItem.sessionID and currentItem.sessionID ~= "") and currentItem.sessionID or db.raidContainers[idx].id
         table.insert(db.raidContainers[idx].lootLog, {
             player     = fullName,
             item       = link,

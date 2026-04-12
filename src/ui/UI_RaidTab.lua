@@ -271,10 +271,9 @@ end
 -- Helfer: Session-Header
 -- ============================================================
 
-local function MakeSessionHeader(parent, session, ci, yOff)
+local function MakeSessionHeader(parent, session, ci, yOff, expanded)
     local db       = GuildLootDB
     local isActive = (db.activeContainerIdx == ci)
-    local expanded = (expandedSessions[session.id] ~= false)
     local isSel    = selectedRaid and selectedRaid.ci == ci
 
     local row = CreateFrame("Frame", nil, parent)
@@ -318,7 +317,7 @@ local function MakeSessionHeader(parent, session, ci, yOff)
         or  "Interface\\Buttons\\UI-PlusButton-Up")
     toggleBtn:SetHighlightTexture("Interface\\Buttons\\UI-PlusButton-Hilight", "ADD")
     toggleBtn:SetScript("OnClick", function()
-        expandedSessions[session.id] = not (expandedSessions[session.id] ~= false)
+        expandedSessions[session.id] = not expanded
         UI.RefreshRaidTab()
     end)
 
@@ -487,9 +486,15 @@ function UI.RefreshRaidTab()
 
     -- Sessions (neueste zuerst)
     for ci = #(db.raidContainers or {}), 1, -1 do
-        local session  = db.raidContainers[ci]
-        local expanded = (expandedSessions[session.id] ~= false)
-        yOff = yOff - MakeSessionHeader(content, session, ci, yOff)
+        local session   = db.raidContainers[ci]
+        local isActive  = (db.activeContainerIdx == ci)
+        local expanded
+        if expandedSessions[session.id] == nil then
+            expanded = isActive  -- aktive Session auf, alle anderen zu
+        else
+            expanded = expandedSessions[session.id]
+        end
+        yOff = yOff - MakeSessionHeader(content, session, ci, yOff, expanded)
 
         if expanded then
             local metas = {}
@@ -501,12 +506,11 @@ function UI.RefreshRaidTab()
             end)
 
             local cr = db.currentRaid
-            local isActiveSess = (db.activeContainerIdx == ci)
             for _, entry in ipairs(metas) do
-                local isCurrentActive = isActiveSess
+                local isCurrentActive = isActive
                                      and (cr.id == entry.raidID)
                                      and not entry.meta.closedAt
-                yOff = yOff - MakeRaidRow(content, session, entry.raidID, entry.meta, yOff, isCurrentActive, isActiveSess)
+                yOff = yOff - MakeRaidRow(content, session, entry.raidID, entry.meta, yOff, isCurrentActive, isActive)
             end
 
             -- Aktiver Raid vor erstem Boss-Kill (noch kein raidMeta)
