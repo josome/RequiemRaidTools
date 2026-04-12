@@ -108,17 +108,24 @@ end
 -- Schwierigkeitsgrad-Erkennung
 -- ============================================================
 
+--- Wandelt eine WoW difficultyID in "N"/"H"/"M" um.
+--- @return string|nil
+function GL.DiffIDToString(id)
+    id = tonumber(id)
+    if not id then return nil end
+    if id == 14 or id == 1  or id == 17 then return "N" end
+    if id == 15 or id == 2              then return "H" end
+    if id == 16 or id == 8              then return "M" end
+    return nil
+end
+
 --- Erkennt N/H/M:
 --- 1. Primär: GetInstanceInfo() difficultyID (zuverlässig wenn in Instanz)
---- 2. Fallback: Item-Level-Ranges
 --- @return string|nil  "N"|"H"|"M" oder nil
 function GL.DetectDifficulty()
     local _, instanceType, difficultyID = GetInstanceInfo()
     if instanceType == "raid" or instanceType == "party" then
-        if difficultyID == 14 or difficultyID == 1  then return "N" end
-        if difficultyID == 15 or difficultyID == 2  then return "H" end
-        if difficultyID == 16 or difficultyID == 8  then return "M" end
-        if difficultyID == 17                        then return "N" end  -- LFR
+        return GL.DiffIDToString(difficultyID)
     end
     return nil
 end
@@ -286,7 +293,7 @@ end
 
 --- Wandelt Raid-Schwierigkeit in WoW-Item-Track-Bezeichnung um.
 function GL.DiffToTrack(diff)
-    if diff == "N" then return "Champion"
+    if diff == "N" then return "Normal"
     elseif diff == "H" then return "Hero"
     elseif diff == "M" then return "Mythic"
     else return diff or "" end

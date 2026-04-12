@@ -167,12 +167,23 @@ function Loot.AssignLoot(recipientShortName)
     -- Fallback: Kurzname als Key
     if not fullName then fullName = recipientShortName end
 
-    -- Difficulty: aus pendingLoot-Eintrag (beim Bosskill gestempelt), Fallback: aktuelle Zone
+    -- Difficulty: aus pendingLoot → raidMeta → DetectDifficulty → Popup
     local diff = nil
+    local db = GuildLootDB
     for _, p in ipairs(GL.Loot.GetPendingLoot() or {}) do
         local pid = tonumber(p.link and p.link:match("item:(%d+)"))
         if p.link == currentItem.link or pid == currentItem.itemID then
-            if p.difficulty and p.difficulty ~= "" then diff = p.difficulty end
+            if p.difficulty and p.difficulty ~= "" then
+                diff = p.difficulty
+            elseif p.raidID and p.raidID ~= "" then
+                -- Fallback: difficulty aus raidMeta des Items
+                local idx = db.activeContainerIdx
+                local s   = idx and db.raidContainers and db.raidContainers[idx]
+                local meta = s and s.raidMeta and s.raidMeta[p.raidID]
+                if meta and meta.difficulty and meta.difficulty ~= "" then
+                    diff = meta.difficulty
+                end
+            end
             break
         end
     end

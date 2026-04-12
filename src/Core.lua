@@ -918,7 +918,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
 
     elseif event == "ENCOUNTER_END" then
         -- arg: encounterID, encounterName, difficultyID, groupSize, success
-        local encounterName, success = select(2, ...), select(5, ...)
+        local encounterName, eventDiffID, success = select(2, ...), select(3, ...), select(5, ...)
         if success == 1 then
             -- Boss-Name für Loot-Tracking speichern
             GuildLootDB.currentRaid.lastBoss = encounterName
@@ -940,13 +940,12 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
             end
             GuildLootDB.currentRaid.currentKillParticipants = kill
             if GL.IsMasterLooter() then
-                -- raidMeta anlegen (und Tier/Diff aus aktueller Zone setzen falls noch leer)
+                -- difficultyID direkt aus Event → zuverlässiger als GetInstanceInfo()
+                local eventDiff = GL.DiffIDToString(eventDiffID)
                 local cr = GuildLootDB.currentRaid
-                if (cr.tier == "" or cr.difficulty == "") then
-                    cr.tier       = cr.tier ~= "" and cr.tier or AutoTierName()
-                    cr.difficulty = cr.difficulty ~= "" and cr.difficulty or (GL.DetectDifficulty() or "")
-                    cr.startedAt  = cr.startedAt ~= 0 and cr.startedAt or time()
-                end
+                cr.tier       = cr.tier ~= "" and cr.tier or AutoTierName()
+                cr.difficulty = eventDiff or cr.difficulty ~= "" and cr.difficulty or (GL.DetectDifficulty() or "")
+                cr.startedAt  = cr.startedAt ~= 0 and cr.startedAt or time()
                 GL.EnsureRaidMeta()
                 if GL.UI and GL.UI.AutoExpand then GL.UI.AutoExpand() end
             end

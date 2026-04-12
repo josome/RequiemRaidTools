@@ -97,7 +97,7 @@ local PRIO_LABEL = { [1]="|cffffcc00BIS|r", [2]="|cff6699ffOS|r", [4]="|cff88888
 local CAT_LABEL  = { weapons="Weapon", trinket="Trinket", setItems="Set", other="Other" }
 
 local function TrackColor(diff)
-    if diff == "N" then return "|cff0070ddChampion|r"
+    if diff == "N" then return "|cff0070ddNormal|r"
     elseif diff == "H" then return "|cffa335eeHero|r"
     elseif diff == "M" then return "|cffff8000Mythic|r"
     else return diff or "" end
