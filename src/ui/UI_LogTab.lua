@@ -168,9 +168,9 @@ local PRIO_LABEL = { [1]="|cffffcc00BIS|r", [2]="|cff6699ffOS|r", [4]="|cff88888
 local CAT_LABEL  = { weapons="Weapon", trinket="Trinket", setItems="Set", other="Other" }
 
 local function TrackColor(diff)
-    if diff == "N" then return "|cff0070ddN|r"
-    elseif diff == "H" then return "|cffa335eeH|r"
-    elseif diff == "M" then return "|cffff8000M|r"
+    if diff == "N" then return "|cff0070ddNormal|r"
+    elseif diff == "H" then return "|cffa335eeHero|r"
+    elseif diff == "M" then return "|cffff8000Mythic|r"
     else return diff or "" end
 end
 
@@ -209,7 +209,7 @@ function UI.RefreshLogTab()
         local editBtn
         if isML then
             editBtn = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
-            editBtn:SetSize(22, 20)
+            editBtn:SetSize(26, 20)
             editBtn:SetPoint("LEFT", ts, "RIGHT", 4, 0)
             editBtn:SetText("<<")
             editBtn:SetScript("OnClick", function()
@@ -234,7 +234,7 @@ function UI.RefreshLogTab()
 
         local trackBtn = CreateFrame("Button", nil, row)
         trackBtn:SetPoint("LEFT", playerLbl, "RIGHT", 4, 0)
-        trackBtn:SetSize(24, 20)
+        trackBtn:SetSize(68, 20)
         local trackLbl = trackBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         trackLbl:SetAllPoints()
         trackLbl:SetJustifyH("LEFT")
