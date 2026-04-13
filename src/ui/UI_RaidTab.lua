@@ -22,7 +22,7 @@ local expandedUnassigned = true
 local selectedRaid = nil
 
 local SESSION_HDR_H = 26
-local RAID_ROW_H    = 23
+local RAID_ROW_H    = 36
 
 -- ============================================================
 -- Shims
@@ -41,7 +41,7 @@ function UI.BuildRaidPanel(parent)
     panel:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", 0, 0)
     panel:Hide()
 
-    local LIST_W = 340
+    local LIST_W = 294
 
     -- ---- Control Strip ----
     local cs = CreateFrame("Frame", nil, panel)
