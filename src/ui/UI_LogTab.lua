@@ -18,7 +18,7 @@ local playerPickerPanel
 local function ShowPlayerPicker(entry)
     local participants = GuildLootDB.currentRaid and GuildLootDB.currentRaid.participants or {}
     local names = {}
-    for name in pairs(participants) do table.insert(names, name) end
+    for _, name in ipairs(participants) do table.insert(names, name) end  -- Array, nicht Hash
     table.sort(names)
     if #names == 0 then return end
 
@@ -35,12 +35,18 @@ local function ShowPlayerPicker(entry)
         })
         playerPickerPanel:SetFrameStrata("DIALOG")
         playerPickerPanel:SetClampedToScreen(true)
-        playerPickerPanel:SetWidth(160)
+        playerPickerPanel:SetWidth(200)
         playerPickerPanel:SetPoint("TOPRIGHT",    mf, "TOPLEFT",    -4, 0)
         playerPickerPanel:SetPoint("BOTTOMRIGHT", mf, "BOTTOMLEFT", -4, 0)
 
+        -- X-Button zum Schließen ohne Auswahl
+        local closeBtn = CreateFrame("Button", nil, playerPickerPanel, "UIPanelCloseButton")
+        closeBtn:SetSize(18, 18)
+        closeBtn:SetPoint("TOPRIGHT", playerPickerPanel, "TOPRIGHT", 2, 2)
+        closeBtn:SetScript("OnClick", function() playerPickerPanel:Hide() end)
+
         local scroll = CreateFrame("ScrollFrame", nil, playerPickerPanel, "UIPanelScrollFrameTemplate")
-        scroll:SetPoint("TOPLEFT",     playerPickerPanel, "TOPLEFT",     6,  -6)
+        scroll:SetPoint("TOPLEFT",     playerPickerPanel, "TOPLEFT",     6,  -20)
         scroll:SetPoint("BOTTOMRIGHT", playerPickerPanel, "BOTTOMRIGHT", -26, 6)
         local inner = CreateFrame("Frame", nil, scroll)
         inner:SetWidth(scroll:GetWidth())
@@ -63,7 +69,7 @@ local function ShowPlayerPicker(entry)
         local lbl = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         lbl:SetAllPoints()
         lbl:SetJustifyH("LEFT")
-        lbl:SetText(GL.ShortName(name))
+        lbl:SetText(name)   -- voller Name inkl. Realm
         local capName = name
         btn:SetScript("OnClick", function()
             entry.player = capName
@@ -86,6 +92,9 @@ function UI.BuildLogPanel(parent)
     panel:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, 0)
     panel:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", 0, 0)
     panel:Hide()
+    panel:SetScript("OnHide", function()
+        if playerPickerPanel then playerPickerPanel:Hide() end
+    end)
 
     local scroll = CreateFrame("ScrollFrame", "GuildLootLogScroll", panel, "UIPanelScrollFrameTemplate")
     scroll:SetPoint("TOPLEFT",     panel, "TOPLEFT",  4,  -4)
@@ -193,8 +202,30 @@ function UI.RefreshLogTab()
         ts:SetText(GL.FormatTimestamp(entry.timestamp))
         ts:SetTextColor(0.6, 0.6, 0.6)
 
+        -- << Button links neben dem Namen (nur ML)
+        local editBtn
+        if isML then
+            editBtn = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+            editBtn:SetSize(26, 20)
+            editBtn:SetPoint("LEFT", ts, "RIGHT", 4, 0)
+            editBtn:SetText("<<")
+            editBtn:SetScript("OnClick", function()
+                if playerPickerPanel and playerPickerPanel:IsShown() then
+                    playerPickerPanel:Hide()
+                else
+                    ShowPlayerPicker(entry)
+                end
+            end)
+            editBtn:SetScript("OnEnter", function(self)
+                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                GameTooltip:SetText("Spieler umverteilen", 1, 1, 1)
+                GameTooltip:Show()
+            end)
+            editBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        end
+
         local playerLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        playerLbl:SetPoint("LEFT", ts, "RIGHT", 4, 0)
+        playerLbl:SetPoint("LEFT", editBtn or ts, "RIGHT", 4, 0)
         playerLbl:SetWidth(100)
         playerLbl:SetText(GL.ShortName(entry.player or "?"))
 
@@ -235,37 +266,10 @@ function UI.RefreshLogTab()
         bossLbl:SetWidth(110)
         bossLbl:SetText(entry.boss and ("|cff888888" .. entry.boss .. "|r") or "|cff555555—|r")
 
-        -- ✎-Button (nur ML, ganz rechts) — vor Item-Link erstellen damit dieser richtig anchort
-        local rightAnchor = row
-        if isML then
-            local editBtn = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
-            editBtn:SetSize(22, 20)
-            editBtn:SetPoint("RIGHT", row, "RIGHT", -2, 0)
-            editBtn:SetText("|cffaaaaaa✎|r")
-            editBtn:SetScript("OnClick", function()
-                if playerPickerPanel and playerPickerPanel:IsShown() then
-                    playerPickerPanel:Hide()
-                else
-                    ShowPlayerPicker(entry)
-                end
-            end)
-            editBtn:SetScript("OnEnter", function(self)
-                GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-                GameTooltip:SetText("Spieler umverteilen", 1, 1, 1)
-                GameTooltip:Show()
-            end)
-            editBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-            rightAnchor = editBtn
-        end
-
-        -- Item-Link inline (anchort RIGHT an editBtn oder row RIGHT)
+        -- Item-Link
         local linkBtn = CreateFrame("Button", nil, row)
         linkBtn:SetPoint("TOPLEFT", bossLbl, "TOPRIGHT", 4, 0)
-        if isML then
-            linkBtn:SetPoint("RIGHT", rightAnchor, "LEFT", -4, 0)
-        else
-            linkBtn:SetPoint("RIGHT", row, "RIGHT", -4, 0)
-        end
+        linkBtn:SetPoint("RIGHT", row, "RIGHT", -4, 0)
         linkBtn:SetHeight(18)
         local linkFs = linkBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         linkFs:SetAllPoints()

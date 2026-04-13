@@ -22,7 +22,7 @@ local expandedUnassigned = true
 local selectedRaid = nil
 
 local SESSION_HDR_H = 26
-local RAID_ROW_H    = 22
+local RAID_ROW_H    = 36
 
 -- ============================================================
 -- Shims
@@ -41,7 +41,7 @@ function UI.BuildRaidPanel(parent)
     panel:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", 0, 0)
     panel:Hide()
 
-    local LIST_W = 280
+    local LIST_W = 340
 
     -- ---- Control Strip ----
     local cs = CreateFrame("Frame", nil, panel)
@@ -191,7 +191,9 @@ function UI.BuildRaidPanel(parent)
     detailFrame:SetPoint("BOTTOMRIGHT", panel,     "BOTTOMRIGHT", -2,  2)
 
     panel.detailHeader = detailFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    panel.detailHeader:SetPoint("TOPLEFT", detailFrame, "TOPLEFT", 6, -6)
+    panel.detailHeader:SetPoint("TOPLEFT",  detailFrame, "TOPLEFT",  6,  -6)
+    panel.detailHeader:SetPoint("TOPRIGHT", detailFrame, "TOPRIGHT", -28, -6)
+    panel.detailHeader:SetWordWrap(true)
     panel.detailHeader:SetText("|cff888888— Auswahl treffen —|r")
 
     local detailScroll = CreateFrame("ScrollFrame", "GuildLootRaidDetailScroll", detailFrame, "UIPanelScrollFrameTemplate")
@@ -389,9 +391,12 @@ local function MakeRaidRow(parent, session, raidID, meta, yOff, isCurrentActive,
     local diffStr = (meta.difficulty and meta.difficulty ~= "") and (" " .. ColorDiff(meta.difficulty)) or ""
     local lbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     lbl:SetPoint("LEFT", dot, "RIGHT", 2, 0)
-    lbl:SetWidth(120)
+    lbl:SetWidth(190)
+    lbl:SetHeight(RAID_ROW_H - 4)
+    lbl:SetWordWrap(true)
     lbl:SetText(tierStr .. diffStr)
     lbl:SetJustifyH("LEFT")
+    lbl:SetJustifyV("TOP")
 
     local lootCount = 0
     for _, item in ipairs(session.lootLog or {}) do
@@ -661,7 +666,7 @@ function UI.RefreshRaidDetail()
     if selectedRaid.unassignedIdx then
         local snap = (db.unassignedRaids or {})[selectedRaid.unassignedIdx]
         if not snap then selectedRaid = nil; UI.raidPanel.detailHeader:SetText("|cff888888— Auswahl treffen —|r"); content:SetHeight(1); return end
-        local diffStr = (snap.difficulty and snap.difficulty ~= "") and (" [" .. snap.difficulty .. "]") or ""
+        local diffStr = (snap.difficulty and snap.difficulty ~= "") and (" " .. ColorDiff(snap.difficulty)) or ""
         UI.raidPanel.detailHeader:SetText("|cffff9900Unassigned|r  " .. (snap.tier or "?") .. diffStr)
         local log = snap.lootLog or {}
         if #log == 0 then
@@ -687,7 +692,7 @@ function UI.RefreshRaidDetail()
     local raidID = selectedRaid.raidID
     local meta   = session.raidMeta and session.raidMeta[raidID]
     local tierStr = (meta and meta.tier and meta.tier ~= "") and meta.tier or "Unknown"
-    local diffStr = (meta and meta.difficulty and meta.difficulty ~= "") and (" [" .. meta.difficulty .. "]") or ""
+    local diffStr = (meta and meta.difficulty and meta.difficulty ~= "") and (" " .. ColorDiff(meta.difficulty)) or ""
     local isActive = (db.activeContainerIdx ~= nil)
                   and (db.currentRaid.id == raidID)
                   and not (meta and meta.closedAt)
