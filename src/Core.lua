@@ -393,7 +393,7 @@ function GL.PostRaidWarn(msg)
         GL.PostToRaid(msg)
         return
     end
-    if UnitIsGroupLeader("player") or UnitIsGroupAssistant("player") then
+    if IsInGroup() and (UnitIsGroupLeader("player") or UnitIsGroupAssistant("player")) then
         SendChatMessage("[ReqRT] " .. msg, "RAID_WARNING")
     else
         GL.PostToRaid(msg)

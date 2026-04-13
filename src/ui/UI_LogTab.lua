@@ -6,7 +6,6 @@ local UI = GL.UI
 
 local TAB_LOG       = UI.TAB_LOG
 local ColorDiff     = UI._H.ColorDiff
-local MakeItemLinkBtn = UI._H.MakeItemLinkBtn
 
 -- ============================================================
 -- Tab-Widgets (file-local)
@@ -14,6 +13,69 @@ local MakeItemLinkBtn = UI._H.MakeItemLinkBtn
 
 local logRows    = {}
 local exportPopup
+local playerPickerPanel
+
+local function ShowPlayerPicker(entry)
+    local participants = GuildLootDB.currentRaid and GuildLootDB.currentRaid.participants or {}
+    local names = {}
+    for name in pairs(participants) do table.insert(names, name) end
+    table.sort(names)
+    if #names == 0 then return end
+
+    local mf = GuildLootMainFrame
+    if not mf then return end
+
+    if not playerPickerPanel then
+        playerPickerPanel = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
+        playerPickerPanel:SetBackdrop({
+            bgFile   = "Interface\\DialogFrame\\UI-DialogBox-Background",
+            edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+            tile = true, tileSize = 16, edgeSize = 16,
+            insets = { left=4, right=4, top=4, bottom=4 },
+        })
+        playerPickerPanel:SetFrameStrata("DIALOG")
+        playerPickerPanel:SetClampedToScreen(true)
+        playerPickerPanel:SetWidth(160)
+        playerPickerPanel:SetPoint("TOPRIGHT",    mf, "TOPLEFT",    -4, 0)
+        playerPickerPanel:SetPoint("BOTTOMRIGHT", mf, "BOTTOMLEFT", -4, 0)
+
+        local scroll = CreateFrame("ScrollFrame", nil, playerPickerPanel, "UIPanelScrollFrameTemplate")
+        scroll:SetPoint("TOPLEFT",     playerPickerPanel, "TOPLEFT",     6,  -6)
+        scroll:SetPoint("BOTTOMRIGHT", playerPickerPanel, "BOTTOMRIGHT", -26, 6)
+        local inner = CreateFrame("Frame", nil, scroll)
+        inner:SetWidth(scroll:GetWidth())
+        scroll:SetScrollChild(inner)
+        playerPickerPanel.inner = inner
+    end
+
+    local inner = playerPickerPanel.inner
+    for _, b in ipairs(inner.buttons or {}) do b:Hide() end
+    inner.buttons = {}
+
+    local ROW_H = 22
+    local yOff  = 0
+    for _, name in ipairs(names) do
+        local btn = CreateFrame("Button", nil, inner)
+        btn:SetPoint("TOPLEFT",  inner, "TOPLEFT",  4, yOff)
+        btn:SetPoint("TOPRIGHT", inner, "TOPRIGHT", -4, yOff)
+        btn:SetHeight(ROW_H)
+        btn:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
+        local lbl = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        lbl:SetAllPoints()
+        lbl:SetJustifyH("LEFT")
+        lbl:SetText(GL.ShortName(name))
+        local capName = name
+        btn:SetScript("OnClick", function()
+            entry.player = capName
+            playerPickerPanel:Hide()
+            GL.UI.RefreshLogTab()
+        end)
+        table.insert(inner.buttons, btn)
+        yOff = yOff - ROW_H
+    end
+    inner:SetHeight(math.max(1, -yOff))
+    playerPickerPanel:Show()
+end
 
 -- ============================================================
 -- Log-Panel bauen
@@ -116,6 +178,7 @@ function UI.RefreshLogTab()
                 and db.raidContainers[idx].lootLog or {}
     local content = UI.logPanel.content
     local yOff    = 0
+    local isML    = GL.IsMasterLooter()
 
     -- Neueste zuerst
     for i = #log, 1, -1 do
@@ -135,10 +198,26 @@ function UI.RefreshLogTab()
         playerLbl:SetWidth(100)
         playerLbl:SetText(GL.ShortName(entry.player or "?"))
 
-        local trackLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        trackLbl:SetPoint("LEFT", playerLbl, "RIGHT", 4, 0)
-        trackLbl:SetWidth(68)
+        local trackBtn = CreateFrame("Button", nil, row)
+        trackBtn:SetPoint("LEFT", playerLbl, "RIGHT", 4, 0)
+        trackBtn:SetSize(68, 20)
+        local trackLbl = trackBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        trackLbl:SetAllPoints()
+        trackLbl:SetJustifyH("LEFT")
         trackLbl:SetText(TrackColor(entry.difficulty))
+        if isML then
+            local CYCLE = { N="H", H="M", M="N" }
+            trackBtn:SetScript("OnClick", function()
+                entry.difficulty = CYCLE[entry.difficulty] or "N"
+                trackLbl:SetText(TrackColor(entry.difficulty))
+            end)
+            trackBtn:SetScript("OnEnter", function(self)
+                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                GameTooltip:SetText("Difficulty ändern (N→H→M)", 1, 1, 1)
+                GameTooltip:Show()
+            end)
+            trackBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        end
 
         local catLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         catLbl:SetPoint("LEFT", trackLbl, "RIGHT", 4, 0)
@@ -156,7 +235,59 @@ function UI.RefreshLogTab()
         bossLbl:SetWidth(110)
         bossLbl:SetText(entry.boss and ("|cff888888" .. entry.boss .. "|r") or "|cff555555—|r")
 
-        MakeItemLinkBtn(row, bossLbl, 4, entry.link or entry.item, entry.item or "?")
+        -- ✎-Button (nur ML, ganz rechts) — vor Item-Link erstellen damit dieser richtig anchort
+        local rightAnchor = row
+        if isML then
+            local editBtn = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+            editBtn:SetSize(22, 20)
+            editBtn:SetPoint("RIGHT", row, "RIGHT", -2, 0)
+            editBtn:SetText("|cffaaaaaa✎|r")
+            editBtn:SetScript("OnClick", function()
+                if playerPickerPanel and playerPickerPanel:IsShown() then
+                    playerPickerPanel:Hide()
+                else
+                    ShowPlayerPicker(entry)
+                end
+            end)
+            editBtn:SetScript("OnEnter", function(self)
+                GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+                GameTooltip:SetText("Spieler umverteilen", 1, 1, 1)
+                GameTooltip:Show()
+            end)
+            editBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+            rightAnchor = editBtn
+        end
+
+        -- Item-Link inline (anchort RIGHT an editBtn oder row RIGHT)
+        local linkBtn = CreateFrame("Button", nil, row)
+        linkBtn:SetPoint("TOPLEFT", bossLbl, "TOPRIGHT", 4, 0)
+        if isML then
+            linkBtn:SetPoint("RIGHT", rightAnchor, "LEFT", -4, 0)
+        else
+            linkBtn:SetPoint("RIGHT", row, "RIGHT", -4, 0)
+        end
+        linkBtn:SetHeight(18)
+        local linkFs = linkBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        linkFs:SetAllPoints()
+        linkFs:SetJustifyH("LEFT")
+        linkFs:SetJustifyV("TOP")
+        local itemLink  = entry.link or entry.item
+        local itemLabel = entry.item or "?"
+        linkFs:SetText(itemLabel)
+        if itemLink and itemLink ~= "" then
+            linkBtn:EnableMouse(true)
+            linkBtn:SetScript("OnEnter", function(self)
+                GameTooltip:SetOwner(self, "ANCHOR_CURSOR")
+                GameTooltip:SetHyperlink(itemLink)
+                GameTooltip:Show()
+            end)
+            linkBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+            linkBtn:SetScript("OnClick", function()
+                if IsModifiedClick("CHATLINK") then
+                    ChatEdit_InsertLink(itemLink)
+                end
+            end)
+        end
 
         row:Show()
         table.insert(logRows, row)
