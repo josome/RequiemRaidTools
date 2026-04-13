@@ -95,6 +95,9 @@ function UI.BuildLogPanel(parent)
     panel:SetScript("OnHide", function()
         if playerPickerPanel then playerPickerPanel:Hide() end
     end)
+    panel:SetScript("OnSizeChanged", function()
+        UI.RefreshLogTab()
+    end)
 
     local scroll = CreateFrame("ScrollFrame", "GuildLootLogScroll", panel, "UIPanelScrollFrameTemplate")
     scroll:SetPoint("TOPLEFT",     panel, "TOPLEFT",  4,  -4)
