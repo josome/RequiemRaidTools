@@ -194,6 +194,7 @@ function UI.BuildRaidPanel(parent)
     panel.detailHeader:SetPoint("TOPLEFT",  detailFrame, "TOPLEFT",  6,  -6)
     panel.detailHeader:SetPoint("TOPRIGHT", detailFrame, "TOPRIGHT", -28, -6)
     panel.detailHeader:SetWordWrap(true)
+    panel.detailHeader:SetJustifyH("LEFT")
     panel.detailHeader:SetText("|cff888888— Auswahl treffen —|r")
 
     local detailScroll = CreateFrame("ScrollFrame", "GuildLootRaidDetailScroll", detailFrame, "UIPanelScrollFrameTemplate")
