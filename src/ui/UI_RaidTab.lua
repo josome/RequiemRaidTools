@@ -22,7 +22,7 @@ local expandedUnassigned = true
 local selectedRaid = nil
 
 local SESSION_HDR_H = 26
-local RAID_ROW_H    = 36
+local RAID_ROW_H    = 23
 
 -- ============================================================
 -- Shims
