@@ -186,6 +186,8 @@ function UI.RefreshLogTab()
     local log = (idx and db.raidContainers and db.raidContainers[idx])
                 and db.raidContainers[idx].lootLog or {}
     local content = UI.logPanel.content
+    local sw = UI.logPanel.content:GetParent():GetWidth()
+    if sw > 10 then content:SetWidth(sw) end
     local yOff    = 0
     local isML    = GL.IsMasterLooter()
 
@@ -193,8 +195,9 @@ function UI.RefreshLogTab()
     for i = #log, 1, -1 do
         local entry = log[i]
         local row = CreateFrame("Frame", nil, content)
-        row:SetSize(content:GetWidth() - 30, 20)
-        row:SetPoint("TOPLEFT", content, "TOPLEFT", 0, yOff)
+        row:SetPoint("TOPLEFT",  content, "TOPLEFT",  0, yOff)
+        row:SetPoint("TOPRIGHT", content, "TOPRIGHT", 0, yOff)
+        row:SetHeight(20)
 
         local ts = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         ts:SetPoint("LEFT", row, "LEFT", 4, 0)
