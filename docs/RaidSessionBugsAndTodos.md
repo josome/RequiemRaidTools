@@ -9,4 +9,9 @@
   Also RaidID wird erstellt wenn Loot droppt, auf dem screenshot zu sehen ist aber das beim Zonenwechsel ein raid entsteht. 
    -> Erwartung:
     Nur Raid einträge in Session für die es loot gibt.
+
+- **new** Datum und Loot ist in der Raidzeile der Session nicht oben aligned
+- **new** Die Raidzeile in der Session sollte nur so hoch wie nötig sein
+- **new** Das Symbol am verteilten Loot des Raid in der Session ist [] (können eigene Symbole/Bilder eingebracht werden?)
+-     
 ---

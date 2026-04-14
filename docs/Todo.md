@@ -80,7 +80,7 @@ Erledigte Items werden mit zwei Checkboxen markiert:
 - erledigt: [x] getestet: [x] Omnitoken mit "Chiming void Curio" oder "Läuternde Leerenkuriosität" im Namen weiterhin nicht in Lootliste, spezieller Filter notwendig
 
 - Prio 4 erledigt: [x] getestet: [ ] Prio wird dem Observer nicht übertragen — im Session Log des Observers fehlt mit welcher Prio ein Item gewonnen wurde
-- erledigt: [x] getestet: [ ] Addon-Prefix von [RLT] auf [ReqRT] umbenannt
+- erledigt: [x] getestet: [x] Addon-Prefix von [RLT] auf [ReqRT] umbenannt
 - erledigt: [x] getestet: [ ] Boss-Name wird im Loot-Log gespeichert und angezeigt (ML + Observer, Session Log)
 - erledigt: [x] getestet: [ ] Dock-Tab: Titel auf RT geändert, ML-Status und Raid-Status als ☑/☐ angezeigt
 - erledigt: [x] getestet: [ ] ML-Checkbox abwählen sendet Broadcast an Observer ("Kein Master Looter aktiv.")
@@ -91,16 +91,6 @@ Erledigte Items werden mit zwei Checkboxen markiert:
       - Beim alten ML: ML-Checkbox bleibt aktiv obwohl Rolle übergeben wurde
       → UI-Refresh nach erfolgreicher Übergabe auf beiden Seiten fehlt
 - erledigt: [x] getestet: [x] wenn der ML den boss nicht looten kann weil items schon verrollt erscheinen diese nicht im Addon unter Pending Loot
-
-## Raid Sessing Bugs 
-- Anlegen von Session nicht möglich, klick New Sessing -> name eingeben -> Start klicken -> nichts passiert fenster bleibt offen keine neue Session
-  -> Erwarteung:
-    
-- wir hatten besprochen das neue Raids in der Session nur durch neuen loot mit RaidIDs entstehen können, jetzt entstehen sie einfach mit zonenwechsel
-  Also RaidID wird erstellt wenn Loot droppt, auf dem screenshot zu sehen ist aber das beim Zonenwechsel ein raid entsteht. 
-   -> Erwartung:
-    Nur Raid einträge in Session für die es loot gibt.
----
 
 ## Erledigt
 
