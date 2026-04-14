@@ -22,7 +22,8 @@ local expandedUnassigned = true
 local selectedRaid = nil
 
 local SESSION_HDR_H = 26
-local RAID_ROW_H    = 36
+local RAID_LINE_H   = 18   -- Höhe einer einzelnen Textzeile in der Raid-Row
+local RAID_ROW_H    = RAID_LINE_H + 4  -- Standardhöhe für einfache Rows (Platzhalter, Unassigned)
 
 -- ============================================================
 -- Shims
@@ -366,10 +367,10 @@ local function MakeRaidRow(parent, session, raidID, meta, yOff, isCurrentActive,
                     and selectedRaid.sessionID == session.id
                     and selectedRaid.raidID == raidID
 
+    -- Erst Höhe provisorisch setzen; wird unten nach GetStringHeight korrigiert
     local row = CreateFrame("Button", nil, parent)
     row:SetPoint("TOPLEFT",  parent, "TOPLEFT",  20, yOff)
     row:SetPoint("TOPRIGHT", parent, "TOPRIGHT",  0, yOff)
-    row:SetHeight(RAID_ROW_H)
 
     local bg = row:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints()
@@ -384,32 +385,36 @@ local function MakeRaidRow(parent, session, raidID, meta, yOff, isCurrentActive,
     end
 
     local dot = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    dot:SetPoint("LEFT", row, "LEFT", 4, 0)
+    dot:SetPoint("TOPLEFT", row, "TOPLEFT", 4, -2)
     dot:SetWidth(10)
     dot:SetText(isCurrentActive and "|cff00ff00•|r" or "|cff555555·|r")
 
     local tierStr = (meta.tier and meta.tier ~= "") and meta.tier or "Unknown"
     local diffStr = (meta.difficulty and meta.difficulty ~= "") and (" " .. ColorDiff(meta.difficulty)) or ""
     local lbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    lbl:SetPoint("LEFT", dot, "RIGHT", 2, 0)
+    lbl:SetPoint("TOPLEFT", dot, "TOPRIGHT", 2, 0)
     lbl:SetWidth(190)
-    lbl:SetHeight(RAID_ROW_H - 4)
     lbl:SetWordWrap(true)
     lbl:SetText(tierStr .. diffStr)
     lbl:SetJustifyH("LEFT")
     lbl:SetJustifyV("TOP")
+
+    -- Dynamische Zeilenhöhe: passt sich Zeilenumbrüchen im Titel an
+    local rowH = math.max(RAID_LINE_H, lbl:GetStringHeight()) + 4
+    row:SetHeight(rowH)
 
     local lootCount = 0
     for _, item in ipairs(session.lootLog or {}) do
         if item.raidID == raidID then lootCount = lootCount + 1 end
     end
     local infoLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    infoLbl:SetPoint("RIGHT", row, "RIGHT", -4, 0)
+    infoLbl:SetPoint("TOPRIGHT", row, "TOPRIGHT", -4, -2)
+    infoLbl:SetJustifyV("TOP")
     if isCurrentActive then
-        infoLbl:SetText("|cff00ff00aktiv  |r|cff888888" .. lootCount .. "↓|r")
+        infoLbl:SetText("|cff00ff00aktiv  |r|cff888888" .. lootCount .. "x|r")
     else
         local dateStr = meta.closedAt and date("%d.%m", meta.closedAt) or "?"
-        infoLbl:SetText("|cff888888" .. dateStr .. "  " .. lootCount .. "↓|r")
+        infoLbl:SetText("|cff888888" .. dateStr .. "  " .. lootCount .. "x|r")
     end
 
     row:SetScript("OnClick", function()
@@ -421,7 +426,7 @@ local function MakeRaidRow(parent, session, raidID, meta, yOff, isCurrentActive,
     row:SetScript("OnLeave", function(self) self:SetAlpha(1) end)
     row:Show()
     table.insert(listRows, row)
-    return RAID_ROW_H
+    return rowH
 end
 
 -- ============================================================
@@ -456,7 +461,7 @@ local function MakeUnassignedRow(parent, snap, idx, yOff)
     local dateStr   = snap.closedAt and date("%d.%m", snap.closedAt) or "?"
     local infoLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     infoLbl:SetPoint("RIGHT", row, "RIGHT", -4, 0)
-    infoLbl:SetText("|cff888888" .. dateStr .. "  " .. lootCount .. "↓|r")
+    infoLbl:SetText("|cff888888" .. dateStr .. "  " .. lootCount .. "x|r")
 
     row:SetScript("OnClick", function()
         selectedRaid = { unassignedIdx = idx }
