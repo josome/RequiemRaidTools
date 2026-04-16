@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.5.0.0-beta
+
+**New Features**
+- Introduced the Session system: group multiple raids into a named Session (typically one per week). Start a new Session with an auto-generated or custom label, close it to archive, and resume it later without losing any data.
+- The Raid tab now shows all Sessions with their raids and loot counts. The active Session is highlighted in green.
+- Sessions sync automatically to all Observers when they join mid-raid.
+- Loot reassignment: in the Log tab, the Master Looter can click the `<<` button next to any loot entry to reassign it to a different raid member via a player picker panel.
+- Difficulty correction: clicking the difficulty badge (N/H/M) on a log entry cycles through Normal → Heroic → Mythic, allowing post-hoc corrections.
+
 ## v0.4.5.0-beta
 
 **New Features**
