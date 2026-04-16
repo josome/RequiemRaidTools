@@ -9,4 +9,6 @@ ignore:
   - analyzer
   - Screenshots
   - .github
+  - .claude
+  - .gitignore
   - "*.md"
