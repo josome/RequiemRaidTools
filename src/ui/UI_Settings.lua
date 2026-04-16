@@ -330,13 +330,29 @@ function UI.BuildSettingsPanel(parent)
     end
     refreshApplyBtn()
     outerPanel:HookScript("OnShow", refreshApplyBtn)
-    applyBtn:SetScript("OnClick", function()
+    local applyArmed = false
+    local applyTimer = nil
+    applyBtn:SetScript("OnClick", function(self)
         local db = GuildLootDB
         if not db.activeContainerIdx then return end
-        local session = db.raidContainers[db.activeContainerIdx]
-        if session then
-            session.priorityConfig = CopyTable(db.settings.priorities or {})
-            GL.Print("[ReqRT] Priority config applied to current Raid Session.")
+        if not applyArmed then
+            applyArmed = true
+            self:SetText("|cffff4444Sure?|r")
+            if applyTimer then applyTimer:Cancel() end
+            applyTimer = C_Timer.NewTimer(3, function()
+                applyArmed = false
+                applyTimer = nil
+                self:SetText("Apply")
+            end)
+        else
+            if applyTimer then applyTimer:Cancel(); applyTimer = nil end
+            applyArmed = false
+            self:SetText("Apply")
+            local session = db.raidContainers[db.activeContainerIdx]
+            if session then
+                session.priorityConfig = CopyTable(db.settings.priorities or {})
+                GL.Print("[ReqRT] Priority config applied to current Raid Session.")
+            end
         end
     end)
     y = y - 30
