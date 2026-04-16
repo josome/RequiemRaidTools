@@ -3,12 +3,13 @@ package-as: RequiemRaidTools
 manual-changelog: CHANGELOG.md
 
 ignore:
-  - RequiemRaidTools_Test
-  - test
-  - docs
-  - analyzer
-  - Screenshots
-  - .github
-  - .claude
+  - test/
+  - docs/
+  - analyzer/
+  - Screenshots/
+  - .github/
+  - .claude/
   - .gitignore
-  - "*.md"
+  - src/Test.lua
+  - CHANGELOG.md
+  - README.md
