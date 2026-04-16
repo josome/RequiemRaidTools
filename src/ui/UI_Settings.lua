@@ -322,13 +322,14 @@ function UI.BuildSettingsPanel(parent)
 
     -- "Apply to current Raid Session" Button
     applyBtn = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-    applyBtn:SetSize(200, 22)
+    applyBtn:SetSize(80, 22)
     applyBtn:SetPoint("TOPLEFT", panel, "TOPLEFT", 32, y)
-    applyBtn:SetText("Apply to current Raid Session")
+    applyBtn:SetText("Apply")
     local function refreshApplyBtn()
         applyBtn:SetEnabled(GuildLootDB.activeContainerIdx ~= nil)
     end
     refreshApplyBtn()
+    outerPanel:HookScript("OnShow", refreshApplyBtn)
     applyBtn:SetScript("OnClick", function()
         local db = GuildLootDB
         if not db.activeContainerIdx then return end
