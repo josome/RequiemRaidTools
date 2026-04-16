@@ -681,9 +681,9 @@ function UI.RefreshRollResults()
         prioText:SetPoint("LEFT", nameText, "RIGHT", 4, 0)
         prioText:SetWidth(50)
         if not entry.eligible then
-            prioText:SetText("|cff888888Prio " .. entry.prio .. "|r")
+            prioText:SetText("|cff888888" .. GL.GetPrioLabel(entry.prio) .. "|r")
         else
-            prioText:SetText("Prio " .. entry.prio)
+            prioText:SetText(GL.GetPrioLabel(entry.prio))
         end
 
         row:Show()

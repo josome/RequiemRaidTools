@@ -136,7 +136,11 @@ function Loot.ActivateItem(link, name, iLevel, equipLoc, quality)
     -- Prio-Sammel-Timer starten
     local prioSecs = GuildLootDB.settings.prioSeconds or 15
     local warnPrefix = (currentItem.count > 1) and (currentItem.count .. "x ") or ""
-    GL.PostRaidWarn(warnPrefix .. "Loot: " .. link .. " -- Post your prio (" .. prioSecs .. " sec): 1=BIS, 2=OS, 4=Transmog")
+    local prioParts = {}
+    for _, p in ipairs(GL.GetActivePrios()) do
+        table.insert(prioParts, p .. "=" .. GL.GetPrioLabel(p))
+    end
+    GL.PostRaidWarn(warnPrefix .. "Loot: " .. link .. " -- Post your prio (" .. prioSecs .. " sec): " .. table.concat(prioParts, ", "))
     currentItem.prioState.active   = true
     currentItem.prioState.timeLeft = prioSecs
     currentItem.prioState.timer = C_Timer.NewTicker(1, function()

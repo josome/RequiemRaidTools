@@ -80,11 +80,11 @@ function Loot.StartRoll()
 
     local needed = currentItem.count  -- Anzahl zu vergebender Kopien
 
-    -- Prio-Tiers (1=BIS, 2=OS, 4=Transmog) der Reihe nach aufzählen
+    -- Aktive Prio-Tiers der Reihe nach aufzählen
     -- bis genug Spieler für alle Kopien gesammelt sind (Cross-Tier-Logik)
     local rollPlayers = {}
     currentItem.rollState.players = {}
-    for _, prio in ipairs({1, 2, 4}) do
+    for _, prio in ipairs(GL.GetActivePrios()) do
         for name, data in pairs(currentItem.candidates) do
             if data.prio == prio then
                 local short = GL.ShortName(name)

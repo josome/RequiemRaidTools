@@ -167,7 +167,6 @@ end
 -- Log-Tab Refresh
 -- ============================================================
 
-local PRIO_LABEL = { [1]="|cffffcc00BIS|r", [2]="|cff6699ffOS|r", [4]="|cff888888Tmog|r" }
 local CAT_LABEL  = { weapons="Weapon", trinket="Trinket", setItems="Set", other="Other" }
 
 local function TrackColor(diff)
@@ -265,7 +264,7 @@ function UI.RefreshLogTab()
         local prioLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         prioLbl:SetPoint("LEFT", catLbl, "RIGHT", 4, 0)
         prioLbl:SetWidth(52)
-        prioLbl:SetText(entry.winnerPrio and ("|cffaaaaaa" .. entry.winnerPrio .. "|r " .. (PRIO_LABEL[entry.winnerPrio] or tostring(entry.winnerPrio))) or "|cff555555—|r")
+        prioLbl:SetText(entry.winnerPrio and ("|cffaaaaaa" .. entry.winnerPrio .. "|r " .. GL.GetPrioLabel(entry.winnerPrio)) or "|cff555555—|r")
 
         local bossLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         bossLbl:SetPoint("LEFT", prioLbl, "RIGHT", 4, 0)

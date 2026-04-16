@@ -9,14 +9,24 @@ local UI = GL.UI
 -- ============================================================
 
 function UI.BuildSettingsPanel(parent)
-    local panel = CreateFrame("Frame", "GuildLootSettingsPanel", parent, "BackdropTemplate")
-    panel:SetBackdrop({
+    local outerPanel = CreateFrame("Frame", "GuildLootSettingsPanel", parent, "BackdropTemplate")
+    outerPanel:SetBackdrop({
         bgFile   = "Interface\\Buttons\\WHITE8x8",
         edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
         edgeSize = 8,
         insets   = { left = 4, right = 4, top = 4, bottom = 4 },
     })
-    panel:SetBackdropColor(0.05, 0.05, 0.08, 1)
+    outerPanel:SetBackdropColor(0.05, 0.05, 0.08, 1)
+
+    -- ScrollFrame damit der Inhalt bei vielen Einstellungen scrollbar ist
+    local scroll = CreateFrame("ScrollFrame", nil, outerPanel, "UIPanelScrollFrameTemplate")
+    scroll:SetPoint("TOPLEFT",     outerPanel, "TOPLEFT",     4,  -4)
+    scroll:SetPoint("BOTTOMRIGHT", outerPanel, "BOTTOMRIGHT", -26, 4)
+
+    local panel = CreateFrame("Frame", nil, scroll)
+    panel:SetWidth(scroll:GetWidth())
+    panel:SetHeight(1)
+    scroll:SetScrollChild(panel)
 
     local y = -12  -- laufende Y-Position
 
@@ -234,5 +244,102 @@ function UI.BuildSettingsPanel(parent)
     end)
     y = y - 30
 
-    return panel
+    -- ── Sektion 4: Priorities ─────────────────────────────────
+    SectionHeader("Priorities")
+
+    local function MakeEditBox(w, placeholder)
+        local eb = CreateFrame("EditBox", nil, panel, "InputBoxTemplate")
+        eb:SetSize(w, 20)
+        eb:SetAutoFocus(false)
+        eb:SetMaxLetters(32)
+        if placeholder then
+            eb:SetText(placeholder)
+        end
+        return eb
+    end
+
+    local prioNames  = { "BIS", "OS", "", "Transmog", "" }
+    local prioDescs  = { "Best In Slot", "Off-Spec", "", "Transmog", "" }
+
+    local applyBtn  -- forward-declare so callback can reference it
+
+    for i = 1, 5 do
+        local pCfg = GuildLootDB.settings.priorities and GuildLootDB.settings.priorities[i] or {}
+        local rowY  = y
+
+        -- Checkbox aktiv
+        local cb = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
+        cb:SetSize(18, 18)
+        cb:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, rowY)
+        cb:SetChecked(pCfg.active == true)
+        cb.text:SetText("")
+        cb:SetScript("OnClick", function(self)
+            if not GuildLootDB.settings.priorities then
+                GuildLootDB.settings.priorities = {}
+            end
+            if not GuildLootDB.settings.priorities[i] then
+                GuildLootDB.settings.priorities[i] = { active=false, shortName="", description="" }
+            end
+            GuildLootDB.settings.priorities[i].active = self:GetChecked()
+        end)
+
+        -- Label "Prio N:"
+        local numLbl = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        numLbl:SetPoint("LEFT", cb, "RIGHT", 2, 0)
+        numLbl:SetText("Prio " .. i .. ":")
+        numLbl:SetWidth(40)
+
+        -- EditBox ShortName
+        local ebName = MakeEditBox(64, pCfg.shortName or prioNames[i] or "")
+        ebName:SetPoint("LEFT", numLbl, "RIGHT", 4, 0)
+        ebName:SetScript("OnEditFocusLost", function(self)
+            if not GuildLootDB.settings.priorities then GuildLootDB.settings.priorities = {} end
+            if not GuildLootDB.settings.priorities[i] then
+                GuildLootDB.settings.priorities[i] = { active=false, shortName="", description="" }
+            end
+            GuildLootDB.settings.priorities[i].shortName = self:GetText()
+        end)
+        ebName:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
+
+        -- EditBox Description
+        local ebDesc = MakeEditBox(120, pCfg.description or prioDescs[i] or "")
+        ebDesc:SetPoint("LEFT", ebName, "RIGHT", 4, 0)
+        ebDesc:SetScript("OnEditFocusLost", function(self)
+            if not GuildLootDB.settings.priorities then GuildLootDB.settings.priorities = {} end
+            if not GuildLootDB.settings.priorities[i] then
+                GuildLootDB.settings.priorities[i] = { active=false, shortName="", description="" }
+            end
+            GuildLootDB.settings.priorities[i].description = self:GetText()
+        end)
+        ebDesc:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
+
+        y = y - 26
+    end
+
+    y = y - 4
+
+    -- "Apply to current Raid Session" Button
+    applyBtn = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+    applyBtn:SetSize(200, 22)
+    applyBtn:SetPoint("TOPLEFT", panel, "TOPLEFT", 32, y)
+    applyBtn:SetText("Apply to current Raid Session")
+    local function refreshApplyBtn()
+        applyBtn:SetEnabled(GuildLootDB.activeContainerIdx ~= nil)
+    end
+    refreshApplyBtn()
+    applyBtn:SetScript("OnClick", function()
+        local db = GuildLootDB
+        if not db.activeContainerIdx then return end
+        local session = db.raidContainers[db.activeContainerIdx]
+        if session then
+            session.priorityConfig = CopyTable(db.settings.priorities or {})
+            GL.Print("[ReqRT] Priority config applied to current Raid Session.")
+        end
+    end)
+    y = y - 30
+
+    -- Inhalt-Höhe anpassen damit ScrollFrame weiß wie weit er scrollen kann
+    panel:SetHeight(math.abs(y) + 12)
+
+    return outerPanel
 end

@@ -52,6 +52,13 @@ local DB_DEFAULTS = {
             setItems = true,
             other    = true,
         },
+        priorities = {
+            [1] = { active=true,  shortName="BIS",      description="Best In Slot" },
+            [2] = { active=true,  shortName="OS",        description="Off-Spec" },
+            [3] = { active=false, shortName="",          description="" },
+            [4] = { active=true,  shortName="Transmog",  description="Transmog" },
+            [5] = { active=false, shortName="",          description="" },
+        },
     },
 }
 
@@ -221,20 +228,21 @@ function GL.StartContainer(label)
     local finalLabel = (label and label ~= "") and label
                        or string.format("KW %02d %d", kw, yr)
     local session = {
-        id          = string.format("%04d-W%02d-%08x", yr, kw, ts),
-        label       = finalLabel,
-        startedAt   = ts,
-        closedAt    = nil,
-        pendingLoot = {},
-        lootLog     = {},
-        trashedLoot = {},
-        raidMeta    = {},
+        id             = string.format("%04d-W%02d-%08x", yr, kw, ts),
+        label          = finalLabel,
+        startedAt      = ts,
+        closedAt       = nil,
+        pendingLoot    = {},
+        lootLog        = {},
+        trashedLoot    = {},
+        raidMeta       = {},
+        priorityConfig = CopyTable(db.settings.priorities or {}),
     }
     table.insert(db.raidContainers, session)
     db.activeContainerIdx = #db.raidContainers
     GL.Print("Session gestartet: " .. finalLabel)
     if GL.Comm and GL.Comm.SendSessionStart then
-        GL.Comm.SendSessionStart(session.id, finalLabel, ts)
+        GL.Comm.SendSessionStart(session.id, finalLabel, ts, session.priorityConfig)
     end
     if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
 end
@@ -562,7 +570,7 @@ end
 -- ============================================================
 
 --- Observer: empfängt SESSION_START vom ML (neue oder wiedergeöffnete Session).
-function GL.OnCommSessionStart(sessionID, label, startedAt, sender)
+function GL.OnCommSessionStart(sessionID, label, startedAt, sender, prioCfg)
     local myName = GL.NormalizeName(UnitName("player") or "") or ""
     if GL.NormalizeName(sender or "") == myName then return end  -- eigene Nachricht ignorieren
     local db = GuildLootDB
@@ -580,13 +588,14 @@ function GL.OnCommSessionStart(sessionID, label, startedAt, sender)
     end
     -- Neue Session anlegen
     local session = {
-        id          = sessionID,
-        label       = label or "",
-        startedAt   = startedAt or 0,
-        closedAt    = nil,
-        lootLog     = {},
-        trashedLoot = {},
-        raidMeta    = {},
+        id             = sessionID,
+        label          = label or "",
+        startedAt      = startedAt or 0,
+        closedAt       = nil,
+        lootLog        = {},
+        trashedLoot    = {},
+        raidMeta       = {},
+        priorityConfig = prioCfg or CopyTable(db.settings.priorities or {}),
     }
     table.insert(db.raidContainers, session)
     db.activeContainerIdx = #db.raidContainers

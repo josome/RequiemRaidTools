@@ -85,7 +85,6 @@ Erledigte Items werden mit zwei Checkboxen markiert:
 - erledigt: [x] getestet: [ ] Dock-Tab: Titel auf RT geändert, ML-Status und Raid-Status als ☑/☐ angezeigt
 - erledigt: [x] getestet: [ ] ML-Checkbox abwählen sendet Broadcast an Observer ("Kein Master Looter aktiv.")
 
-- Prio 5 [ ] Token werden nicht zuverlässig getradet — tritt aktuell nicht auf, beobachten
 - Prio 3 [ ] ML-Übergabe: UI wird nach Bestätigung nicht aktualisiert
       - Beim Observer: alter ML-Name steht noch im Fenster, erst Fenster schließen/öffnen zeigt neuen ML
       - Beim alten ML: ML-Checkbox bleibt aktiv obwohl Rolle übergeben wurde

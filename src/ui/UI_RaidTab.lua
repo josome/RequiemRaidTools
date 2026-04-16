@@ -50,9 +50,9 @@ function UI.BuildRaidPanel(parent)
     cs:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -2, -2)
     cs:SetHeight(28)
 
-    -- New Session / Close: KW X
+    -- New Raid Session / Close Raid Session
     local sessionBtn = CreateFrame("Button", nil, cs, "UIPanelButtonTemplate")
-    sessionBtn:SetSize(130, 22)
+    sessionBtn:SetSize(150, 22)
     sessionBtn:SetPoint("LEFT", cs, "LEFT", 4, 0)
     sessionBtn:SetScript("OnClick", function()
         if GuildLootDB.activeContainerIdx then
@@ -65,9 +65,9 @@ function UI.BuildRaidPanel(parent)
     end)
     panel.sessionBtn = sessionBtn
 
-    -- Resume (kontextsensitiv: aktive Session = grau/disabled; inaktive Session selektiert = enabled)
+    -- Resume Raid Session
     local resumeBtn = CreateFrame("Button", nil, cs, "UIPanelButtonTemplate")
-    resumeBtn:SetSize(70, 22)
+    resumeBtn:SetSize(90, 22)
     resumeBtn:SetPoint("LEFT", sessionBtn, "RIGHT", 4, 0)
     resumeBtn:SetText("Resume")
     resumeBtn:SetEnabled(false)
@@ -222,9 +222,9 @@ local function UpdateControlStrip()
     -- Session-Button
     if db.activeContainerIdx then
         local s = db.raidContainers[db.activeContainerIdx]
-        panel.sessionBtn:SetText("Close Session")
+        panel.sessionBtn:SetText("Close Raid Session")
     else
-        panel.sessionBtn:SetText("New Session")
+        panel.sessionBtn:SetText("New Raid Session")
     end
 
     -- Resume: nur wenn eine inaktive Session selektiert
@@ -611,7 +611,7 @@ function UI.RefreshRaidTab()
     if #(db.raidContainers or {}) == 0 and #unassigned == 0 then
         local empty = content:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         empty:SetPoint("TOPLEFT", content, "TOPLEFT", 8, -8)
-        empty:SetText("|cff888888Keine Sessions. 'New Session' drücken.|r")
+        empty:SetText("|cff888888Keine Raid Sessions. 'New Raid Session' drücken.|r")
         table.insert(listRows, empty)
         yOff = -20
     end

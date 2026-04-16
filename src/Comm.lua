@@ -68,9 +68,37 @@ end
 -- ---- Session-System ----
 
 --- ML hat eine neue Session gestartet (oder eine geschlossene fortgesetzt)
-function Comm.SendSessionStart(sessionID, label, startedAt)
+local function SerializePrioCfg(cfg)
+    local parts = {}
+    for i = 1, 5 do
+        local p = cfg and cfg[i] or {}
+        local active = (p.active) and "1" or "0"
+        local name   = (p.shortName or ""):gsub(":", ""):gsub(";", "")
+        local desc   = (p.description or ""):gsub(":", ""):gsub(";", "")
+        table.insert(parts, active .. ":" .. name .. ":" .. desc)
+    end
+    return table.concat(parts, ";")
+end
+
+local function DeserializePrioCfg(str)
+    if not str or str == "" then return nil end
+    local cfg = {}
+    local i = 1
+    for entry in str:gmatch("[^;]+") do
+        local active, name, desc = entry:match("^([01]):([^:]*):(.*)$")
+        if active then
+            cfg[i] = { active=(active=="1"), shortName=name, description=desc }
+        end
+        i = i + 1
+        if i > 5 then break end
+    end
+    return cfg
+end
+
+function Comm.SendSessionStart(sessionID, label, startedAt, prioCfg)
+    local cfgStr = prioCfg and SerializePrioCfg(prioCfg) or ""
     SendToGroup("SESSION_START" .. SEP .. (sessionID or "") .. SEP .. (label or "")
-                                .. SEP .. tostring(startedAt or 0))
+                                .. SEP .. tostring(startedAt or 0) .. SEP .. cfgStr)
 end
 
 --- ML hat die aktive Session geschlossen
@@ -98,7 +126,8 @@ function Comm.SendSessionSync(session, target)
         end
     end
     -- 1. Session-Metadaten
-    Whisper("SESSION_START" .. SEP .. session.id .. SEP .. (session.label or "") .. SEP .. tostring(session.startedAt or 0))
+    local cfgStr = session.priorityConfig and SerializePrioCfg(session.priorityConfig) or ""
+    Whisper("SESSION_START" .. SEP .. session.id .. SEP .. (session.label or "") .. SEP .. tostring(session.startedAt or 0) .. SEP .. cfgStr)
     -- 2. raidMeta-Einträge
     for raidID, meta in pairs(session.raidMeta or {}) do
         local participants = table.concat(meta.participants or {}, ",")
@@ -209,7 +238,8 @@ function Comm.OnMessage(msg, sender)
 
     elseif cmd == "SESSION_START" then
         local sessionID, label, startedAt = parts[2], parts[3], tonumber(parts[4]) or 0
-        if GL.OnCommSessionStart then GL.OnCommSessionStart(sessionID, label, startedAt, sender) end
+        local prioCfg = parts[5] and DeserializePrioCfg(parts[5]) or nil
+        if GL.OnCommSessionStart then GL.OnCommSessionStart(sessionID, label, startedAt, sender, prioCfg) end
 
     elseif cmd == "SESSION_END" then
         local sessionID, closedAt = parts[2], tonumber(parts[3]) or 0

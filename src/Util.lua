@@ -139,19 +139,54 @@ function GL.IsValidZone()
 end
 
 -- ============================================================
+-- Prioritäten-Hilfsfunktionen
+-- ============================================================
+
+--- Gibt sortierte Liste aktiver Prio-Nummern (1-5) zurück.
+--- Liest aus priorityConfig der aktiven Raid Session, Fallback auf settings.
+function GL.GetActivePrios()
+    local db  = GuildLootDB
+    local cfg = (db.activeContainerIdx and db.raidContainers
+                 and db.raidContainers[db.activeContainerIdx]
+                 and db.raidContainers[db.activeContainerIdx].priorityConfig)
+                or (db.settings and db.settings.priorities) or {}
+    local result = {}
+    for i = 1, 5 do
+        if cfg[i] and cfg[i].active then table.insert(result, i) end
+    end
+    if #result == 0 then return {1, 2, 4} end  -- Failsafe
+    return result
+end
+
+--- Gibt den Kurznamen einer Prio zurück (z.B. "BIS"); Fallback "Prio N".
+--- Liest aus priorityConfig der aktiven Raid Session, Fallback auf settings.
+function GL.GetPrioLabel(n)
+    if not n then return "" end
+    local db  = GuildLootDB
+    local cfg = (db.activeContainerIdx and db.raidContainers
+                 and db.raidContainers[db.activeContainerIdx]
+                 and db.raidContainers[db.activeContainerIdx].priorityConfig)
+                or (db.settings and db.settings.priorities) or {}
+    local p = cfg[n]
+    if p and p.shortName and p.shortName ~= "" then return p.shortName end
+    return "Prio " .. tostring(n)
+end
+
+-- ============================================================
 -- Chat-Parsing
 -- ============================================================
 
---- Extrahiert die führende Prio-Zahl (1, 2 oder 4) aus einer Chat-Nachricht.
---- Akzeptiert: "1", "2", "4", "1bis", "2os", "4tmog" etc.
+--- Extrahiert die führende Prio-Zahl aus einer Chat-Nachricht.
+--- Akzeptiert nur aktive Prioritäten der aktuellen Raid Session.
 --- @param message string
---- @return number|nil  1, 2, 4 oder nil
+--- @return number|nil
 function GL.ParseLootInput(message)
     if not message then return nil end
-    local digit = message:match("^%s*([124])")
-    if digit then
-        return tonumber(digit)
-    end
+    local digits = ""
+    for _, p in ipairs(GL.GetActivePrios()) do digits = digits .. p end
+    if digits == "" then return nil end
+    local digit = message:match("^%s*([" .. digits .. "])")
+    if digit then return tonumber(digit) end
     return nil
 end
 
@@ -320,7 +355,6 @@ function GL.ExportCSV(raidData)
     local idx  = db.activeContainerIdx
     local raid = raidData or (idx and db.raidContainers and db.raidContainers[idx]) or db.currentRaid
 
-    local PRIO_LABEL = { [1]="BIS", [2]="OS", [4]="Transmog" }
     local CAT_LABEL  = { weapons="Weapon", trinket="Trinket", setItems="Set", other="Other" }
 
     local function esc(s)
@@ -339,7 +373,7 @@ function GL.ExportCSV(raidData)
     -- Zugewiesene Items (lootLog)
     for _, entry in ipairs(raid.lootLog or {}) do
         local track = GL.DiffToTrack(entry.difficulty or raid.difficulty or "")
-        local prio  = entry.winnerPrio and (PRIO_LABEL[entry.winnerPrio] or tostring(entry.winnerPrio)) or ""
+        local prio  = entry.winnerPrio and GL.GetPrioLabel(entry.winnerPrio) or ""
         local cat   = CAT_LABEL[entry.category] or (entry.category or "")
         table.insert(lines, table.concat({
             esc(raid.id or ""),
