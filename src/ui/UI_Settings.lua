@@ -24,9 +24,11 @@ function UI.BuildSettingsPanel(parent)
     scroll:SetPoint("BOTTOMRIGHT", outerPanel, "BOTTOMRIGHT", -26, 4)
 
     local panel = CreateFrame("Frame", nil, scroll)
-    panel:SetWidth(scroll:GetWidth())
     panel:SetHeight(1)
     scroll:SetScrollChild(panel)
+    scroll:HookScript("OnSizeChanged", function(self)
+        panel:SetWidth(self:GetWidth())
+    end)
 
     local y = -12  -- laufende Y-Position
 
