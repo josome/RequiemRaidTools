@@ -749,14 +749,15 @@ StaticPopupDialogs["RLT_RENAME_SESSION"] = {
     hasEditBox   = true,
     maxLetters   = 48,
     OnShow       = function(self)
+        self.EditBox:SetWidth(260)
         if selectedRaid and selectedRaid.ci then
             local session = GuildLootDB.raidContainers[selectedRaid.ci]
-            self.editBox:SetText(session and session.label or "")
-            self.editBox:HighlightText()
+            self.EditBox:SetText(session and session.label or "")
+            self.EditBox:HighlightText()
         end
     end,
     OnAccept     = function(self)
-        local name = self.editBox:GetText()
+        local name = self.EditBox:GetText()
         if name ~= "" and selectedRaid and selectedRaid.ci then
             local session = GuildLootDB.raidContainers[selectedRaid.ci]
             if session then
@@ -780,6 +781,8 @@ StaticPopupDialogs["RLT_RENAME_SESSION"] = {
     whileDead      = false,
     hideOnEscape   = true,
     preferredIndex = 3,
+    EditBoxWidth   = 260,
+    wide           = 1,
 }
 
 StaticPopupDialogs["RLT_NEW_SESSION"] = {
@@ -793,15 +796,14 @@ StaticPopupDialogs["RLT_NEW_SESSION"] = {
         local d    = date("*t", now)
         -- EU: Raidwoche startet Mittwoch (wday=4); wday: 1=So,2=Mo,3=Di,4=Mi,5=Do,6=Fr,7=Sa
         local daysSinceWed = (d.wday - 4 + 7) % 7
-        local startTime = now - daysSinceWed * 86400
-        local endTime   = startTime + 6 * 86400
-        local startDate = date("%d.%m.", startTime)
-        local endDate   = date("%d.%m.", endTime)
-        self.editBox:SetText("Raidweek " .. startDate .. " – " .. endDate)
-        self.editBox:HighlightText()
+        local sd = date("*t", now - daysSinceWed * 86400)
+        local ed = date("*t", now + (6 - daysSinceWed) * 86400)
+        self.EditBox:SetWidth(260)
+        self.EditBox:SetText(string.format("RW %02d.%02d. - %02d.%02d.", sd.day, sd.month, ed.day, ed.month))
+        self.EditBox:HighlightText()
     end,
     OnAccept     = function(self)
-        local name = self.editBox:GetText()
+        local name = self.EditBox:GetText()
         GL.StartContainer(name ~= "" and name or nil)
         if GL.UI then
             GL.UI.RefreshRaidTab()
@@ -821,4 +823,6 @@ StaticPopupDialogs["RLT_NEW_SESSION"] = {
     whileDead      = false,
     hideOnEscape   = true,
     preferredIndex = 3,
+    EditBoxWidth   = 260,
+    wide           = 1,
 }
