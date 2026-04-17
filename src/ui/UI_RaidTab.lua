@@ -124,10 +124,23 @@ function UI.BuildRaidPanel(parent)
     end)
     panel.exportBtn = exportBtn
 
+    -- Rename
+    local renameBtn = CreateFrame("Button", nil, cs, "UIPanelButtonTemplate")
+    renameBtn:SetSize(60, 22)
+    renameBtn:SetPoint("LEFT", exportBtn, "RIGHT", 4, 0)
+    renameBtn:SetText("Rename")
+    renameBtn:SetEnabled(false)
+    renameBtn:SetScript("OnClick", function()
+        if selectedRaid and selectedRaid.ci then
+            StaticPopup_Show("RLT_RENAME_SESSION")
+        end
+    end)
+    panel.renameBtn = renameBtn
+
     -- Delete
     local deleteBtn = CreateFrame("Button", nil, cs, "UIPanelButtonTemplate")
     deleteBtn:SetSize(54, 22)
-    deleteBtn:SetPoint("LEFT", exportBtn, "RIGHT", 4, 0)
+    deleteBtn:SetPoint("LEFT", renameBtn, "RIGHT", 4, 0)
     deleteBtn:SetText("Delete")
     deleteBtn:SetEnabled(false)
     local delPending = false; local delTimer = nil
@@ -232,6 +245,10 @@ local function UpdateControlStrip()
                    and (db.activeContainerIdx ~= selectedRaid.ci)
                    and not db.activeContainerIdx  -- nur wenn gerade keine Session offen
     panel.resumeBtn:SetEnabled(canResume and true or false)
+
+    -- Rename: nur wenn Session-Header selektiert (nicht Einzel-Raid, nicht Unassigned)
+    local canRename = selectedRaid and selectedRaid.ci ~= nil and selectedRaid.raidID == nil
+    panel.renameBtn:SetEnabled(canRename and true or false)
 
     -- Export + Delete: wenn etwas selektiert
     local hasSel = selectedRaid ~= nil
@@ -724,6 +741,46 @@ end
 -- ============================================================
 -- StaticPopup-Definitionen (einmalig beim Laden registrieren)
 -- ============================================================
+
+StaticPopupDialogs["RLT_RENAME_SESSION"] = {
+    text         = "Session umbenennen:",
+    button1      = "OK",
+    button2      = "Abbrechen",
+    hasEditBox   = true,
+    maxLetters   = 48,
+    OnShow       = function(self)
+        if selectedRaid and selectedRaid.ci then
+            local session = GuildLootDB.raidContainers[selectedRaid.ci]
+            self.editBox:SetText(session and session.label or "")
+            self.editBox:HighlightText()
+        end
+    end,
+    OnAccept     = function(self)
+        local name = self.editBox:GetText()
+        if name ~= "" and selectedRaid and selectedRaid.ci then
+            local session = GuildLootDB.raidContainers[selectedRaid.ci]
+            if session then
+                session.label = name
+                GL.UI.RefreshRaidTab()
+                GL.UI.RefreshSessionBar()
+            end
+        end
+    end,
+    EditBoxOnEnterPressed = function(self)
+        local name = self:GetText()
+        if name ~= "" and selectedRaid and selectedRaid.ci then
+            local session = GuildLootDB.raidContainers[selectedRaid.ci]
+            if session then session.label = name end
+        end
+        StaticPopup_Hide("RLT_RENAME_SESSION")
+        GL.UI.RefreshRaidTab()
+        GL.UI.RefreshSessionBar()
+    end,
+    timeout        = 0,
+    whileDead      = false,
+    hideOnEscape   = true,
+    preferredIndex = 3,
+}
 
 StaticPopupDialogs["RLT_NEW_SESSION"] = {
     text         = "Session-Name:",
