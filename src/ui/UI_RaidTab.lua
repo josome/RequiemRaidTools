@@ -789,11 +789,15 @@ StaticPopupDialogs["RLT_NEW_SESSION"] = {
     hasEditBox   = true,
     maxLetters   = 48,
     OnShow       = function(self)
-        local now = time()
-        local d   = date("*t", now)
-        local dow = (d.wday == 1) and 7 or (d.wday - 1)
-        local kw  = math.floor((d.yday - dow + 10) / 7)
-        self.editBox:SetText(string.format("KW %02d %d", kw, d.year))
+        local now  = time()
+        local d    = date("*t", now)
+        -- EU: Raidwoche startet Mittwoch (wday=4); wday: 1=So,2=Mo,3=Di,4=Mi,5=Do,6=Fr,7=Sa
+        local daysSinceWed = (d.wday - 4 + 7) % 7
+        local startTime = now - daysSinceWed * 86400
+        local endTime   = startTime + 6 * 86400
+        local startDate = date("%d.%m.", startTime)
+        local endDate   = date("%d.%m.", endTime)
+        self.editBox:SetText(startDate .. " – " .. endDate)
         self.editBox:HighlightText()
     end,
     OnAccept     = function(self)
