@@ -797,7 +797,7 @@ StaticPopupDialogs["RLT_NEW_SESSION"] = {
         local endTime   = startTime + 6 * 86400
         local startDate = date("%d.%m.", startTime)
         local endDate   = date("%d.%m.", endTime)
-        self.editBox:SetText(startDate .. " – " .. endDate)
+        self.editBox:SetText("Raidweek " .. startDate .. " – " .. endDate)
         self.editBox:HighlightText()
     end,
     OnAccept     = function(self)
