@@ -11,6 +11,10 @@
 - Ist die genannte Nummer kleiner als die aktuelle TOC-Version, dem User mitteilen und auf Rückmeldung warten bevor etwas geändert wird.
 - Nach jedem Hochziehen dem User mitteilen welche Version es jetzt ist, z.B. "TOC → 0.5.1.1-beta".
 
+## Release-Checkliste (vor jedem Tag)
+- `.pkgmeta` prüfen: Neue Dateien/Ordner seit dem letzten Tag evaluieren — gehören sie in den Release oder müssen sie unter `ignore:` eingetragen werden?
+- Faustregel: Alles was kein WoW-Addon-Code ist (Entwickler-Notizen, KI-Regeln, Test-Tools, Docs) kommt in die ignore-Liste.
+
 ## Projekt-Konventionen
 - Slash-Commands: `/reqrt` und `/requiemraidtools` — NICHT `/rlt`
 - UI-Begriff für Sessions: **"Raid Session"** (intern `container`/`raidContainer`)

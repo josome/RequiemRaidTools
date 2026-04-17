@@ -9,3 +9,4 @@ ignore:
   - src/Test.lua
   - CHANGELOG.md
   - README.md
+  - CLAUDE.md
