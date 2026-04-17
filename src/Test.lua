@@ -385,6 +385,59 @@ function GL.Test.SimulateMultiRoll(count)
     GL.Print("testmulti: " .. count .. "x Drop simuliert — Gewinner bestimmt. 'Assign All (" .. count .. ")' klicken.")
 end
 
+-- Erstellt einen Unassigned-Raid-Snapshot (ohne Session) mit Fake-Loot-Einträgen.
+-- Verwendung: /reqrt testunassigned
+function GL.Test.AddUnassignedRaid()
+    local db    = GuildLootDB
+    local realm = GetRealmName() or "Realm"
+    local ts    = time() - math.random(3, 14) * 86400
+
+    local fakeItems = {
+        { link = "|cffa335ee|Hitem:212426::::::::80:::::|h[Ovi'nax's Mercurial Egg]|h|r",   name = "Ovi'nax's Mercurial Egg",   category = "trinket" },
+        { link = "|cffa335ee|Hitem:212436::::::::80:::::|h[Sikran's Shadow Scepter]|h|r",    name = "Sikran's Shadow Scepter",    category = "weapons" },
+        { link = "|cffa335ee|Hitem:212449::::::::80:::::|h[Ansurek's Silken Wraps]|h|r",     name = "Ansurek's Silken Wraps",     category = "other"   },
+    }
+    local fakePlayers = {
+        "Myriella-Malfurion", "Darbolosch-Malfurion", "Borgotho-Antonidas",
+    }
+    local diffs = { "N", "H", "M" }
+    local diff  = diffs[math.random(#diffs)]
+
+    local raidID = string.format("%08x", ts % 0xFFFFFFFF)
+    local lootLog = {}
+    for i = 1, math.random(2, 3) do
+        local item   = fakeItems[((i - 1) % #fakeItems) + 1]
+        local player = fakePlayers[((i - 1) % #fakePlayers) + 1]
+        table.insert(lootLog, {
+            player     = player .. "-" .. realm,
+            item       = item.name,
+            link       = item.link,
+            category   = item.category,
+            difficulty = diff,
+            winnerPrio = (i % 2 == 0) and 2 or 1,
+            timestamp  = ts + i * 300,
+            raidID     = raidID,
+        })
+    end
+
+    local snap = {
+        id           = raidID,
+        tier         = "Nerub'ar Palace",
+        difficulty   = diff,
+        startedAt    = ts,
+        closedAt     = ts + 5400,
+        participants = fakePlayers,
+        lootLog      = lootLog,
+        trashedLoot  = {},
+    }
+
+    db.unassignedRaids = db.unassignedRaids or {}
+    table.insert(db.unassignedRaids, snap)
+    GL.Print(string.format("testunassigned: Unassigned Raid '%s %s' mit %d Loot-Einträgen erstellt.",
+        snap.tier, diff, #lootLog))
+    if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
+end
+
 -- Erstellt eine vollständige Test-Session mit zwei Raids und mehreren Loot-Einträgen.
 -- Kein Inventar nötig — verwendet Hard-coded Item-IDs aus Nerub'ar Palace.
 -- Verwendung: /reqrt testsetup

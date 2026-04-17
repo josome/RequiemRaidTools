@@ -20,6 +20,8 @@ local expandedSessions   = {}
 local expandedUnassigned = true
 -- selectedRaid = { sessionID, raidID } | { unassignedIdx } | { ci } (session selected)
 local selectedRaid = nil
+-- checkedUnassigned[idx] = true für Multi-Select-Assign
+local checkedUnassigned = {}
 
 local SESSION_HDR_H = 26
 local RAID_LINE_H   = 18   -- Höhe einer einzelnen Textzeile in der Raid-Row
@@ -160,6 +162,7 @@ function UI.BuildRaidPanel(parent)
                 end
             elseif selectedRaid.unassignedIdx then
                 table.remove(db.unassignedRaids or {}, selectedRaid.unassignedIdx)
+                checkedUnassigned = {}
             end
             selectedRaid = nil
             UI.RefreshRaidTab(); UI.RefreshSessionBar()
@@ -171,6 +174,18 @@ function UI.BuildRaidPanel(parent)
         end
     end)
     panel.deleteBtn = deleteBtn
+
+    -- Assign (unassigned raid → session)
+    local assignBtn = CreateFrame("Button", nil, cs, "UIPanelButtonTemplate")
+    assignBtn:SetSize(70, 22)
+    assignBtn:SetPoint("LEFT", deleteBtn, "RIGHT", 4, 0)
+    assignBtn:SetText("Assign")
+    assignBtn:SetEnabled(false)
+    assignBtn:SetScript("OnClick", function()
+        if not next(checkedUnassigned) then return end
+        UI.ShowSessionPickerForAssign(assignBtn)
+    end)
+    panel.assignBtn = assignBtn
 
     -- ---- Liste (links) ----
     local listFrame = CreateFrame("Frame", nil, panel, "BackdropTemplate")
@@ -254,6 +269,14 @@ local function UpdateControlStrip()
     local hasSel = selectedRaid ~= nil
     panel.exportBtn:SetEnabled(hasSel)
     panel.deleteBtn:SetEnabled(hasSel)
+
+    -- Assign: wenn mindestens eine Checkbox gecheckt und Sessions vorhanden
+    local canAssign = next(checkedUnassigned) ~= nil
+                   and #(GuildLootDB.raidContainers or {}) > 0
+    panel.assignBtn:SetEnabled(canAssign and true or false)
+    local checkedCount = 0
+    for _ in pairs(checkedUnassigned) do checkedCount = checkedCount + 1 end
+    panel.assignBtn:SetText(checkedCount > 1 and ("Assign (" .. checkedCount .. ")") or "Assign")
 end
 
 -- ============================================================
@@ -452,6 +475,7 @@ end
 
 local function MakeUnassignedRow(parent, snap, idx, yOff)
     local isSelected = selectedRaid and selectedRaid.unassignedIdx == idx
+    local isChecked  = checkedUnassigned[idx] == true
 
     local row = CreateFrame("Button", nil, parent)
     row:SetPoint("TOPLEFT",  parent, "TOPLEFT",  20, yOff)
@@ -460,19 +484,35 @@ local function MakeUnassignedRow(parent, snap, idx, yOff)
 
     local bg = row:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints()
-    bg:SetColorTexture(isSelected and 1 or 1, isSelected and 0.8 or 1, isSelected and 0 or 1,
-                       isSelected and 0.15 or 0.03)
+    if isChecked then
+        bg:SetColorTexture(0.2, 0.6, 1, 0.2)
+    elseif isSelected then
+        bg:SetColorTexture(1, 0.8, 0, 0.15)
+    else
+        bg:SetColorTexture(1, 1, 1, 0.03)
+    end
 
-    local dot = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    dot:SetPoint("LEFT", row, "LEFT", 4, 0)
-    dot:SetWidth(10)
-    dot:SetText("|cff555555·|r")
+    -- Checkbox
+    local cb = CreateFrame("CheckButton", nil, row, "UICheckButtonTemplate")
+    cb:SetSize(18, 18)
+    cb:SetPoint("LEFT", row, "LEFT", 2, 0)
+    cb:SetChecked(isChecked)
+    cb:SetScript("OnClick", function(self)
+        checkedUnassigned[idx] = self:GetChecked() and true or nil
+        UI.RefreshRaidTab()
+    end)
 
     local lbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    lbl:SetPoint("LEFT", dot, "RIGHT", 2, 0)
-    lbl:SetWidth(120)
+    lbl:SetPoint("LEFT", cb, "RIGHT", 2, 0)
+    lbl:SetWidth(110)
     lbl:SetText((snap.tier and snap.tier ~= "") and snap.tier or "Unknown")
     lbl:SetJustifyH("LEFT")
+
+    local diffStr = (snap.difficulty and snap.difficulty ~= "") and (" " .. ColorDiff(snap.difficulty)) or ""
+    local diffLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    diffLbl:SetPoint("LEFT", lbl, "RIGHT", 2, 0)
+    diffLbl:SetWidth(20)
+    diffLbl:SetText(diffStr)
 
     local lootCount = snap.lootLog and #snap.lootLog or 0
     local dateStr   = snap.closedAt and date("%d.%m", snap.closedAt) or "?"
@@ -784,6 +824,110 @@ StaticPopupDialogs["RLT_RENAME_SESSION"] = {
     EditBoxWidth   = 260,
     wide           = 1,
 }
+
+-- ============================================================
+-- Session-Picker: Unassigned Raid einer Session zuweisen
+-- ============================================================
+
+local sessionPickerFrame = nil
+
+local function BuildSessionPickerFrame()
+    local f = CreateFrame("Frame", "RLT_SessionPickerFrame", UIParent, "BackdropTemplate")
+    f:SetSize(260, 40)
+    f:SetFrameStrata("DIALOG")
+    f:SetBackdrop({
+        bgFile   = "Interface\\DialogFrame\\UI-DialogBox-Background",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        edgeSize = 8,
+        insets   = { left = 3, right = 3, top = 3, bottom = 3 },
+    })
+    f:EnableMouse(true)
+    f:Hide()
+
+    f:SetScript("OnHide", function() end)
+
+    -- Klick außerhalb schließt
+    f:SetScript("OnMouseDown", function(self, btn)
+        if btn == "RightButton" then self:Hide() end
+    end)
+
+    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    title:SetPoint("TOPLEFT", f, "TOPLEFT", 6, -6)
+    title:SetText("|cffff9900Assign to Session:|r")
+    f.title = title
+
+    f.rows = {}
+    return f
+end
+
+function UI.ShowSessionPickerForAssign(anchorBtn)
+    if not sessionPickerFrame then
+        sessionPickerFrame = BuildSessionPickerFrame()
+    end
+    local f = sessionPickerFrame
+
+    -- Alte Rows entfernen
+    for _, r in ipairs(f.rows) do r:Hide() end
+    f.rows = {}
+
+    local db       = GuildLootDB
+    local sessions = db.raidContainers or {}
+    local ROW_H    = 20
+    local yOff     = -20
+
+    for ci = #sessions, 1, -1 do
+        local session = sessions[ci]
+        local isActive = (db.activeContainerIdx == ci)
+        local label = (session.label or "?")
+        if isActive then label = "|cff00ff00" .. label .. "|r" end
+
+        local row = CreateFrame("Button", nil, f)
+        row:SetPoint("TOPLEFT",  f, "TOPLEFT",  6, yOff)
+        row:SetPoint("TOPRIGHT", f, "TOPRIGHT", -6, yOff)
+        row:SetHeight(ROW_H)
+
+        local bg = row:CreateTexture(nil, "BACKGROUND")
+        bg:SetAllPoints()
+        bg:SetColorTexture(1, 1, 1, 0.04)
+
+        local lbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        lbl:SetPoint("LEFT", row, "LEFT", 4, 0)
+        lbl:SetPoint("RIGHT", row, "RIGHT", -4, 0)
+        lbl:SetJustifyH("LEFT")
+        lbl:SetText(label)
+
+        local capturedCI = ci
+        row:SetScript("OnClick", function()
+            f:Hide()
+            -- gecheckte Indices absteigend sortieren (verhindert Index-Shift beim Entfernen)
+            local indices = {}
+            for k in pairs(checkedUnassigned) do table.insert(indices, k) end
+            table.sort(indices, function(a, b) return a > b end)
+            for _, uidx in ipairs(indices) do
+                GL.AssignUnassignedToSession(uidx, capturedCI)
+            end
+            checkedUnassigned = {}
+            selectedRaid = nil
+            UI.RefreshRaidTab()
+            UI.RefreshSessionBar()
+        end)
+        row:SetScript("OnEnter", function(self) bg:SetColorTexture(1, 0.8, 0, 0.15) end)
+        row:SetScript("OnLeave", function(self) bg:SetColorTexture(1, 1, 1, 0.04) end)
+        row:Show()
+        table.insert(f.rows, row)
+        yOff = yOff - ROW_H
+    end
+
+    local totalH = 24 + (#sessions * ROW_H) + 6
+    f:SetHeight(totalH)
+    f:ClearAllPoints()
+    f:SetPoint("BOTTOMLEFT", anchorBtn, "TOPLEFT", 0, 4)
+    if f:IsShown() then
+        f:Hide()
+    else
+        f:Show()
+    end
+end
 
 StaticPopupDialogs["RLT_NEW_SESSION"] = {
     text         = "Session-Name:",

@@ -201,6 +201,42 @@ function GL.MigrateRaidHistory()
     end
 end
 
+--- Unassigned Raid in eine Session verschieben.
+function GL.AssignUnassignedToSession(unassignedIdx, ci)
+    local db      = GuildLootDB
+    local snap    = (db.unassignedRaids or {})[unassignedIdx]
+    local session = (db.raidContainers or {})[ci]
+    if not snap or not session then return end
+
+    local raidID = snap.id
+    if not raidID or raidID == "" then
+        raidID = GL.GenerateRaidID(snap.tier or "", snap.difficulty or "", snap.startedAt or 0)
+    end
+
+    if not session.raidMeta[raidID] then
+        session.raidMeta[raidID] = {
+            tier         = snap.tier or "",
+            difficulty   = snap.difficulty or "",
+            startedAt    = snap.startedAt or 0,
+            closedAt     = snap.closedAt,
+            participants = snap.participants or {},
+        }
+    end
+
+    for _, item in ipairs(snap.lootLog or {}) do
+        item.raidID    = raidID
+        item.sessionID = session.id
+        table.insert(session.lootLog, item)
+    end
+    for _, item in ipairs(snap.trashedLoot or {}) do
+        item.raidID    = raidID
+        item.sessionID = session.id
+        table.insert(session.trashedLoot, item)
+    end
+
+    table.remove(db.unassignedRaids, unassignedIdx)
+end
+
 --- Timestamp des letzten EU-Weekly-Resets (Mittwoch 07:00 Systemzeit).
 function GL.GetLastWeeklyReset()
     local now         = time()
@@ -1124,6 +1160,13 @@ SlashCmdList["REQUIEMRAIDTOOLS"] = function(input)
     elseif cmd == "testsetup" then
         if GL.Test and GL.Test.SetupTestSession then
             GL.Test.SetupTestSession()
+        else
+            GL.Print("Test mode not loaded.")
+        end
+
+    elseif cmd == "testunassigned" then
+        if GL.Test and GL.Test.AddUnassignedRaid then
+            GL.Test.AddUnassignedRaid()
         else
             GL.Print("Test mode not loaded.")
         end
