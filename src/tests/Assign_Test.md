@@ -6,6 +6,21 @@
 
 ---
 
+## Inhaltsverzeichnis
+
+- [Voraussetzungen](#voraussetzungen)
+- [Testziel](#testziel)
+- [Teststrategie: DB-Swap + direkter Funktionsaufruf](#teststrategie-db-swap--direkter-funktionsaufruf)
+- [Testfälle](#testfälle)
+  - [testWritesLootLog](#testwriteslootlog)
+  - [testRemovesFromPending](#testremovesfrompending)
+  - [testWritesPlayerRecord](#testwritesplayerrecord)
+  - [testCommAssignObserver](#testcommassignobserver)
+- [Was diese Tests nicht abdecken](#was-diese-tests-nicht-abdecken)
+- [Tests erweitern](#tests-erweitern)
+
+---
+
 ## Voraussetzungen
 
 | Bedingung | Warum |

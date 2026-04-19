@@ -6,6 +6,25 @@
 
 ---
 
+## Inhaltsverzeichnis
+
+- [Voraussetzungen](#voraussetzungen)
+- [Testziel](#testziel)
+- [Teststrategie](#teststrategie)
+- [Testfälle](#testfälle)
+  - [testStart](#teststart)
+  - [testRename](#testrename)
+  - [testClose](#testclose)
+  - [testDelete](#testdelete)
+  - [testStartBlockedWhenActive](#teststartblockedwhenactive)
+  - [testDefaultLabel](#testdefaultlabel)
+  - [testPriorityConfig](#testpriorityconfig)
+  - [testResume](#testresume)
+  - [testRaidsInSession](#testraidinsession)
+- [Was diese Tests nicht abdecken](#was-diese-tests-nicht-abdecken)
+
+---
+
 ## Voraussetzungen
 
 | Bedingung | Warum |

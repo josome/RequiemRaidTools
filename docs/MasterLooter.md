@@ -5,6 +5,23 @@ und als Grundlage für automatische Tests.
 
 ---
 
+## Inhaltsverzeichnis
+
+- [3-Layer System](#3-layer-system)
+- [Privilegien](#privilegien)
+  - [Master Looter](#master-looter)
+  - [Observer](#observer)
+  - [Player (geplant)](#player-geplant-noch-nicht-implementiert)
+- [ML-Erkennung](#ml-erkennung)
+- [ML-exklusive Aktionen](#ml-exklusive-aktionen)
+- [ML-Handover Flow](#ml-handover-flow)
+- [Bekannte Probleme](#bekannte-probleme)
+- [UI-Anzeige](#ui-anzeige)
+- [currentItem bei ML-Wechsel](#currentitem-bei-ml-wechsel)
+- [Live-Test Checkliste](#live-test-checkliste)
+
+---
+
 ## 3-Layer System
 
 | Rolle | Wer | Status |
