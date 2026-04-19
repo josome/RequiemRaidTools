@@ -638,6 +638,7 @@ function GL.OnCommSessionStart(sessionID, label, startedAt, sender, prioCfg)
     local db = GuildLootDB
     for i, s in ipairs(db.raidContainers or {}) do
         if s.id == sessionID then
+            if prioCfg then s.priorityConfig = prioCfg end
             ResumeSession(s, i)
             if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
             return

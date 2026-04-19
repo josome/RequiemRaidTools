@@ -13,6 +13,7 @@
 | WoWUnit installiert | Test-Framework; ohne es gibt `if not WoWUnit then return end` die Datei sofort frei |
 | `/reqrt devmode` aktiv | Schützt Produktiv-Nutzer die WoWUnit installiert haben; Tests überspringen sich selbst wenn devMode aus ist |
 | `/reload` nach devMode-Toggle | Damit der Addon-State sauber initialisiert ist |
+| Keine aktive Raid Session | Eine aktive Session beim Reload kann zu Konflikten mit den Assign- und Session-Tests führen |
 
 ---
 
@@ -101,6 +102,76 @@ dieser Testfall muss rot sein, und wird irgendwann entfernt
 
 ---
 
+### `testItemOffRoundtrip`
+
+**Testet:** `Comm.SendItemClear` → `Comm.OnMessage` → `Loot.OnCommItemClear`
+
+**Prüft:** Handler wird aufgerufen (keine Parameter).
+
+---
+
+### `testSessionEndRoundtrip`
+
+**Testet:** `Comm.SendSessionEnd` → `Comm.OnMessage` → `GL.OnCommSessionEnd`
+
+**Prüft:** `sessionID` (string) und `closedAt` (number) kommen korrekt an.
+
+**Warum wichtig:** SESSION_END schreibt `closedAt` in alle Observer-DBs — Typ-Konvertierung (Tab-String → number) muss sauber sein.
+
+---
+
+### `testRaidMetaRoundtrip`
+
+**Testet:** `Comm.SendRaidMeta` → `Comm.OnMessage` → `GL.OnCommRaidMeta`
+
+**Prüft:** Alle Meta-Felder (`tier`, `difficulty`, `startedAt`, `closedAt` als number), `participants` als korrekte Liste.
+
+**Warum wichtig:** `closedAt=0` wird als `nil` deserialisiert (Sonderfall im Parser) — Roundtrip-Test erkennt Regressionen daran sofort.
+
+---
+
+### `testRollStartRoundtrip`
+
+**Testet:** `Comm.SendRollStart` → `Comm.OnMessage` → `Loot.OnCommRollStart`
+
+**Prüft:** `seconds` (number) und `players` (Tabelle mit Namen) kommen korrekt an.
+
+---
+
+### `testRaidQueryRoundtrip`
+
+**Testet:** `Comm.SendRaidQuery(true)` → `Comm.OnMessage` → `GL.OnCommRaidQuery`
+
+**Prüft:** `sender` und `inCombat` (bool) kommen korrekt an. Der Sender kommt aus dem `OnMessage`-Argument, nicht aus der Nachricht selbst.
+
+---
+
+### `testMLAnnounceRoundtrip`
+
+**Testet:** `Comm.SendMLAnnounce` → `Comm.OnMessage` → `GL.OnCommMLAnnounce`
+
+**Prüft:** `newMLName` kommt korrekt an.
+
+**Warum wichtig:** ML_ANNOUNCE ist die kritischste ML-Handover-Nachricht — Namensformat-Fehler führen dazu dass der neue ML nicht als ML erkannt wird.
+
+---
+
+### `testMLRequestRoundtrip`
+
+**Testet:** `Comm.SendMLRequest` → `Comm.OnMessage` → `GL.OnCommMLRequest`
+
+**Prüft:** `claimantName` (arg 1) und `sender` (arg 2, aus OnMessage) kommen korrekt an.
+
+---
+
+### `testMLDenyRoundtrip`
+
+**Testet:** `Comm.SendMLDeny` → `Comm.OnMessage` → `GL.OnCommMLDeny`
+
+**Prüft:** `claimantName` kommt korrekt an.
+
+---
+
 ### `testMLGuardBlocks`
 
 **Testet:** Als Master Looter (ML) wird eine eingehende `ITEM_ON`-Nachricht ignoriert
@@ -145,7 +216,8 @@ dieser Testfall muss rot sein, und wird irgendwann entfernt
 | Nachrichtenlänge (WoW-Limit: 255 Zeichen) | Kein Längencheck in der Testsuite; sehr lange Item-Links oder PrioCfg könnten truncated werden |
 | Protokoll-Versionskompatibilität (Minor-Mismatch) | Kein Test der eine ältere Protokollversion simuliert |
 | UI-Reaktionen | UI-Layer ist nicht Gegenstand der Comm-Tests |
-| `ROLL_START`, `RAID_QUERY`, `RAID_META`, `SESSION_END`, `ML_ANNOUNCE`, `ML_REQUEST`, `ML_DENY` | Noch nicht durch Roundtrip-Tests abgedeckt |
+| `LOOT_TRASH` | Kein Handler-Mock möglich — schreibt direkt in GuildLootDB |
+| `SendSessionSync` (Whisper-Serie) | Mehrere Nachrichten, eigener Test bei Bedarf |
 
 ---
 

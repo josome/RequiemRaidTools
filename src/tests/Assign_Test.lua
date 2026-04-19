@@ -78,8 +78,10 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
             players            = {},
             currentRaid        = { id="raid-01", participants={"Myriella-Malfurion"}, currentKillParticipants={}, absent={} },
         }
-        fn(GuildLootDB.raidContainers[1])
-        GuildLootDB = origDB
+        local session = GuildLootDB.raidContainers[1]
+        local ok, err = pcall(fn, session)
+        GuildLootDB = origDB  -- immer wiederherstellen, auch bei Fehler
+        if not ok then error(err, 2) end
     end
 
     -- currentItem mit Testdaten befüllen (kein ActivateItem → kein Timer, kein GetItemInfo)

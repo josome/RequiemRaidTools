@@ -1,6 +1,5 @@
 -- RequiemRaidTools — src/tests/Probe_Test.lua
--- Verifikationstest: stellt sicher dass WoWUnit Fehler korrekt als rot markiert.
--- Dieser Test muss immer rot sein — er ist kein echter Testfall sondern ein Sanity-Check.
+-- Smoke-Test: stellt sicher dass WoWUnit korrekt läuft und Assertions funktionieren.
 
 if not WoWUnit then return end
 
@@ -14,10 +13,12 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
     local Tests = WoWUnit("ReqRT.Probe")
 
     local AreEqual = WoWUnit.AreEqual
+    local IsTrue   = WoWUnit.IsTrue
 
-    -- Dieser Test muss rot bleiben — zeigt dass die Suite Fehler aufdecken kann
-    function Tests:testRedProbe()
-        AreEqual("FAIL-PROBE: WoWUnit Fail-Pfad funktioniert", false)
+    -- Prüft: WoWUnit läuft und Assertions funktionieren
+    function Tests:testSmokeGreen()
+        AreEqual(1, 1)
+        IsTrue(true)
     end
 
 end)

@@ -13,6 +13,7 @@
 | WoWUnit installiert | Test-Framework; ohne es gibt `if not WoWUnit then return end` die Datei sofort frei |
 | `/reqrt devmode` aktiv | Schützt Produktiv-Nutzer die WoWUnit installiert haben; Tests registrieren sich gar nicht wenn devMode aus ist |
 | `/reload` nach devMode-Toggle | Damit der Addon-State sauber initialisiert ist und `GuildLootDB` korrekt geladen wurde |
+| Keine aktive Raid Session | Tests isolieren GuildLootDB intern — eine aktive Session beim Reload führt zu Konflikten |
 
 ---
 
