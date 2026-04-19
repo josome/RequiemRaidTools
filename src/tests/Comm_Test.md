@@ -6,6 +6,31 @@
 
 ---
 
+## Inhaltsverzeichnis
+
+- [Voraussetzungen](#voraussetzungen)
+- [Teststrategie: Roundtrip](#teststrategie-roundtrip)
+- [Mocking-Infrastruktur](#mocking-infrastruktur)
+- [Testfälle](#testfälle)
+  - [testAssignRoundtrip](#testassignroundtrip)
+  - [testItemOnRoundtrip](#testitemoroundtrip)
+  - [testSessionStartRoundtrip](#testsessionstartroundtrip)
+  - [testItemOffRoundtrip](#testitemoffroundtrip)
+  - [testSessionEndRoundtrip](#testsessionendroundtrip)
+  - [testRaidMetaRoundtrip](#testraidmetaroundtrip)
+  - [testRollStartRoundtrip](#testrollstartroundtrip)
+  - [testRaidQueryRoundtrip](#testraidqueryroundtrip)
+  - [testMLAnnounceRoundtrip](#testmlannounceroundtrip)
+  - [testMLRequestRoundtrip](#testmlrequestroundtrip)
+  - [testMLDenyRoundtrip](#testmldenyroundtrip)
+  - [testMLGuard](#testmlguard)
+  - [testSelfFilter](#testselffilter)
+  - [testSelfFilterLoopback](#testselffilterloopback)
+- [Was diese Tests nicht abdecken](#was-diese-tests-nicht-abdecken)
+- [Tests erweitern](#tests-erweitern)
+
+---
+
 ## Voraussetzungen
 
 | Bedingung | Warum |
