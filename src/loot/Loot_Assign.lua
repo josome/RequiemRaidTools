@@ -11,6 +11,53 @@ local currentItem = Loot.GetCurrentItem()
 -- Item das noch auf GetItemInfo wartet (modul-lokal, nur hier benötigt)
 local pendingActivation = nil
 
+-- Laufende Prio- und Roll-Timer abbrechen (ohne Roll-State zurückzusetzen)
+local function CancelCurrentTimers()
+    if currentItem.prioState and currentItem.prioState.timer then
+        currentItem.prioState.timer:Cancel()
+        currentItem.prioState.timer = nil
+    end
+    if currentItem.rollState and currentItem.rollState.timer then
+        currentItem.rollState.timer:Cancel()
+        currentItem.rollState.timer = nil
+    end
+end
+
+-- Kopienanzahl, Boss-Quelle und Session-Metadaten für ein Item aus pendingLoot lesen.
+-- Gibt eine Tabelle zurück: { copyCount, boss, raidID, difficulty, sessionID }
+local function ResolvePendingMeta(link, itemID)
+    local copyCount = 0
+    local boss, raidID, difficulty, sessionID
+    local exactFound = false
+    for _, p in ipairs(Loot.GetPendingLoot()) do
+        local pid = tonumber(p.link:match("item:(%d+)"))
+        if pid == itemID then
+            copyCount = copyCount + 1
+            if not boss and p.boss then boss = p.boss end
+            if not exactFound then
+                if not raidID then
+                    raidID     = p.raidID
+                    difficulty = p.difficulty
+                    sessionID  = p.sessionID
+                end
+                if p.link == link then
+                    raidID     = p.raidID
+                    difficulty = p.difficulty
+                    sessionID  = p.sessionID
+                    exactFound = true
+                end
+            end
+        end
+    end
+    return {
+        copyCount  = (copyCount > 0) and copyCount or 1,
+        boss       = boss,
+        raidID     = raidID     or "",
+        difficulty = difficulty or "",
+        sessionID  = sessionID  or "",
+    }
+end
+
 -- ============================================================
 -- Item freigeben (ML klickt Item-Button)
 -- ============================================================
@@ -82,13 +129,7 @@ end
 function Loot.ActivateItem(link, name, iLevel, equipLoc, quality)
     local itemID = tonumber(link:match("item:(%d+)"))
 
-    -- Laufende Timer canceln bevor currentItem überschrieben wird
-    if currentItem.prioState and currentItem.prioState.timer then
-        currentItem.prioState.timer:Cancel()
-    end
-    if currentItem.rollState and currentItem.rollState.timer then
-        currentItem.rollState.timer:Cancel()
-    end
+    CancelCurrentTimers()
 
     currentItem.link       = link
     currentItem.name       = name
@@ -103,35 +144,12 @@ function Loot.ActivateItem(link, name, iLevel, equipLoc, quality)
     currentItem.prioState  = { active=false, timeLeft=0, timer=nil }
     currentItem.rollState  = { active=false, players={}, results={}, timer=nil, timeLeft=0 }
 
-    -- Anzahl der Kopien, Boss-Quelle und raidID/difficulty aus pendingLoot
-    local copyCount = 0
-    local bossSource, raidID, difficulty, sessionID
-    for _, p in ipairs(Loot.GetPendingLoot()) do
-        local pid = tonumber(p.link:match("item:(%d+)"))
-        if pid == itemID then
-            copyCount = copyCount + 1
-            if not bossSource and p.boss       then bossSource = p.boss       end
-            -- Ersten passenden Eintrag für raidID/difficulty merken
-            -- (exakter Link-Match hat Vorrang, damit N/H/M-Duplikate korrekt landen)
-            if not raidID then
-                raidID     = p.raidID
-                difficulty = p.difficulty
-                sessionID  = p.sessionID
-            end
-            if p.link == link then
-                -- exakter Match → überschreiben (korrekteste Quelle)
-                raidID     = p.raidID
-                difficulty = p.difficulty
-                sessionID  = p.sessionID
-                break
-            end
-        end
-    end
-    currentItem.count      = (copyCount > 0) and copyCount or 1
-    currentItem.boss       = bossSource
-    currentItem.raidID     = raidID     or ""
-    currentItem.difficulty = difficulty or ""
-    currentItem.sessionID  = sessionID  or ""
+    local meta             = ResolvePendingMeta(link, itemID)
+    currentItem.count      = meta.copyCount
+    currentItem.boss       = meta.boss
+    currentItem.raidID     = meta.raidID
+    currentItem.difficulty = meta.difficulty
+    currentItem.sessionID  = meta.sessionID
 
     -- Prio-Sammel-Timer starten
     local prioSecs = GuildLootDB.settings.prioSeconds or 15
@@ -366,9 +384,7 @@ function Loot.OnCommItemActivate(link, category)
     if GL.IsMasterLooter() then return end  -- ML hat bereits lokal verarbeitet
     local name   = link:match("%[(.-)%]") or "?"
     local itemID = tonumber(link:match("item:(%d+)")) or 0
-    -- Laufende Timer auf Beobachterseite (falls vorhanden) abbrechen
-    if currentItem.prioState.timer then currentItem.prioState.timer:Cancel() end
-    if currentItem.rollState.timer  then currentItem.rollState.timer:Cancel()  end
+    CancelCurrentTimers()
     currentItem.link       = link
     currentItem.name       = name
     currentItem.itemID     = itemID
@@ -403,8 +419,7 @@ function Loot.OnCommItemClear()
             if pl[i].link == link then table.remove(pl, i); break end
         end
     end
-    if currentItem.prioState.timer then currentItem.prioState.timer:Cancel() end
-    if currentItem.rollState.timer  then currentItem.rollState.timer:Cancel()  end
+    CancelCurrentTimers()
     currentItem.link       = nil
     currentItem.name       = nil
     currentItem.candidates = {}

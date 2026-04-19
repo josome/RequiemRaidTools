@@ -94,6 +94,7 @@ local activeItemCategoryLabel
 local candidateRows        = {}
 local rollResultRows       = {}
 local sessionLootRows      = {}
+local sessionLootPool      = {}
 local countdownLabel
 local resetItemBtn
 local trashItemBtn
@@ -309,6 +310,11 @@ function UI.BuildLootPanel(parent)
     sessionScroll:SetScrollChild(sessionContent)
     panel.sessionContent = sessionContent
     panel.sessionScroll  = sessionScroll
+    local sessionEmptyLabel = sessionContent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    sessionEmptyLabel:SetPoint("TOPLEFT", sessionContent, "TOPLEFT", 4, -4)
+    sessionEmptyLabel:SetText("|cff888888No loot distributed yet.|r")
+    sessionEmptyLabel:Hide()
+    panel.sessionEmptyLabel = sessionEmptyLabel
 
     -- Results und Session Loot gleichmäßig aufteilen
     local function equalizeScrolls()
@@ -693,13 +699,72 @@ function UI.RefreshRollResults()
     content:SetHeight(math.max(1, -yOff))
 end
 
+local function AcquireSessionRow(parent)
+    local row = table.remove(sessionLootPool)
+    if row then
+        row:SetParent(parent)
+        return row
+    end
+    row = CreateFrame("Frame", nil, parent)
+    row:SetHeight(26)
+
+    row.cb = CreateFrame("CheckButton", nil, row, "UICheckButtonTemplate")
+    row.cb:SetSize(18, 18)
+    row.cb:SetPoint("LEFT", row, "LEFT", 0, 0)
+
+    row.iconFrame = CreateFrame("Frame", nil, row)
+    row.iconFrame:SetSize(24, 24)
+    row.iconFrame:SetPoint("LEFT", row.cb, "RIGHT", 2, 0)
+
+    row.iconTex = row.iconFrame:CreateTexture(nil, "ARTWORK")
+    row.iconTex:SetAllPoints()
+    row.iconTex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+
+    row.xBtn = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
+    row.xBtn:SetSize(18, 18)
+    row.xBtn:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+    row.xBtn:SetText("×")
+
+    row.nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    row.nameText:SetPoint("LEFT", row.iconFrame, "RIGHT", 4, 0)
+    row.nameText:SetWidth(100)
+    row.nameText:SetJustifyH("LEFT")
+
+    row.diffLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    row.diffLbl:SetPoint("LEFT", row.nameText, "RIGHT", 2, 0)
+    row.diffLbl:SetWidth(20)
+
+    row.itemLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    row.itemLbl:SetPoint("LEFT",  row.diffLbl,  "RIGHT",  4,  0)
+    row.itemLbl:SetPoint("RIGHT", row.xBtn,     "LEFT",  -4,  0)
+    row.itemLbl:SetJustifyH("LEFT")
+
+    row.itemHover = CreateFrame("Frame", nil, row)
+    row.itemHover:SetAllPoints(row.itemLbl)
+    row.itemHover:EnableMouse(true)
+
+    return row
+end
+
+local function ReleaseSessionRow(row)
+    row:Hide()
+    row:ClearAllPoints()
+    row.cb:SetScript("OnClick", nil)
+    row.xBtn:SetScript("OnClick", nil)
+    row.iconFrame:SetScript("OnEnter", nil)
+    row.iconFrame:SetScript("OnLeave", nil)
+    row.itemHover:SetScript("OnEnter", nil)
+    row.itemHover:SetScript("OnLeave", nil)
+    table.insert(sessionLootPool, row)
+end
+
 function UI.RefreshSessionLoot()
     local content = UI.lootPanel and UI.lootPanel.sessionContent
     if not content then return end
     local sw = UI.lootPanel.sessionScroll and UI.lootPanel.sessionScroll:GetWidth() or 0
     if sw > 10 then content:SetWidth(sw) end
 
-    for _, r in ipairs(sessionLootRows) do r:Hide() end
+    for _, r in ipairs(sessionLootRows) do ReleaseSessionRow(r) end
     sessionLootRows = {}
 
     local db  = GuildLootDB
@@ -715,86 +780,53 @@ function UI.RefreshSessionLoot()
         local k = tostring(entry.timestamp) .. (entry.player or "")
         if not sessionHidden()[k] then
             local isChecked = sessionChecked()[k] or false
-            local row = CreateFrame("Frame", nil, content)
+            local row = AcquireSessionRow(content)
+            row:ClearAllPoints()
             row:SetPoint("TOPLEFT",  content, "TOPLEFT",  0, yOff)
             row:SetPoint("TOPRIGHT", content, "TOPRIGHT", 0, yOff)
-            row:SetHeight(ROW_H)
 
-            local nameText, itemLbl, iconFrame
-
-            local cb = CreateFrame("CheckButton", nil, row, "UICheckButtonTemplate")
-            cb:SetSize(18, 18)
-            cb:SetPoint("LEFT", row, "LEFT", 0, 0)
-
-            iconFrame = CreateFrame("Frame", nil, row)
-            iconFrame:SetSize(24, 24)
-            iconFrame:SetPoint("LEFT", cb, "RIGHT", 2, 0)
-            cb:SetChecked(isChecked)
-            cb:SetScript("OnClick", function(self)
+            row.cb:SetChecked(isChecked)
+            row.cb:SetScript("OnClick", function(self)
                 sessionChecked()[k] = self:GetChecked()
-                local alpha = sessionChecked()[k] and 0.4 or 1
-                if nameText  then nameText:SetAlpha(alpha)  end
-                if itemLbl   then itemLbl:SetAlpha(alpha)   end
-                if iconFrame then iconFrame:SetAlpha(alpha) end
+                local alpha = self:GetChecked() and 0.4 or 1
+                row.nameText:SetAlpha(alpha)
+                row.itemLbl:SetAlpha(alpha)
+                row.iconFrame:SetAlpha(alpha)
             end)
 
-            local xBtn = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
-            xBtn:SetSize(18, 18)
-            xBtn:SetPoint("RIGHT", row, "RIGHT", 0, 0)
-            xBtn:SetText("×")
-            xBtn:SetScript("OnClick", function()
+            row.xBtn:SetScript("OnClick", function()
                 sessionHidden()[k] = true
                 UI.RefreshSessionLoot()
             end)
 
-            nameText = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-            nameText:SetPoint("LEFT", iconFrame, "RIGHT", 4, 0)
-            nameText:SetWidth(100)
-            nameText:SetJustifyH("LEFT")
-            nameText:SetText("|cffffcc00" .. GL.ShortName(entry.player or "?") .. "|r")
+            row.nameText:SetText("|cffffcc00" .. GL.ShortName(entry.player or "?") .. "|r")
+            row.diffLbl:SetText(ColorDiff(entry.difficulty))
+            row.itemLbl:SetText(entry.item or "?")
 
-            local diffLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-            diffLbl:SetPoint("LEFT", nameText, "RIGHT", 2, 0)
-            diffLbl:SetWidth(20)
-            diffLbl:SetText(ColorDiff(entry.difficulty))
-
-            local iconTex = iconFrame:CreateTexture(nil, "ARTWORK")
-            iconTex:SetAllPoints()
-            iconTex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
             local icon = select(10, GetItemInfo(entry.item or ""))
-            if icon then iconTex:SetTexture(icon) end
-            iconFrame:SetScript("OnEnter", function(self)
+            row.iconTex:SetTexture(icon or nil)
+
+            row.iconFrame:SetScript("OnEnter", function(self)
                 if entry.item then
                     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
                     GameTooltip:SetHyperlink(entry.item)
                     GameTooltip:Show()
                 end
             end)
-            iconFrame:SetScript("OnLeave", function() GameTooltip:Hide() end)
-
-            itemLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-            itemLbl:SetPoint("LEFT",  diffLbl, "RIGHT",  4,  0)
-            itemLbl:SetPoint("RIGHT", xBtn,    "LEFT",  -4,  0)
-            itemLbl:SetJustifyH("LEFT")
-            itemLbl:SetText(entry.item or "?")
-
-            local itemHover = CreateFrame("Frame", nil, row)
-            itemHover:SetAllPoints(itemLbl)
-            itemHover:EnableMouse(true)
-            itemHover:SetScript("OnEnter", function(self)
+            row.iconFrame:SetScript("OnLeave", function() GameTooltip:Hide() end)
+            row.itemHover:SetScript("OnEnter", function(self)
                 if entry.item then
                     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
                     GameTooltip:SetHyperlink(entry.item)
                     GameTooltip:Show()
                 end
             end)
-            itemHover:SetScript("OnLeave", function() GameTooltip:Hide() end)
+            row.itemHover:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
-            if isChecked then
-                nameText:SetAlpha(0.4)
-                itemLbl:SetAlpha(0.4)
-                iconFrame:SetAlpha(0.4)
-            end
+            local alpha = isChecked and 0.4 or 1
+            row.nameText:SetAlpha(alpha)
+            row.itemLbl:SetAlpha(alpha)
+            row.iconFrame:SetAlpha(alpha)
 
             row:Show()
             table.insert(sessionLootRows, row)
@@ -803,13 +835,9 @@ function UI.RefreshSessionLoot()
         end
     end
 
-    if shown == 0 then
-        local empty = content:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        empty:SetPoint("TOPLEFT", content, "TOPLEFT", 4, -4)
-        empty:SetText("|cff888888No loot distributed yet.|r")
-        table.insert(sessionLootRows, empty)
-        yOff = -20
-    end
+    local emptyLabel = UI.lootPanel.sessionEmptyLabel
+    if emptyLabel then emptyLabel:SetShown(shown == 0) end
+    if shown == 0 then yOff = -20 end
 
     content:SetHeight(math.max(1, -yOff))
 end

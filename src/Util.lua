@@ -79,10 +79,13 @@ function GL.GetItemCategory(itemID, itemEquipLoc, quality)
 
     -- 2. Nicht-ausrüstbare Token (kein Equip-Slot, Epic+)
     if (itemEquipLoc == "" or itemEquipLoc == "INVTYPE_NON_EQUIP_IGNORE" or itemEquipLoc == "INVTYPE_NON_EQUIP") and quality >= 4 then
-        -- 2a. Omni-Settoken: Name enthält "Curio" (EN) oder "Kuriosit" (DE)
+        -- 2a. Omni-Settoken: Name enthält "curio" (EN) oder "kuriosit" (DE), case-insensitive
         local itemName = GetItemInfo(itemID)
-        if itemName and (itemName:find("Curio") or itemName:find("Kuriosit")) then
-            return "setItems"
+        if itemName then
+            local ln = itemName:lower()
+            if ln:find("curio") or ln:find("kuriosit") then
+                return "setItems"
+            end
         end
         -- 2b. Klassen-Token: hat Klassen-Einschränkung im Tooltip
         if HasClassRestriction(itemID) then

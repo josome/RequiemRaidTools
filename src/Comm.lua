@@ -10,6 +10,18 @@ local Comm = GL.Comm
 local PREFIX = "RequiemRLT"
 local SEP    = "\t"   -- Tab als Trennzeichen (sicher in Addon-Nachrichten)
 
+-- Protokoll-Versionierung: die Minor-Version (0.X.y.z) ist die Protokoll-Version.
+-- MIN_PROTO_MINOR NUR erhöhen wenn das Nachrichtenformat inkompatibel geändert wird.
+local ADDON_VERSION   = (C_AddOns and C_AddOns.GetAddOnMetadata and C_AddOns.GetAddOnMetadata("RequiemRaidTools", "Version"))
+                     or (GetAddOnMetadata and GetAddOnMetadata("RequiemRaidTools", "Version"))
+                     or "0.5"  -- Fallback mit gültiger Minor-Version
+local MIN_PROTO_MINOR = 5  -- älteste kompatible Minor-Version
+
+local function MinorVersion(v)
+    local minor = v:match("^%d+%.(%d+)")
+    return tonumber(minor) or 0
+end
+
 -- Prefix beim Laden registrieren
 if C_ChatInfo then
     C_ChatInfo.RegisterAddonMessagePrefix(PREFIX)
@@ -19,12 +31,16 @@ end
 -- Intern: Senden an Gruppe
 -- ============================================================
 
+Comm._isInRaid  = function() return IsInRaid()  end
+Comm._isInGroup = function() return IsInGroup() end
+
 local function SendToGroup(msg)
     if not C_ChatInfo then return end
-    if IsInRaid() then
-        C_ChatInfo.SendAddonMessage(PREFIX, msg, "RAID")
-    elseif IsInGroup() then
-        C_ChatInfo.SendAddonMessage(PREFIX, msg, "PARTY")
+    local versioned = ADDON_VERSION .. SEP .. msg
+    if Comm._isInRaid() then
+        C_ChatInfo.SendAddonMessage(PREFIX, versioned, "RAID")
+    elseif Comm._isInGroup() then
+        C_ChatInfo.SendAddonMessage(PREFIX, versioned, "PARTY")
     end
 end
 
@@ -122,7 +138,7 @@ function Comm.SendSessionSync(session, target)
     if not session or not target then return end
     local function Whisper(msg)
         if C_ChatInfo then
-            C_ChatInfo.SendAddonMessage(PREFIX, msg, "WHISPER", target)
+            C_ChatInfo.SendAddonMessage(PREFIX, ADDON_VERSION .. SEP .. msg, "WHISPER", target)
         end
     end
     -- 1. Session-Metadaten
@@ -189,9 +205,33 @@ function Comm.OnMessage(msg, sender)
         end
     end
 
-    -- Nachricht aufsplitten
+    -- Addon-Version aus erstem Feld extrahieren
+    local sep1 = msg:find(SEP, 1, true)
+    if not sep1 then
+        GL.Print("|cffff4444[ReqRT] Nachricht ohne Version von "
+                 .. GL.ShortName(sender or "?") .. " — bitte Addon aktualisieren.|r")
+        return
+    end
+    local senderVersion = msg:sub(1, sep1 - 1)
+    local payload       = msg:sub(sep1 + 1)
+
+    local senderMinor = MinorVersion(senderVersion)
+    local localMinor  = MinorVersion(ADDON_VERSION)
+    if senderMinor < MIN_PROTO_MINOR then
+        GL.Print("|cffff4444[ReqRT] " .. GL.ShortName(sender or "?")
+                 .. " hat v" .. senderVersion
+                 .. " — inkompatibel (min Minor: " .. MIN_PROTO_MINOR
+                 .. "). Bitte Addon aktualisieren.|r")
+        return
+    elseif senderMinor ~= localMinor then
+        GL.Print("|cffff8800[ReqRT] Protokoll-Version mismatch: "
+                 .. GL.ShortName(sender or "?") .. " hat v" .. senderVersion
+                 .. ", lokal v" .. ADDON_VERSION .. "|r")
+    end
+
+    -- Nachricht aufsplitten (payload = msg ohne Version-Prefix)
     local parts = {}
-    for p in (msg .. SEP):gmatch("(.-)" .. SEP) do
+    for p in (payload .. SEP):gmatch("(.-)" .. SEP) do
         table.insert(parts, p)
     end
     local cmd = parts[1]

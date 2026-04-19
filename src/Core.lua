@@ -45,6 +45,7 @@ local DB_DEFAULTS = {
         whisperWinner  = true,
         exportFormat = "JSON",  -- "JSON" | "CSV"
         commLoopback = false,   -- true: eigene Addon-Nachrichten empfangen (nur für Tests)
+        devMode      = false,   -- true: WoWUnit-Tests aktivieren (/reqrt devmode)
         filterNonEquip   = true,
         filterCategories = {
             weapons  = true,
@@ -605,25 +606,20 @@ end
 -- Observer-Handler (empfangen Comm-Nachrichten vom ML)
 -- ============================================================
 
---- Observer: empfängt SESSION_START vom ML (neue oder wiedergeöffnete Session).
-function GL.OnCommSessionStart(sessionID, label, startedAt, sender, prioCfg)
-    local myName = GL.NormalizeName(UnitName("player") or "") or ""
-    if GL.NormalizeName(sender or "") == myName then return end  -- eigene Nachricht ignorieren
+-- Vorhandene Session als aktiv setzen; geschlossene Session dabei wieder öffnen.
+local function ResumeSession(s, i)
     local db = GuildLootDB
-    -- Prüfen ob Session bereits vorhanden (Resume-Fall)
-    for i, s in ipairs(db.raidContainers or {}) do
-        if s.id == sessionID then
-            if s.closedAt then
-                s.closedAt = nil
-                db.activeContainerIdx = i
-                GL.Print("Session fortgesetzt von ML: " .. (s.label or "?"))
-            end
-            if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
-            return
-        end
+    if s.closedAt then
+        s.closedAt = nil
+        GL.Print("Session fortgesetzt von ML: " .. (s.label or "?"))
     end
-    -- Neue Session anlegen
-    local session = {
+    db.activeContainerIdx = i
+end
+
+-- Session-Objekt aus Sync-Daten bauen (keine DB-Seiteneffekte).
+local function BuildSessionFromSync(sessionID, label, startedAt, prioCfg)
+    local db = GuildLootDB
+    return {
         id             = sessionID,
         label          = label or "",
         startedAt      = startedAt or 0,
@@ -633,6 +629,21 @@ function GL.OnCommSessionStart(sessionID, label, startedAt, sender, prioCfg)
         raidMeta       = {},
         priorityConfig = prioCfg or CopyTable(db.settings.priorities or {}),
     }
+end
+
+--- Observer: empfängt SESSION_START vom ML (neue oder wiedergeöffnete Session).
+function GL.OnCommSessionStart(sessionID, label, startedAt, sender, prioCfg)
+    local myName = GL.NormalizeName(UnitName("player") or "") or ""
+    if GL.NormalizeName(sender or "") == myName then return end
+    local db = GuildLootDB
+    for i, s in ipairs(db.raidContainers or {}) do
+        if s.id == sessionID then
+            ResumeSession(s, i)
+            if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
+            return
+        end
+    end
+    local session = BuildSessionFromSync(sessionID, label, startedAt, prioCfg)
     table.insert(db.raidContainers, session)
     db.activeContainerIdx = #db.raidContainers
     GL.Print("Session von ML synchronisiert: " .. (label or "?"))
@@ -926,7 +937,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
                 cr.tier       = newTier
                 cr.difficulty = newDiff
                 cr.startedAt  = time()
-                GL.LoadRaidRoster()
+                C_Timer.After(0, GL.LoadRaidRoster)
             end
         end
 
@@ -943,22 +954,28 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         end
 
     elseif event == "RAID_ROSTER_UPDATE" or event == "GROUP_ROSTER_UPDATE" then
-        GL.SyncRoster()
-        local db = GuildLootDB
-        -- ML: Session-State an neue Mitglieder pushen
-        if db.activeContainerIdx and GL.IsMasterLooter() then
-            local session = db.raidContainers[db.activeContainerIdx]
-            if GL.Comm and GL.Comm.SendSessionStart then
-                GL.Comm.SendSessionStart(session.id, session.label, session.startedAt)
-            end
-        end
-        -- Observer ohne aktive Session → Sync anfordern (max. 1x alle 5s)
-        if not GL.IsMasterLooter() and not db.activeContainerIdx then
-            local now = time()
-            if not GL._lastRaidQuery or (now - GL._lastRaidQuery) > 5 then
-                GL._lastRaidQuery = now
-                if GL.Comm and GL.Comm.SendRaidQuery then GL.Comm.SendRaidQuery() end
-            end
+        if not GL._rosterUpdatePending then
+            GL._rosterUpdatePending = true
+            C_Timer.After(0, function()
+                GL._rosterUpdatePending = nil
+                GL.SyncRoster()
+                local db = GuildLootDB
+                -- ML: Session-State an neue Mitglieder pushen
+                if db.activeContainerIdx and GL.IsMasterLooter() then
+                    local session = db.raidContainers[db.activeContainerIdx]
+                    if GL.Comm and GL.Comm.SendSessionStart then
+                        GL.Comm.SendSessionStart(session.id, session.label, session.startedAt)
+                    end
+                end
+                -- Observer ohne aktive Session → Sync anfordern (max. 1x alle 5s)
+                if not GL.IsMasterLooter() and not db.activeContainerIdx then
+                    local now = time()
+                    if not GL._lastRaidQuery or (now - GL._lastRaidQuery) > 5 then
+                        GL._lastRaidQuery = now
+                        if GL.Comm and GL.Comm.SendRaidQuery then GL.Comm.SendRaidQuery() end
+                    end
+                end
+            end)
         end
 
     elseif event == "ENCOUNTER_END" then
@@ -1009,7 +1026,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
                     cr.startedAt  = cr.startedAt ~= 0 and cr.startedAt or time()
                 end
                 GL.EnsureRaidMeta()
-                if GL.UI and GL.UI.AutoExpand then GL.UI.AutoExpand() end
+                if GL.UI and GL.UI.AutoExpand then C_Timer.After(0, GL.UI.AutoExpand) end
             end
         end
 
@@ -1040,12 +1057,16 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         end
 
     elseif event == "LOOT_OPENED" then
-        if GL.IsValidZone() and GL.Loot and GL.Loot.OnLootOpened then GL.Loot.OnLootOpened() end
+        if GL.IsValidZone() and GL.Loot and GL.Loot.OnLootOpened then
+            C_Timer.After(0, function() GL.Loot.OnLootOpened() end)
+        end
 
     elseif event == "LOOT_SLOT_CHANGED" then
         -- In Group Loot kommen Items asynchron nach LOOT_OPENED
         -- OnLootOpened erneut aufrufen – Dedup verhindert doppelte Einträge
-        if GL.IsValidZone() and GL.Loot and GL.Loot.OnLootOpened then GL.Loot.OnLootOpened() end
+        if GL.IsValidZone() and GL.Loot and GL.Loot.OnLootOpened then
+            C_Timer.After(0, function() GL.Loot.OnLootOpened() end)
+        end
 
     elseif event == "LOOT_CLOSED" then
         if GL.IsValidZone() and GL.Loot and GL.Loot.OnLootClosed then GL.Loot.OnLootClosed() end
@@ -1196,6 +1217,11 @@ SlashCmdList["REQUIEMRAIDTOOLS"] = function(input)
         local s = GuildLootDB.settings
         s.commLoopback = not s.commLoopback
         GL.Print("Comm Loopback: " .. (s.commLoopback and "|cff00ff00ON|r" or "|cffff4444OFF|r"))
+
+    elseif cmd == "devmode" then
+        local s = GuildLootDB.settings
+        s.devMode = not s.devMode
+        GL.Print("Dev Mode: " .. (s.devMode and "|cff00ff00ON|r (WoWUnit-Tests aktiv nach /reload)|r" or "|cffff4444OFF|r"))
 
     elseif cmd == "cleanup" then
         local history = GuildLootDB.raidHistory or {}
