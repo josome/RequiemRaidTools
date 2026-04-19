@@ -58,14 +58,6 @@ Setzt intern drei Mocks (SendAddonMessage, IsInRaid, IsInGroup), ruft `sendFn()`
 
 ## Testfälle
 
-### `testRedTestforVerification`
-
-**Testet:** Prüft die Testquite ob assertion red liefern können
-
-dieser Testfall muss rot sein, und wird irgendwann entfernt
-
----
-
 ### `testAssignRoundtrip`
 
 **Testet:** `Comm.SendAssign` → Serialisierung → `Comm.OnMessage` → `Loot.OnCommAssign`
@@ -172,7 +164,7 @@ dieser Testfall muss rot sein, und wird irgendwann entfernt
 
 ---
 
-### `testMLGuardBlocks`
+### `testMLGuard`
 
 **Testet:** Als Master Looter (ML) wird eine eingehende `ITEM_ON`-Nachricht ignoriert
 
@@ -184,7 +176,7 @@ dieser Testfall muss rot sein, und wird irgendwann entfernt
 
 ---
 
-### `testSelfFilterBlocks`
+### `testSelfFilter`
 
 **Testet:** Eigene Nachrichten werden ignoriert wenn `commLoopback = false` (Produktiv-Default)
 
