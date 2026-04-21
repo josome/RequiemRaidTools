@@ -190,6 +190,120 @@ end
 -- Receive-Handler (alle Addon-User empfangen)
 -- ============================================================
 
+local function HandleItemOn(parts, sender)
+    local link, category = parts[2], parts[3]
+    if link and link ~= "" and GL.Loot and GL.Loot.OnCommItemActivate then
+        GL.Loot.OnCommItemActivate(link, category or "other")
+    end
+end
+
+local function HandleItemOff(parts, sender)
+    if GL.Loot and GL.Loot.OnCommItemClear then
+        GL.Loot.OnCommItemClear()
+    end
+end
+
+local function HandleRollStart(parts, sender)
+    local seconds = tonumber(parts[2]) or 15
+    local players = {}
+    if parts[3] and parts[3] ~= "" then
+        for p in parts[3]:gmatch("[^,]+") do
+            table.insert(players, p)
+        end
+    end
+    if GL.Loot and GL.Loot.OnCommRollStart then
+        GL.Loot.OnCommRollStart(seconds, players)
+    end
+end
+
+local function HandleAssign(parts, sender)
+    local name, diff, link, category, quality, winnerPrio, boss = parts[2], parts[3], parts[4], parts[5], parts[6], parts[7], parts[8]
+    local sessionID, raidID = parts[9], parts[10]
+    if GL.Loot and GL.Loot.OnCommAssign then
+        GL.Loot.OnCommAssign(name, diff, link, category,
+                             tonumber(quality) or 0,
+                             tonumber(winnerPrio) or nil,
+                             boss ~= "" and boss or nil,
+                             sessionID ~= "" and sessionID or nil,
+                             raidID ~= "" and raidID or nil)
+    end
+end
+
+local function HandleRaidQuery(parts, sender)
+    local inCombat = (parts[2] == "1")
+    if GL.OnCommRaidQuery then GL.OnCommRaidQuery(sender, inCombat) end
+end
+
+local function HandleSessionStart(parts, sender)
+    local sessionID, label, startedAt = parts[2], parts[3], tonumber(parts[4]) or 0
+    local prioCfg = parts[5] and DeserializePrioCfg(parts[5]) or nil
+    if GL.OnCommSessionStart then GL.OnCommSessionStart(sessionID, label, startedAt, sender, prioCfg) end
+end
+
+local function HandleSessionEnd(parts, sender)
+    local sessionID, closedAt = parts[2], tonumber(parts[3]) or 0
+    if GL.OnCommSessionEnd then GL.OnCommSessionEnd(sessionID, closedAt) end
+end
+
+local function HandleRaidMeta(parts, sender)
+    local sessionID, raidID = parts[2], parts[3]
+    local tier, diff = parts[4], parts[5]
+    local startedAt  = tonumber(parts[6]) or 0
+    local closedAt   = (parts[7] ~= "" and parts[7] ~= "0") and tonumber(parts[7]) or nil
+    local participants = {}
+    if parts[8] and parts[8] ~= "" then
+        for p in parts[8]:gmatch("[^,]+") do
+            table.insert(participants, p)
+        end
+    end
+    local meta = { tier=tier, difficulty=diff, startedAt=startedAt, closedAt=closedAt, participants=participants }
+    if GL.OnCommRaidMeta then GL.OnCommRaidMeta(sessionID, raidID, meta) end
+end
+
+local function HandleLootTrash(parts, sender)
+    local link, sessionID, raidID = parts[2], parts[3], parts[4]
+    local db = GuildLootDB
+    local targetSession = nil
+    if sessionID and sessionID ~= "" then
+        for _, s in ipairs(db.raidContainers or {}) do
+            if s.id == sessionID then targetSession = s; break end
+        end
+    end
+    if not targetSession and db.activeContainerIdx then
+        targetSession = db.raidContainers[db.activeContainerIdx]
+    end
+    if targetSession and link and link ~= "" then
+        table.insert(targetSession.trashedLoot, { link=link, sessionID=sessionID or "", raidID=raidID or "" })
+    end
+end
+
+local function HandleMLAnnounce(parts, sender)
+    if GL.OnCommMLAnnounce then GL.OnCommMLAnnounce(parts[2]) end
+end
+
+local function HandleMLRequest(parts, sender)
+    if GL.OnCommMLRequest then GL.OnCommMLRequest(parts[2], sender) end
+end
+
+local function HandleMLDeny(parts, sender)
+    if GL.OnCommMLDeny then GL.OnCommMLDeny(parts[2]) end
+end
+
+local msgHandlers = {
+    ITEM_ON       = HandleItemOn,
+    ITEM_OFF      = HandleItemOff,
+    ROLL_START    = HandleRollStart,
+    ASSIGN        = HandleAssign,
+    RAID_QUERY    = HandleRaidQuery,
+    SESSION_START = HandleSessionStart,
+    SESSION_END   = HandleSessionEnd,
+    RAID_META     = HandleRaidMeta,
+    LOOT_TRASH    = HandleLootTrash,
+    ML_ANNOUNCE   = HandleMLAnnounce,
+    ML_REQUEST    = HandleMLRequest,
+    ML_DENY       = HandleMLDeny,
+}
+
 function Comm.OnMessage(msg, sender)
     -- Eigene Nachrichten ignorieren (ML hat bereits lokal verarbeitet)
     -- Ausnahme: commLoopback-Flag für Tests
@@ -237,97 +351,6 @@ function Comm.OnMessage(msg, sender)
     local cmd = parts[1]
     if not cmd then return end
 
-    if cmd == "ITEM_ON" then
-        local link, category = parts[2], parts[3]
-        if link and link ~= "" and GL.Loot and GL.Loot.OnCommItemActivate then
-            GL.Loot.OnCommItemActivate(link, category or "other")
-        end
-
-    elseif cmd == "ITEM_OFF" then
-        if GL.Loot and GL.Loot.OnCommItemClear then
-            GL.Loot.OnCommItemClear()
-        end
-
-    elseif cmd == "ROLL_START" then
-        local seconds = tonumber(parts[2]) or 15
-        local players = {}
-        if parts[3] and parts[3] ~= "" then
-            for p in parts[3]:gmatch("[^,]+") do
-                table.insert(players, p)
-            end
-        end
-        if GL.Loot and GL.Loot.OnCommRollStart then
-            GL.Loot.OnCommRollStart(seconds, players)
-        end
-
-    elseif cmd == "ASSIGN" then
-        local name, diff, link, category, quality, winnerPrio, boss = parts[2], parts[3], parts[4], parts[5], parts[6], parts[7], parts[8]
-        local sessionID, raidID = parts[9], parts[10]
-        if GL.Loot and GL.Loot.OnCommAssign then
-            GL.Loot.OnCommAssign(name, diff, link, category,
-                                 tonumber(quality) or 0,
-                                 tonumber(winnerPrio) or nil,
-                                 boss ~= "" and boss or nil,
-                                 sessionID ~= "" and sessionID or nil,
-                                 raidID ~= "" and raidID or nil)
-        end
-
-    elseif cmd == "RAID_QUERY" then
-        local inCombat = (parts[2] == "1")
-        if GL.OnCommRaidQuery then GL.OnCommRaidQuery(sender, inCombat) end
-
-    elseif cmd == "SESSION_START" then
-        local sessionID, label, startedAt = parts[2], parts[3], tonumber(parts[4]) or 0
-        local prioCfg = parts[5] and DeserializePrioCfg(parts[5]) or nil
-        if GL.OnCommSessionStart then GL.OnCommSessionStart(sessionID, label, startedAt, sender, prioCfg) end
-
-    elseif cmd == "SESSION_END" then
-        local sessionID, closedAt = parts[2], tonumber(parts[3]) or 0
-        if GL.OnCommSessionEnd then GL.OnCommSessionEnd(sessionID, closedAt) end
-
-    elseif cmd == "RAID_META" then
-        local sessionID, raidID = parts[2], parts[3]
-        local tier, diff = parts[4], parts[5]
-        local startedAt  = tonumber(parts[6]) or 0
-        local closedAt   = (parts[7] ~= "" and parts[7] ~= "0") and tonumber(parts[7]) or nil
-        local participants = {}
-        if parts[8] and parts[8] ~= "" then
-            for p in parts[8]:gmatch("[^,]+") do
-                table.insert(participants, p)
-            end
-        end
-        local meta = { tier=tier, difficulty=diff, startedAt=startedAt, closedAt=closedAt, participants=participants }
-        if GL.OnCommRaidMeta then GL.OnCommRaidMeta(sessionID, raidID, meta) end
-
-    elseif cmd == "LOOT_TRASH" then
-        local link, sessionID, raidID = parts[2], parts[3], parts[4]
-        local db = GuildLootDB
-        local targetSession = nil
-        if sessionID and sessionID ~= "" then
-            for _, s in ipairs(db.raidContainers or {}) do
-                if s.id == sessionID then targetSession = s; break end
-            end
-        end
-        if not targetSession and db.activeContainerIdx then
-            targetSession = db.raidContainers[db.activeContainerIdx]
-        end
-        if targetSession and link and link ~= "" then
-            table.insert(targetSession.trashedLoot, { link=link, sessionID=sessionID or "", raidID=raidID or "" })
-        end
-
-    elseif cmd == "ML_ANNOUNCE" then
-        if GL.OnCommMLAnnounce then
-            GL.OnCommMLAnnounce(parts[2])
-        end
-
-    elseif cmd == "ML_REQUEST" then
-        if GL.OnCommMLRequest then
-            GL.OnCommMLRequest(parts[2], sender)
-        end
-
-    elseif cmd == "ML_DENY" then
-        if GL.OnCommMLDeny then
-            GL.OnCommMLDeny(parts[2])
-        end
-    end
+    local handler = msgHandlers[cmd]
+    if handler then handler(parts, sender) end
 end
