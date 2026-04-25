@@ -361,16 +361,16 @@ function UI.BuildSettingsPanel(parent)
     -- Nur sichtbar wenn kein ML — steuert welche announced Items den Popup zeigen
     if not GL.IsMasterLooter() then
         y = y - 4
-        SectionHeader("Announce-Filter")
+        SectionHeader("Announce Filter")
 
         local afDefs = {
-            { key="cloth",   label="Stoff"     },
-            { key="leather", label="Leder"      },
-            { key="mail",    label="Kette"      },
-            { key="plate",   label="Platte"     },
-            { key="jewelry", label="Schmuck"    },
-            { key="weapon",  label="Waffe"      },
-            { key="other",   label="Sonstiges"  },
+            { key="cloth",   label="Cloth"   },
+            { key="leather", label="Leather" },
+            { key="mail",    label="Mail"    },
+            { key="plate",   label="Plate"   },
+            { key="jewelry", label="Jewelry" },
+            { key="weapon",  label="Weapon"  },
+            { key="other",   label="Other"   },
         }
         local function MakeAFCheck(labelText, key, col)
             local cb = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")

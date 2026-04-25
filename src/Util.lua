@@ -237,21 +237,23 @@ function GL.IsPlayerMode()
 end
 
 --- Announce-Filter: soll dieses Item den Popup triggern?
+--- skipUsableCheck = true: IsUsableItem-Prüfung überspringen (z.B. forcePlayerMode)
 --- Gibt true zurück wenn Item-Daten noch nicht gecacht (false positive besser als verpasstes Item).
-function GL.PopupFilterMatches(link, category)
+function GL.PopupFilterMatches(link, category, skipUsableCheck)
     local f = GuildLootDB and GuildLootDB.settings and GuildLootDB.settings.announceFilter
     if not f then return true end
 
     -- Klassen-Restriction via WoW-API (deckt Token-Relevanz automatisch ab)
     -- nil = noch nicht gecacht → zeigen (false positive ok)
-    local isUsable = IsUsableItem(link)
-    if isUsable == false then return false end
+    if not skipUsableCheck then
+        local isUsable = IsUsableItem(link)
+        if isUsable == false then return false end
+    end
 
     if category == "weapons" then return f.weapon  ~= false end
     if category == "trinket" then return f.jewelry ~= false end
-    if category == "other"   then return f.other   ~= false end
 
-    -- Rüstungstyp via itemSubType
+    -- Rüstungstyp via itemSubType (auch für category=="other" und "setItems")
     local _, _, _, _, _, _, itemSubType = GetItemInfo(link)
     if itemSubType == "Cloth"   then return f.cloth   ~= false end
     if itemSubType == "Leather" then return f.leather ~= false end

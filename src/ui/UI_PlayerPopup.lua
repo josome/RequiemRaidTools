@@ -18,13 +18,13 @@ local filterChecks   = {}    -- { key = CheckButton }
 local autoCloseTimer = nil
 
 local FILTER_DEFS = {
-    { key="cloth",   label="Stoff"   },
-    { key="leather", label="Leder"   },
-    { key="mail",    label="Kette"   },
-    { key="plate",   label="Platte"  },
-    { key="jewelry", label="Schmuck" },
-    { key="weapon",  label="Waffe"   },
-    { key="other",   label="Sonstiges" },
+    { key="cloth",   label="Cloth"   },
+    { key="leather", label="Leather" },
+    { key="mail",    label="Mail"    },
+    { key="plate",   label="Plate"   },
+    { key="jewelry", label="Jewelry" },
+    { key="weapon",  label="Weapon"  },
+    { key="other",   label="Other"   },
 }
 
 -- ============================================================
@@ -77,13 +77,26 @@ local function BuildPopup()
     -- Titel-Bar (ziehbar)
     local titleBar = popup:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     titleBar:SetPoint("TOPLEFT", popup, "TOPLEFT", 16, -10)
-    titleBar:SetText("|cffffcc00Loot-Announce|r")
+    titleBar:SetText("|cffffcc00Loot Announce|r")
 
-    -- Item-Icon
-    local icon = popup:CreateTexture(nil, "ARTWORK")
-    icon:SetSize(36, 36)
-    icon:SetPoint("TOPLEFT", popup, "TOPLEFT", 16, -28)
+    -- Item-Icon mit Tooltip (gleiche Pattern wie Loot-Tab)
+    local iconBtn = CreateFrame("Frame", nil, popup)
+    iconBtn:SetSize(36, 36)
+    iconBtn:SetPoint("TOPLEFT", popup, "TOPLEFT", 16, -28)
+    iconBtn:EnableMouse(true)
+    local icon = iconBtn:CreateTexture(nil, "ARTWORK")
+    icon:SetAllPoints()
+    icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    iconBtn:SetScript("OnEnter", function(self)
+        if popup._link and popup._link:find("|H") then
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetHyperlink(popup._link)
+            GameTooltip:Show()
+        end
+    end)
+    iconBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     popup.itemIcon = icon
+    popup.itemIconBtn = iconBtn
 
     -- Item-Link Button (Tooltip)
     local linkBtn = CreateFrame("Button", nil, popup)
@@ -119,7 +132,7 @@ local function BuildPopup()
     -- Prio-Label
     local prioLbl = popup:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     prioLbl:SetPoint("TOPLEFT", popup, "TOPLEFT", 16, -82)
-    prioLbl:SetText("|cffaaaaaa Priorität:|r")
+    prioLbl:SetText("|cffaaaaaa Priority:|r")
 
     -- Prio-Buttons (5 Stück)
     local btnW = 56
@@ -158,14 +171,14 @@ local function BuildPopup()
     rollBtn = CreateFrame("Button", nil, popup, "UIPanelButtonTemplate")
     rollBtn:SetSize(100, 22)
     rollBtn:SetPoint("TOPLEFT", popup, "TOPLEFT", 16, -138)
-    rollBtn:SetText("🎲 Roll")
+    rollBtn:SetText("Roll")
     rollBtn:SetEnabled(false)
     rollBtn:SetAlpha(0.4)
     rollBtn:SetScript("OnClick", function()
         RandomRoll(1, 100)
         rollBtn:SetEnabled(false)
         rollBtn:SetAlpha(0.4)
-        rollBtn:SetText("Gerollt")
+        rollBtn:SetText("Rolled")
     end)
 
     -- Gewinner-Label (versteckt bis ASSIGN mit eigenem Namen)
@@ -183,7 +196,7 @@ local function BuildPopup()
     -- Announce-Filter Sektion
     local filterLbl = popup:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     filterLbl:SetPoint("TOPLEFT", popup, "TOPLEFT", 16, -168)
-    filterLbl:SetText("|cffaaaaaa Announce-Filter:|r")
+    filterLbl:SetText("|cffaaaaaa Announce Filter:|r")
 
     local colW = 100
     for idx, def in ipairs(FILTER_DEFS) do
@@ -231,7 +244,7 @@ function UI.ShowPlayerPopup(link, category)
     selectedPrio = nil
 
     -- Alle Elemente sichtbar schalten (nach evt. FilterOnly-Modus)
-    popup.itemIcon:Show()
+    popup.itemIconBtn:Show()
     for _, btn in ipairs(prioButtons) do btn:Show() end
     rollBtn:Show()
 
@@ -247,21 +260,34 @@ function UI.ShowPlayerPopup(link, category)
     local itemName = ParseItemName(link)
     popup.linkLabel:SetText("|cffA335EE" .. itemName .. "|r")
 
-    -- Prio-Buttons auffrischen
+    -- Prio-Buttons auffrischen (dynamische Breite basierend auf Text)
     local cfg = GetPrioCfg()
+    local MIN_BTN_W = 56
+    local BTN_PAD   = 16  -- Padding links+rechts innerhalb Button
+    local BTN_GAP   = 4
+    local xOff = 16
     for i, btn in ipairs(prioButtons) do
-        local prio = cfg and cfg[i]
+        local prio   = cfg and cfg[i]
         local active = prio and prio.active
         local label  = (prio and prio.shortName ~= "") and prio.shortName or tostring(i)
         btn:SetText(label)
         btn:SetEnabled(active == true)
         btn:SetAlpha(active and 1.0 or 0.3)
+        local textW = btn:GetFontString():GetStringWidth()
+        local btnW  = math.max(MIN_BTN_W, math.ceil(textW) + BTN_PAD)
+        btn:SetSize(btnW, 22)
+        btn:ClearAllPoints()
+        btn:SetPoint("TOPLEFT", popup, "TOPLEFT", xOff, -98)
+        xOff = xOff + btnW + BTN_GAP
     end
+    -- Frame-Breite an Buttons anpassen (Buttons + rechter Rand 16px)
+    local requiredW = math.max(340, xOff - BTN_GAP + 16)
+    popup:SetWidth(requiredW)
 
     -- Roll-Button zurücksetzen
     rollBtn:SetEnabled(false)
     rollBtn:SetAlpha(0.4)
-    rollBtn:SetText("🎲 Roll")
+    rollBtn:SetText("Roll")
     rollBtn:Show()
     winnerLabel:Hide()
 
@@ -282,7 +308,7 @@ function UI.EnablePlayerPopupRoll()
     if not popup or not popup:IsShown() then return end
     rollBtn:SetEnabled(true)
     rollBtn:SetAlpha(1.0)
-    rollBtn:SetText("🎲 Roll")
+    rollBtn:SetText("Roll")
 end
 
 --- Filter-Only-Ansicht: Popup ohne aktives Item zeigen (Dock-Klick im Player-Mode).
@@ -292,8 +318,8 @@ function UI.ShowPlayerPopupFilterOnly()
     popup._link = nil
 
     -- Item-Bereich ausblenden
-    popup.itemIcon:Hide()
-    popup.linkLabel:SetText("|cff888888Kein Item announced|r")
+    popup.itemIconBtn:Hide()
+    popup.linkLabel:SetText("|cff888888No item announced|r")
     for _, btn in ipairs(prioButtons) do btn:Hide() end
     rollBtn:Hide()
     winnerLabel:Hide()
@@ -310,7 +336,7 @@ function UI.ShowPlayerPopupWin(link)
 
     local itemName = ParseItemName(link)
     rollBtn:Hide()
-    winnerLabel:SetText("|cff00ff00Du bekommst:|r " .. "|cffA335EE" .. itemName .. "|r")
+    winnerLabel:SetText("|cff00ff00You receive:|r " .. "|cffA335EE" .. itemName .. "|r")
     winnerLabel:Show()
     popup:Show()
 

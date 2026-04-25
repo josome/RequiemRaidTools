@@ -179,9 +179,11 @@ function Loot.ActivateItem(link, name, iLevel, equipLoc, quality)
     -- Observer informieren
     if GL.Comm then GL.Comm.SendItemActivate(link, currentItem.category) end
 
-    -- forcePlayerMode: Popup auch für ML zeigen (Solo-Test), Filter überspringen
+    -- forcePlayerMode: Popup auch für ML zeigen (Solo-Test)
     if GuildLootDB.settings.forcePlayerMode and GL.UI and GL.UI.ShowPlayerPopup then
-        GL.UI.ShowPlayerPopup(link, currentItem.category)
+        if GL.PopupFilterMatches(link, currentItem.category, true) then
+            GL.UI.ShowPlayerPopup(link, currentItem.category)
+        end
     end
 
     if GL.UI then

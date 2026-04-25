@@ -1227,8 +1227,12 @@ SlashCmdList["REQUIEMRAIDTOOLS"] = function(input)
             if simLink then break end
         end
         if simLink and GL.UI and GL.UI.ShowPlayerPopup then
-            GL.UI.ShowPlayerPopup(simLink, simCat)
-            GL.Print("Simulated ITEM_ON (Popup): " .. simLink .. " [" .. (simCat or "?") .. "]")
+            if GL.PopupFilterMatches and not GL.PopupFilterMatches(simLink, simCat, true) then
+                GL.Print("|cffff4444Item vom Announce-Filter geblockt: " .. simLink .. "|r")
+            else
+                GL.UI.ShowPlayerPopup(simLink, simCat)
+                GL.Print("Simulated ITEM_ON (Popup): " .. simLink .. " [" .. (simCat or "?") .. "]")
+            end
         else
             GL.Print("|cffff4444Kein equippables Item in den Taschen gefunden.|r")
         end
