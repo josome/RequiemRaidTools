@@ -60,6 +60,15 @@ local DB_DEFAULTS = {
             [4] = { active=true,  shortName="Transmog",  description="Transmog" },
             [5] = { active=false, shortName="",          description="" },
         },
+        announceFilter = {
+            cloth   = true,
+            leather = true,
+            mail    = true,
+            plate   = true,
+            jewelry = true,
+            weapon  = true,
+            other   = true,
+        },
     },
 }
 
@@ -1199,6 +1208,42 @@ SlashCmdList["REQUIEMRAIDTOOLS"] = function(input)
         settings.isMasterLooter = not settings.isMasterLooter
         GL.Print("Master Looter: " .. (settings.isMasterLooter and "|cff00ff00ON|r" or "|cffff4444OFF|r"))
         if GL.UI and GL.UI.RefreshMLButton then GL.UI.RefreshMLButton() end
+
+    elseif cmd == "simitem" then
+        -- Simuliert ITEM_ON vom ML: erstes equippables Item aus den Taschen
+        local simLink, simCat
+        for bag = 0, 4 do
+            for slot = 1, C_Container.GetContainerNumSlots(bag) do
+                local info = C_Container.GetContainerItemInfo(bag, slot)
+                if info and info.hyperlink then
+                    local _, _, _, _, _, _, subType, _, equipLoc = GetItemInfo(info.hyperlink)
+                    if equipLoc and equipLoc ~= "" and equipLoc ~= "INVTYPE_BAG" then
+                        simLink = info.hyperlink
+                        simCat  = GL.CategorizeItem and GL.CategorizeItem(info.hyperlink, equipLoc, subType) or "other"
+                        break
+                    end
+                end
+            end
+            if simLink then break end
+        end
+        if simLink and GL.UI and GL.UI.ShowPlayerPopup then
+            GL.UI.ShowPlayerPopup(simLink, simCat)
+            GL.Print("Simulated ITEM_ON (Popup): " .. simLink .. " [" .. (simCat or "?") .. "]")
+        else
+            GL.Print("|cffff4444Kein equippables Item in den Taschen gefunden.|r")
+        end
+
+    elseif cmd == "playermode" then
+        local s = GuildLootDB.settings
+        s.forcePlayerMode = not s.forcePlayerMode
+        GL.Print("Player Mode (Force): " .. (s.forcePlayerMode and "|cff00ff00ON|r" or "|cffff4444OFF|r"))
+        if GL.UI and GL.UI.ToggleMinimize then
+            -- Fenster kurz neu öffnen damit die Weiche greift
+            if not GuildLootDB.settings.minimized then
+                GL.UI.Dock()
+                GL.UI.Undock()
+            end
+        end
 
     elseif cmd == "test" then
         if GL.Test and GL.Test.AddPendingItem then

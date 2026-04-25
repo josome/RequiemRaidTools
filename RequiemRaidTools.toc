@@ -2,7 +2,7 @@
 ## Title: RequiemRaidTools
 ## Notes: Strukturierte Raid-Loot-Verteilung fuer Gilden-Offiziere und Raid-Leader. Prio-System, automatische Roll-Auswertung und Echtzeit-Sync zwischen allen Raid-Mitgliedern.
 ## Category: Raid
-## Version: 0.5.4.3-beta
+## Version: 0.5.4.10-beta
 ## SavedVariables: GuildLootDB GuildLootDBBackup
 ## OptionalDeps: WoWUnit
 ## X-Curse-Project-ID: 1502142
@@ -17,6 +17,7 @@ src/loot/Loot_Trade.lua
 src/MinimapButton.lua
 src/ui/UI.lua
 src/ui/UI_Settings.lua
+src/ui/UI_PlayerPopup.lua
 src/ui/UI_LootTab.lua
 src/ui/UI_SpielerTab.lua
 src/ui/UI_LogTab.lua

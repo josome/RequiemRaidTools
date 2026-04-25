@@ -179,6 +179,11 @@ function Loot.ActivateItem(link, name, iLevel, equipLoc, quality)
     -- Observer informieren
     if GL.Comm then GL.Comm.SendItemActivate(link, currentItem.category) end
 
+    -- forcePlayerMode: Popup auch für ML zeigen (Solo-Test), Filter überspringen
+    if GuildLootDB.settings.forcePlayerMode and GL.UI and GL.UI.ShowPlayerPopup then
+        GL.UI.ShowPlayerPopup(link, currentItem.category)
+    end
+
     if GL.UI then
         if GL.UI.RefreshCandidates  then GL.UI.RefreshCandidates()  end
         if GL.UI.RefreshRollResults then GL.UI.RefreshRollResults() end
@@ -406,6 +411,11 @@ function Loot.OnCommItemActivate(link, category)
         table.insert(pl, { link = link, name = name, itemID = itemID, quality = 0, category = category })
     end
     if GL.UI and GL.UI.RefreshLootTab then GL.UI.RefreshLootTab() end
+    if GL.UI and GL.UI.ShowPlayerPopup then
+        if GL.PopupFilterMatches(link, category) then
+            GL.UI.ShowPlayerPopup(link, category)
+        end
+    end
 end
 
 --- ML hat Item abgebrochen → Observer leeren Anzeige
@@ -427,6 +437,7 @@ function Loot.OnCommItemClear()
     currentItem.prioState  = { active = false, timeLeft = 0, timer = nil }
     currentItem.rollState  = { active = false, players  = {}, results = {}, timer = nil, timeLeft = 0 }
     if GL.UI and GL.UI.RefreshLootTab then GL.UI.RefreshLootTab() end
+    if GL.UI and GL.UI.HidePlayerPopup then GL.UI.HidePlayerPopup() end
 end
 
 --- ML hat Loot zugewiesen → Observer aktualisiert Session-Log
@@ -465,6 +476,13 @@ function Loot.OnCommAssign(playerName, diff, link, category, quality, winnerPrio
             sessionID  = sessionID or "",
             raidID     = raidID or db.currentRaid.id or "",
         })
+    end
+    -- Gewinner-Popup für den lokalen Spieler
+    if GL.UI and GL.UI.ShowPlayerPopupWin then
+        local myShort = GL.ShortName(UnitName("player") or "")
+        if GL.ShortName(playerName) == myShort then
+            GL.UI.ShowPlayerPopupWin(link or "")
+        end
     end
     Loot.OnCommItemClear()
     if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end

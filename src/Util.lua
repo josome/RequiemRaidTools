@@ -217,6 +217,50 @@ function GL.IsMasterLooter()
     return false
 end
 
+--- Raid-Assist oder Raid-Lead, aber kein ML.
+function GL.IsObserver()
+    if GL.IsMasterLooter() then return false end
+    return UnitIsRaidOfficer("player") or UnitIsGroupLeader("player") or false
+end
+
+--- Player Mode: aktiv in Raid-Gruppe, aber weder ML noch Assist/Lead.
+--- Außerhalb eines Raids (solo, Dungeon, kein Raid) immer false → volles Fenster.
+--- Ausnahme: forcePlayerMode = true (Dev-Test-Flag via /reqrt playermode).
+function GL.IsPlayerMode()
+    if GuildLootDB and GuildLootDB.settings and GuildLootDB.settings.forcePlayerMode then
+        return true
+    end
+    if not IsInRaid() then return false end
+    if GL.IsMasterLooter() then return false end
+    if GL.IsObserver() then return false end
+    return true
+end
+
+--- Announce-Filter: soll dieses Item den Popup triggern?
+--- Gibt true zurück wenn Item-Daten noch nicht gecacht (false positive besser als verpasstes Item).
+function GL.PopupFilterMatches(link, category)
+    local f = GuildLootDB and GuildLootDB.settings and GuildLootDB.settings.announceFilter
+    if not f then return true end
+
+    -- Klassen-Restriction via WoW-API (deckt Token-Relevanz automatisch ab)
+    -- nil = noch nicht gecacht → zeigen (false positive ok)
+    local isUsable = IsUsableItem(link)
+    if isUsable == false then return false end
+
+    if category == "weapons" then return f.weapon  ~= false end
+    if category == "trinket" then return f.jewelry ~= false end
+    if category == "other"   then return f.other   ~= false end
+
+    -- Rüstungstyp via itemSubType
+    local _, _, _, _, _, _, itemSubType = GetItemInfo(link)
+    if itemSubType == "Cloth"   then return f.cloth   ~= false end
+    if itemSubType == "Leather" then return f.leather ~= false end
+    if itemSubType == "Mail"    then return f.mail    ~= false end
+    if itemSubType == "Plate"   then return f.plate   ~= false end
+
+    return f.other ~= false
+end
+
 function GL.IsPlayerInGroup(name)
     if not name then return false end
     name = GL.ShortName(name)

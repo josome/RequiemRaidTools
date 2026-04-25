@@ -502,10 +502,15 @@ function UI.Dock()
     dockTab:Show()
 end
 
--- Abdocken: Dock-Tab verstecken, Hauptfenster wiederherstellen
+-- Abdocken: Dock-Tab verstecken, Hauptfenster wiederherstellen.
+-- Im Player-Mode: statt vollem Fenster den Player-Popup (Filter-Ansicht) zeigen.
 function UI.Undock()
     if dockTab then dockTab:Hide() end
     GuildLootDB.settings.minimized = false
+    if GL.IsPlayerMode() then
+        if UI.ShowPlayerPopupFilterOnly then UI.ShowPlayerPopupFilterOnly() end
+        return
+    end
     if not mainFrame then UI.BuildMainFrame() end
     UI.LoadPosition()
     mainFrame:Show()
