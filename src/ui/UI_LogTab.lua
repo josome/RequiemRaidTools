@@ -16,9 +16,25 @@ local exportPopup
 local playerPickerPanel
 
 local function ShowPlayerPicker(entry)
-    local participants = GuildLootDB.currentRaid and GuildLootDB.currentRaid.participants or {}
+    local db      = GuildLootDB
+    local idx     = db.activeContainerIdx
+    local session = idx and db.raidContainers and db.raidContainers[idx]
+
+    local seen = {}
     local names = {}
-    for _, name in ipairs(participants) do table.insert(names, name) end  -- Array, nicht Hash
+    local function addName(n)
+        if n and n ~= "" and not seen[n] then seen[n] = true; table.insert(names, n) end
+    end
+    -- Raid-Snapshot aus raidMeta (zum Zeitpunkt des Drops)
+    if session and entry.raidID and session.raidMeta then
+        local meta = session.raidMeta[entry.raidID]
+        for _, n in ipairs(meta and meta.participants or {}) do addName(n) end
+    end
+    -- Alle Spieler aus dem Session-Loot-Log
+    for _, e in ipairs(session and session.lootLog or {}) do addName(e.player) end
+    -- currentRaid-Teilnehmer als Fallback
+    for _, n in ipairs(db.currentRaid and db.currentRaid.participants or {}) do addName(n) end
+
     table.sort(names)
     if #names == 0 then return end
 

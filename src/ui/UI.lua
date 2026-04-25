@@ -134,11 +134,20 @@ function UI.BuildMainFrame()
     resizeGrip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
     resizeGrip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
     resizeGrip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
-    resizeGrip:SetScript("OnMouseDown", function() mainFrame:StartSizing("BOTTOMRIGHT") end)
+    local resizeStartW, resizeStartH = FRAME_W, FRAME_H
+    resizeGrip:SetScript("OnMouseDown", function()
+        resizeStartW = mainFrame:GetWidth()
+        resizeStartH = mainFrame:GetHeight()
+        mainFrame:StartSizing("BOTTOMRIGHT")
+    end)
     resizeGrip:SetScript("OnMouseUp", function()
         mainFrame:StopMovingOrSizing()
         local w = mainFrame:GetWidth()
         local h = mainFrame:GetHeight()
+        -- Kein echter Drag (nur Klick) → gespeicherte Größe beibehalten
+        if math.abs(w - resizeStartW) < 16 and math.abs(h - resizeStartH) < 16 then
+            w, h = resizeStartW, resizeStartH
+        end
         local x = mainFrame:GetLeft()
         local y = mainFrame:GetTop() - UIParent:GetTop()
         mainFrame:ClearAllPoints()
@@ -149,7 +158,9 @@ function UI.BuildMainFrame()
 
     -- Titelzeile
     local version = C_AddOns.GetAddOnMetadata("RequiemRaidTools", "Version") or "?"
-    mainFrame.TitleText:SetText("RequiemRaidTools v" .. version)
+    local devSuffix = (GuildLootDB and GuildLootDB.settings and GuildLootDB.settings.devMode)
+                      and " |cffff0000[devmode=on]|r" or ""
+    mainFrame.TitleText:SetText("RequiemRaidTools v" .. version .. devSuffix)
 
     -- Settings-Button (Zahnrad-Icon)
     local settingsBtn = CreateFrame("Button", nil, mainFrame)

@@ -15,6 +15,15 @@
 - `.pkgmeta` prüfen: Neue Dateien/Ordner seit dem letzten Tag evaluieren — gehören sie in den Release oder müssen sie unter `ignore:` eingetragen werden?
 - Faustregel: Alles was kein WoW-Addon-Code ist (Entwickler-Notizen, KI-Regeln, Test-Tools, Docs) kommt in die ignore-Liste.
 
+## Refactoring-Vorgehen
+
+- **Single Responsibility Principle.** Jede Funktion tut genau das, wofür sie spezifiziert wurde — nicht mehr. Wird weitere Funktionalität benötigt, kommt sie in eine neue, benannte Funktion. Nie stille Zuständigkeiten in bestehende Funktionen hineinwachsen lassen.
+- **Open/Closed Principle.** Bestehende, funktionierende Funktionen werden nicht modifiziert um neues Verhalten hinzuzufügen — sie werden durch neue Funktionen erweitert. Änderungen an bestehenden Funktionen nur zur Bugfixes oder Refactoring, nicht für neue Features.
+- **Refactoring-Branches.** Strukturelle Umbauten (Funktionen aufteilen, Zuständigkeiten trennen) laufen auf einem eigenen Branch, nicht direkt auf `main`.
+
+## Protokoll-Versionierung
+- Die Minor-Version (`0.X.y.z`) ist die Protokoll-Version. `MIN_PROTO_MINOR` in `src/Comm.lua` nur erhöhen wenn das Nachrichtenformat inkompatibel geändert wird (Felder hinzugefügt/entfernt/umsortiert). Bewusste Entscheidung bei jedem Minor-Version-Bump.
+
 ## Projekt-Konventionen
 - Slash-Commands: `/reqrt` und `/requiemraidtools` — NICHT `/rlt`
 - UI-Begriff für Sessions: **"Raid Session"** (intern `container`/`raidContainer`)
