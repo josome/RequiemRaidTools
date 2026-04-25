@@ -16,6 +16,8 @@ local ADDON_VERSION   = (C_AddOns and C_AddOns.GetAddOnMetadata and C_AddOns.Get
                      or (GetAddOnMetadata and GetAddOnMetadata("RequiemRaidTools", "Version"))
                      or "0.5"  -- Fallback mit gültiger Minor-Version
 local MIN_PROTO_MINOR = 5  -- älteste kompatible Minor-Version
+local VERSION_WARN_COOLDOWN = 60  -- Sekunden zwischen Warnungen pro Sender
+local versionWarnedAt = {}  -- sender -> GetTime() der letzten Warnung
 
 local function MinorVersion(v)
     local minor = v:match("^%d+%.(%d+)")
@@ -331,16 +333,25 @@ function Comm.OnMessage(msg, sender)
 
     local senderMinor = MinorVersion(senderVersion)
     local localMinor  = MinorVersion(ADDON_VERSION)
+    local now = GetTime()
+    local lastWarn = versionWarnedAt[sender] or 0
+    local canWarn = (now - lastWarn) >= VERSION_WARN_COOLDOWN
     if senderMinor < MIN_PROTO_MINOR then
-        GL.Print("|cffff4444[ReqRT] " .. GL.ShortName(sender or "?")
-                 .. " hat v" .. senderVersion
-                 .. " — inkompatibel (min Minor: " .. MIN_PROTO_MINOR
-                 .. "). Bitte Addon aktualisieren.|r")
+        if canWarn then
+            GL.Print("|cffff4444[ReqRT] " .. GL.ShortName(sender or "?")
+                     .. " hat v" .. senderVersion
+                     .. " — inkompatibel (min Minor: " .. MIN_PROTO_MINOR
+                     .. "). Bitte Addon aktualisieren.|r")
+            versionWarnedAt[sender] = now
+        end
         return
     elseif senderMinor ~= localMinor then
-        GL.Print("|cffff8800[ReqRT] Protokoll-Version mismatch: "
-                 .. GL.ShortName(sender or "?") .. " hat v" .. senderVersion
-                 .. ", lokal v" .. ADDON_VERSION .. "|r")
+        if canWarn then
+            GL.Print("|cffff8800[ReqRT] Protokoll-Version mismatch: "
+                     .. GL.ShortName(sender or "?") .. " hat v" .. senderVersion
+                     .. ", lokal v" .. ADDON_VERSION .. "|r")
+            versionWarnedAt[sender] = now
+        end
     end
 
     -- Nachricht aufsplitten (payload = msg ohne Version-Prefix)

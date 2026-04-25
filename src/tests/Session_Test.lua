@@ -87,6 +87,23 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
         Mock(GuildLoot.UI,   "RefreshLootTab",    function() end)
     end
 
+    -- --------------------------------------------------------
+    -- Fängt alle Whisper-Nachrichten ab, die SendSessionSync generiert.
+    -- Stellt nur die eigenen Mocks wieder her, nicht die des Aufrufers.
+    -- --------------------------------------------------------
+    local function CaptureWhispers(session)
+        local msgs    = {}
+        local saveLen = #_mocks
+        Mock(C_ChatInfo, "SendAddonMessage", function(_, msg, channel)
+            if channel == "WHISPER" then table.insert(msgs, msg) end
+        end)
+        GuildLoot.Comm.SendSessionSync(session, "Observer")
+        for i = #_mocks, saveLen + 1, -1 do
+            local m = _mocks[i]; m.tbl[m.key] = m.orig; _mocks[i] = nil
+        end
+        return msgs
+    end
+
     -- currentItem für Assign-Schritte vorbereiten
     local TEST_LINK = "|Hitem:212426|h[Egg]|h|r"
     local function SetupCurrentItem(raidID, sessionID)
@@ -304,6 +321,154 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
             AreEqual("raid-03", session.lootLog[3].raidID)
             AreEqual("raid-04", session.lootLog[4].raidID)
 
+            MockRestore()
+        end)
+    end
+
+    -- --------------------------------------------------------
+    -- testLateJoinerSyncNewSession
+    -- Prüft: Observer empfängt SESSION_START + RAID_META + ASSIGN via Whisper
+    --        → neue Session wird korrekt in GuildLootDB angelegt
+    -- --------------------------------------------------------
+    function Tests:testLateJoinerSyncNewSession()
+        WithTestDB(function()
+            GuildLootDB.settings.isMasterLooter = false
+            Mock(GuildLoot,    "IsMasterLooter",  function() return false end)
+            Mock(GuildLoot,    "Print",           function() end)
+            Mock(GuildLoot.UI, "Refresh",         function() end)
+            Mock(GuildLoot.UI, "RefreshLootTab",  function() end)
+
+            local session = {
+                id = "sess-42", label = "Raidnacht", startedAt = 1000,
+                priorityConfig = nil,
+                raidMeta = { ["raid-01"] = { tier="T1", difficulty="H",
+                              startedAt=100, closedAt=0, participants={"Myri","Joern"} } },
+                lootLog = { { player="Myri", difficulty="H",
+                              link="|Hitem:1|h[Helm]|h|r", category="head",
+                              quality=4, winnerPrio=1, boss="Boss",
+                              sessionID="sess-42", raidID="raid-01" } },
+                trashedLoot = {},
+            }
+            local whispers = CaptureWhispers(session)
+
+            for _, msg in ipairs(whispers) do
+                GuildLoot.Comm.OnMessage(msg, "FakeML-Realm")
+            end
+
+            local db = GuildLootDB
+            AreEqual(1,           #db.raidContainers)
+            AreEqual(1,           db.activeContainerIdx)
+            AreEqual("sess-42",   db.raidContainers[1].id)
+            AreEqual("Raidnacht", db.raidContainers[1].label)
+            Exists(db.raidContainers[1].raidMeta["raid-01"])
+            AreEqual("T1",        db.raidContainers[1].raidMeta["raid-01"].tier)
+            AreEqual("Myri",      db.raidContainers[1].raidMeta["raid-01"].participants[1])
+            AreEqual(1,           #db.raidContainers[1].lootLog)
+            AreEqual("Myri",      db.raidContainers[1].lootLog[1].player)
+
+            MockRestore()
+        end)
+    end
+
+    -- --------------------------------------------------------
+    -- testLateJoinerSyncWithLootTrash
+    -- Prüft: LOOT_TRASH-Whisper wird korrekt in trashedLoot eingetragen
+    -- --------------------------------------------------------
+    function Tests:testLateJoinerSyncWithLootTrash()
+        WithTestDB(function()
+            GuildLootDB.settings.isMasterLooter = false
+            Mock(GuildLoot,    "IsMasterLooter",  function() return false end)
+            Mock(GuildLoot,    "Print",           function() end)
+            Mock(GuildLoot.UI, "Refresh",         function() end)
+            Mock(GuildLoot.UI, "RefreshLootTab",  function() end)
+
+            local session = {
+                id = "sess-42", label = "T", startedAt = 1000,
+                priorityConfig = nil, raidMeta = {}, lootLog = {},
+                trashedLoot = { { link="|Hitem:99|h[Schwert]|h|r",
+                                  sessionID="sess-42", raidID="raid-01" } },
+            }
+            local whispers = CaptureWhispers(session)
+
+            for _, msg in ipairs(whispers) do
+                GuildLoot.Comm.OnMessage(msg, "FakeML-Realm")
+            end
+
+            local s = GuildLootDB.raidContainers[1]
+            Exists(s)
+            AreEqual(1,                          #s.trashedLoot)
+            AreEqual("|Hitem:99|h[Schwert]|h|r", s.trashedLoot[1].link)
+            AreEqual("raid-01",                  s.trashedLoot[1].raidID)
+
+            MockRestore()
+        end)
+    end
+
+    -- --------------------------------------------------------
+    -- testLateJoinerSyncUpdatesExistingSession
+    -- Prüft: Existiert bereits eine inaktive Session mit gleicher ID,
+    --        wird sie reaktiviert (kein Duplikat, activeContainerIdx gesetzt)
+    -- --------------------------------------------------------
+    function Tests:testLateJoinerSyncUpdatesExistingSession()
+        WithTestDB(function()
+            GuildLootDB.settings.isMasterLooter = false
+            Mock(GuildLoot,    "IsMasterLooter",  function() return false end)
+            Mock(GuildLoot,    "Print",           function() end)
+            Mock(GuildLoot.UI, "Refresh",         function() end)
+            Mock(GuildLoot.UI, "RefreshLootTab",  function() end)
+
+            -- Vorhandene, inaktive Session mit gleicher ID aber ohne raidMeta
+            GuildLootDB.raidContainers = { { id="sess-42", label="Alt", startedAt=1,
+                                             closedAt=999, lootLog={}, trashedLoot={}, raidMeta={} } }
+            GuildLootDB.activeContainerIdx = nil
+
+            local session = {
+                id = "sess-42", label = "Neu", startedAt = 2000,
+                priorityConfig = nil,
+                raidMeta = { ["raid-01"] = { tier="T2", difficulty="M",
+                              startedAt=200, closedAt=0, participants={} } },
+                lootLog = {}, trashedLoot = {},
+            }
+            local whispers = CaptureWhispers(session)
+
+            for _, msg in ipairs(whispers) do
+                GuildLoot.Comm.OnMessage(msg, "FakeML-Realm")
+            end
+
+            local db = GuildLootDB
+            AreEqual(1,         #db.raidContainers)                    -- kein Duplikat
+            AreEqual(1,         db.activeContainerIdx)                  -- reaktiviert
+            AreEqual("sess-42", db.raidContainers[1].id)
+            Exists(db.raidContainers[1].raidMeta["raid-01"])            -- neu hinzugefügt
+
+            MockRestore()
+        end)
+    end
+
+    -- --------------------------------------------------------
+    -- testRaidQueryCombatGate
+    -- Prüft: ML queued RAID_QUERY im Kampf statt sofort SendSessionSync aufzurufen
+    -- --------------------------------------------------------
+    function Tests:testRaidQueryCombatGate()
+        WithTestDB(function()
+            GuildLootDB.raidContainers     = { { id="sess-1", label="X", startedAt=1,
+                                                 lootLog={}, trashedLoot={}, raidMeta={} } }
+            GuildLootDB.activeContainerIdx = 1
+
+            Mock(_G,             "UnitAffectingCombat", function() return "player" end)
+            Mock(GuildLoot,      "IsMasterLooter",      function() return true end)
+            Mock(GuildLoot,      "Print",               function() end)
+            local syncCalled = false
+            Mock(GuildLoot.Comm, "SendSessionSync",     function() syncCalled = true end)
+
+            GL._pendingSyncRequests = nil
+            GuildLoot.OnCommRaidQuery("Observer-Realm", false)
+
+            IsFalse(syncCalled)
+            Exists(GL._pendingSyncRequests)
+            IsTrue(GL._pendingSyncRequests["Observer-Realm"] == true)
+
+            GL._pendingSyncRequests = nil
             MockRestore()
         end)
     end
