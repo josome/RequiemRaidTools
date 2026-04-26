@@ -60,6 +60,18 @@ local DB_DEFAULTS = {
             [4] = { active=true,  shortName="Transmog",  description="Transmog" },
             [5] = { active=false, shortName="",          description="" },
         },
+        announceFilter = {
+            cloth           = true,
+            leather         = true,
+            mail            = true,
+            plate           = true,
+            nonUsableWeapon = true,   -- Waffen die der Spieler nicht ausrüsten kann
+            trinket         = true,
+            ring            = true,
+            neck            = true,
+            other           = true,
+        },
+        popupEnabled = nil,   -- nil = auto (Raid=an, Gruppe/Solo=aus); true/false = explizit
     },
 }
 
@@ -351,6 +363,10 @@ function GL.ResumeContainer(ci)
     if GL.Comm and GL.Comm.SendSessionStart then
         GL.Comm.SendSessionStart(session.id, session.label or "", session.startedAt or 0)
     end
+    -- Falls wir der ML sind, unsere Rolle ankündigen
+    if GL.IsMasterLooter() and GL.Comm and GL.Comm.SendMLAnnounce then
+        GL.Comm.SendMLAnnounce(UnitName("player") or "")
+    end
     if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
 end
 
@@ -597,6 +613,10 @@ function GL.StartRaid(tier)
     GL.LoadRaidRoster()
     raid.mlName = NormalizeName(UnitName("player")) or ""
     GuildLootDB.settings.isMasterLooter = true
+    -- ML-Rolle an alle Raid-Mitglieder ankündigen (damit niemand mit altem isMasterLooter=true im SavedVariables hängt)
+    if GL.Comm and GL.Comm.SendMLAnnounce then
+        GL.Comm.SendMLAnnounce(UnitName("player") or "")
+    end
     -- Create raidMeta entry and broadcast RAID_META
     GL.EnsureRaidMeta()
     GL.Print("Raid started: " .. raid.tier .. ". " .. #raid.participants .. " players loaded.")
@@ -642,6 +662,9 @@ end
 function GL.OnCommSessionStart(sessionID, label, startedAt, sender, prioCfg)
     local myName = GL.NormalizeName(UnitName("player") or "") or ""
     if GL.NormalizeName(sender or "") == myName then return end
+    -- Wir empfangen eine Session von jemand anderem → wir sind definitiv nicht der ML.
+    -- Verhindert dass ein alter isMasterLooter=true aus den SavedVariables hängt.
+    GuildLootDB.settings.isMasterLooter = false
     local db = GuildLootDB
     for i, s in ipairs(db.raidContainers or {}) do
         if s.id == sessionID then
@@ -1199,6 +1222,51 @@ SlashCmdList["REQUIEMRAIDTOOLS"] = function(input)
         settings.isMasterLooter = not settings.isMasterLooter
         GL.Print("Master Looter: " .. (settings.isMasterLooter and "|cff00ff00ON|r" or "|cffff4444OFF|r"))
         if GL.UI and GL.UI.RefreshMLButton then GL.UI.RefreshMLButton() end
+
+    elseif cmd == "simitem" then
+        -- Simuliert ITEM_ON vom ML: erstes equippables Item aus den Taschen
+        local simLink, simCat
+        for bag = 0, 4 do
+            for slot = 1, C_Container.GetContainerNumSlots(bag) do
+                local info = C_Container.GetContainerItemInfo(bag, slot)
+                if info and info.hyperlink then
+                    local _, _, _, _, _, _, subType, _, equipLoc = GetItemInfo(info.hyperlink)
+                    if equipLoc and equipLoc ~= "" and equipLoc ~= "INVTYPE_BAG" then
+                        simLink = info.hyperlink
+                        simCat  = GL.CategorizeItem and GL.CategorizeItem(info.hyperlink, equipLoc, subType) or "other"
+                        break
+                    end
+                end
+            end
+            if simLink then break end
+        end
+        if simLink and GL.UI and GL.UI.ShowPlayerPopup then
+            if GL.PopupFilterMatches and not GL.PopupFilterMatches(simLink, simCat, true) then
+                GL.Print("|cffff4444Item vom Announce-Filter geblockt: " .. simLink .. "|r")
+            else
+                GL.UI.ShowPlayerPopup(simLink, simCat)
+                GL.Print("Simulated ITEM_ON (Popup): " .. simLink .. " [" .. (simCat or "?") .. "]")
+            end
+        else
+            GL.Print("|cffff4444Kein equippables Item in den Taschen gefunden.|r")
+        end
+
+    elseif cmd == "popup" then
+        if GL.UI and GL.UI.ShowPlayerPopupFilterOnly then
+            GL.UI.ShowPlayerPopupFilterOnly()
+        end
+
+    elseif cmd == "playermode" then
+        local s = GuildLootDB.settings
+        s.forcePlayerMode = not s.forcePlayerMode
+        GL.Print("Player Mode (Force): " .. (s.forcePlayerMode and "|cff00ff00ON|r" or "|cffff4444OFF|r"))
+        if GL.UI and GL.UI.ToggleMinimize then
+            -- Fenster kurz neu öffnen damit die Weiche greift
+            if not GuildLootDB.settings.minimized then
+                GL.UI.Dock()
+                GL.UI.Undock()
+            end
+        end
 
     elseif cmd == "test" then
         if GL.Test and GL.Test.AddPendingItem then

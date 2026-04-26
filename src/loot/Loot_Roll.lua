@@ -319,4 +319,11 @@ function Loot.OnCommRollStart(seconds, players)
         end
     end, seconds)
     if GL.UI and GL.UI.RefreshLootTab then GL.UI.RefreshLootTab() end
+    -- Roll-Button im Player-Popup aktivieren wenn Spieler in der Liste ist
+    if GL.UI and GL.UI.EnablePlayerPopupRoll then
+        local myShort = GL.ShortName(UnitName("player") or "")
+        if currentItem.rollState.players[myShort] then
+            GL.UI.EnablePlayerPopupRoll()
+        end
+    end
 end

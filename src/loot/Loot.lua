@@ -270,6 +270,7 @@ function Loot.RemovePendingItem(link)
     if currentItem.link == link then
         Loot.ClearCurrentItem()
         if GL.Comm then GL.Comm.SendItemClear() end
+        if GuildLootDB.settings.forcePlayerMode and GL.UI and GL.UI.HidePlayerPopup then GL.UI.HidePlayerPopup() end
     end
 end
 
@@ -298,12 +299,19 @@ function Loot.DeleteFromTrash(link)
     if GL.UI and GL.UI.RefreshLootTab then GL.UI.RefreshLootTab() end
 end
 
+local function HidePopupIfForced()
+    if GuildLootDB.settings.forcePlayerMode and GL.UI and GL.UI.HidePlayerPopup then
+        GL.UI.HidePlayerPopup()
+    end
+end
+
 function Loot.TrashActiveItem()
     if not GL.IsMasterLooter() then return end
     local link = currentItem.link
     if not link then return end
     Loot.ClearCurrentItem()
     if GL.Comm then GL.Comm.SendItemClear() end
+    HidePopupIfForced()
     Loot.RemovePendingItem(link)
     if GL.UI and GL.UI.RefreshLootTab then GL.UI.RefreshLootTab() end
 end
@@ -313,6 +321,7 @@ function Loot.ResetCurrentItem()
     local itemLink = currentItem.link
     Loot.ClearCurrentItem()
     if GL.Comm then GL.Comm.SendItemClear() end
+    HidePopupIfForced()
     GL.Print("Item reset: " .. (itemLink or "?"))
     if GL.UI and GL.UI.RefreshLootTab then GL.UI.RefreshLootTab() end
 end
@@ -322,6 +331,7 @@ function Loot.CancelPrio()
     if not currentItem.prioState.active then return end
     Loot.ClearCurrentItem()
     if GL.Comm then GL.Comm.SendItemClear() end
+    HidePopupIfForced()
     GL.Print("Prio phase cancelled.")
     if GL.UI and GL.UI.RefreshLootTab then GL.UI.RefreshLootTab() end
 end

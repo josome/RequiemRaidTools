@@ -217,6 +217,64 @@ function GL.IsMasterLooter()
     return false
 end
 
+--- Raid-Assist oder Raid-Lead, aber kein ML.
+function GL.IsObserver()
+    if GL.IsMasterLooter() then return false end
+    return UnitIsRaidOfficer("player") or UnitIsGroupLeader("player") or false
+end
+
+--- Player Mode: aktiv im Raid, aber weder ML noch Assist/Lead.
+--- Außerhalb eines Raids (solo, Party, Dungeon) → false → volles Fenster.
+--- Ausnahme: forcePlayerMode = true (Dev-Test-Flag via /reqrt playermode).
+function GL.IsPlayerMode()
+    if GuildLootDB and GuildLootDB.settings and GuildLootDB.settings.forcePlayerMode then
+        return true
+    end
+    if not IsInRaid() then return false end
+    if GL.IsMasterLooter() then return false end
+    if GL.IsObserver() then return false end
+    return true
+end
+
+--- Announce-Filter: soll dieses Item den Popup triggern?
+--- skipUsableCheck = true: IsUsableItem-Prüfung überspringen (z.B. forcePlayerMode)
+--- Gibt true zurück wenn Item-Daten noch nicht gecacht (false positive besser als verpasstes Item).
+function GL.PopupFilterMatches(link, category, skipUsableCheck)
+    local f = GuildLootDB and GuildLootDB.settings and GuildLootDB.settings.announceFilter
+    if not f then return true end
+
+    -- Waffen: usable → immer zeigen; nicht-usable → nonUsableWeapon-Filter
+    if category == "weapons" then
+        if not skipUsableCheck then
+            local isUsable = IsUsableItem(link)
+            if isUsable ~= false then return true end   -- usable oder noch nicht gecacht → zeigen
+            return f.nonUsableWeapon ~= false            -- nicht-usable → Filter prüfen
+        end
+        return f.nonUsableWeapon ~= false
+    end
+
+    -- Trinkets haben eigenen Filter-Key
+    if category == "trinket" then return f.trinket ~= false end
+
+    -- Ring/Neck via equipLoc; Rüstungstyp via itemSubType.
+    -- IsUsableItem wird hier bewusst NICHT verwendet:
+    --   • Legacy-Items (z.B. Shadowlands in Midnight) sind auf fremden Clients oft nicht gecacht →
+    --     GetItemInfo liefert nil, IsUsableItem liefert false → fälschlicherweise blockiert.
+    --   • Die Checkbox-Filter (cloth/leather/mail/plate/other) sind die korrekte Steuerung.
+    local _, _, _, _, _, _, itemSubType, _, itemEquipLoc = GetItemInfo(link)
+    if itemEquipLoc == "INVTYPE_NECK"   then return f.neck    ~= false end
+    if itemEquipLoc == "INVTYPE_FINGER" then return f.ring    ~= false end
+    if itemSubType  == "Cloth"          then return f.cloth   ~= false end
+    if itemSubType  == "Leather"        then return f.leather ~= false end
+    if itemSubType  == "Mail"           then return f.mail    ~= false end
+    if itemSubType  == "Plate"          then return f.plate   ~= false end
+
+    -- Nicht klassifizierbar (Item noch nicht gecacht, Token, sonstiges) → other-Filter.
+    -- Absichtlich kein IsUsableItem-Check: false-positive (Item wird gezeigt obwohl nicht nutzbar)
+    -- ist besser als false-negative (Item wird nicht gezeigt obwohl der ML es announced hat).
+    return f.other ~= false
+end
+
 function GL.IsPlayerInGroup(name)
     if not name then return false end
     name = GL.ShortName(name)

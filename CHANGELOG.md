@@ -1,5 +1,24 @@
 # Changelog
 
+## v0.5.5.0-beta
+
+**New Features**
+- **Player Mode** — Raiders without Raid Assist or Raid Lead now get a dedicated Loot Popup instead of the full addon window. The popup appears automatically when the Master Looter announces an item.
+- **Loot Popup** — Shows the announced item with icon and colored link, five priority buttons (matching the current session config), and a Roll button that activates when the ML starts a roll phase. Clicking a priority button posts your priority to raid chat automatically.
+- **Announce Filter** — Each player can configure which item types trigger the popup: armor types (Cloth / Leather / Mail / Plate), non-equippable weapons, Trinkets, Rings, Necks, and Other. Usable weapons always appear regardless of the filter.
+- **Winner notification** — When the Master Looter assigns an item to you, the popup briefly shows "You receive: [Item]" before closing automatically after 6 seconds.
+- **Minimap button for Players** — In Player Mode the minimap button toggles the popup exclusively; the main window is never opened. A first click opens the popup in filter-only view for pre-configuration, a second click closes it.
+- **Priority name sync** — When the ML changes priority names and clicks Apply, the new names are broadcast to all raid members and update their popup buttons immediately.
+- **Enable checkbox** — A checkbox in the top-right corner of the popup controls whether it appears automatically on item announcements. Leaving it unset uses auto mode (on during a raid, off outside).
+- **Help panel** — The "i" button next to the enable checkbox opens a side panel describing what each announce filter does.
+
+**Bug Fixes**
+- Fixed an issue where the popup would not appear for non-ML players if an old `isMasterLooter = true` value was stuck in SavedVariables from a previous test session.
+- Fixed announce filter not working for legacy items (e.g. Shadowlands content on Midnight clients) whose item data had not yet been cached. The popup is now briefly deferred until the data arrives, then the filter is applied correctly.
+- Fixed priority buttons showing generic numbers instead of the session's configured names on clients that joined after the session started.
+- Fixed the minimap button sometimes opening the main window instead of the popup when in Player Mode.
+- Fixed the winner popup being immediately hidden because the item-clear event fired on the same frame as the win notification.
+
 ## v0.5.0.0-beta
 
 **New Features**

@@ -351,11 +351,59 @@ function UI.BuildSettingsPanel(parent)
             local session = db.raidContainers[db.activeContainerIdx]
             if session then
                 session.priorityConfig = CopyTable(db.settings.priorities or {})
-                GL.Print("[ReqRT] Priority config applied to current Raid Session.")
+                -- Neue Prio-Config an alle Raid-Mitglieder übertragen
+                if GL.Comm and GL.Comm.SendSessionStart then
+                    GL.Comm.SendSessionStart(session.id, session.label, session.startedAt, session.priorityConfig)
+                end
+                GL.Print("[ReqRT] Priority config applied and broadcast to raid.")
             end
         end
     end)
     y = y - 30
+
+    -- ── Sektion 5: Announce-Filter (Observer + Player) ───────────
+    -- Nur sichtbar wenn kein ML — steuert welche announced Items den Popup zeigen
+    if not GL.IsMasterLooter() then
+        y = y - 4
+        SectionHeader("Announce Filter")
+
+        -- 2-Spalten-Layout: links Rüstung, rechts Waffe/Schmuck/Rest
+        local afDefs = {
+            { key="cloth",           label="Cloth"              },
+            { key="nonUsableWeapon", label="non usable Weapons" },
+            { key="leather",         label="Leather"            },
+            { key="trinket",         label="Trinkets"           },
+            { key="mail",            label="Mail"               },
+            { key="ring",            label="Rings"              },
+            { key="plate",           label="Plate"              },
+            { key="neck",            label="Necks"              },
+            { key="other",           label="Other"              },
+        }
+        local function MakeAFCheck(labelText, key, col)
+            local cb = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
+            cb:SetSize(18, 18)
+            local xOff = (col == 1) and 20 or 160
+            cb:SetPoint("TOPLEFT", panel, "TOPLEFT", xOff, y)
+            cb.text:SetText(labelText)
+            cb.text:ClearAllPoints()
+            cb.text:SetPoint("LEFT", cb, "RIGHT", 2, 0)
+            local f = GuildLootDB.settings.announceFilter or {}
+            cb:SetChecked(f[key] ~= false)
+            cb:SetScript("OnClick", function(self)
+                if not GuildLootDB.settings.announceFilter then
+                    GuildLootDB.settings.announceFilter = {}
+                end
+                GuildLootDB.settings.announceFilter[key] = self:GetChecked()
+            end)
+            return cb
+        end
+        for i, def in ipairs(afDefs) do
+            local col = (i % 2 == 1) and 1 or 2
+            MakeAFCheck(def.label, def.key, col)
+            if col == 2 then y = y - 24 end
+        end
+        if #afDefs % 2 == 1 then y = y - 24 end
+    end
 
     -- Inhalt-Höhe anpassen damit ScrollFrame weiß wie weit er scrollen kann
     panel:SetHeight(math.abs(y) + 12)
