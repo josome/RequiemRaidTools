@@ -10,6 +10,8 @@ local UI = GL.UI
 -- ============================================================
 
 local popup          = nil   -- das Frame
+local helpPanel      = nil   -- Filter-Beschreibungs-Panel (links vom Popup)
+local enableCheck    = nil   -- Checkbox: Popup aktiviert/deaktiviert
 local selectedPrio   = nil   -- zuletzt geklickter Prio-Button-Index
 local prioButtons    = {}
 local rollBtn        = nil
@@ -17,14 +19,30 @@ local winnerLabel    = nil
 local filterChecks   = {}    -- { key = CheckButton }
 local autoCloseTimer = nil
 
+-- col/row = explizite Gitterposition (3 Spalten, 4 Zeilen)
+-- Spalte 0: Rüstungstypen | Spalte 1: Waffe/Schmuck | Spalte 2: Sonstiges
 local FILTER_DEFS = {
-    { key="cloth",   label="Cloth"   },
-    { key="leather", label="Leather" },
-    { key="mail",    label="Mail"    },
-    { key="plate",   label="Plate"   },
-    { key="jewelry", label="Jewelry" },
-    { key="weapon",  label="Weapon"  },
-    { key="other",   label="Other"   },
+    { key="cloth",           label="Cloth",              col=0, row=0 },
+    { key="leather",         label="Leather",            col=0, row=1 },
+    { key="mail",            label="Mail",               col=0, row=2 },
+    { key="plate",           label="Plate",              col=0, row=3 },
+    { key="nonUsableWeapon", label="non usable Weapons", col=1, row=0 },
+    { key="trinket",         label="Trinkets",           col=1, row=1 },
+    { key="ring",            label="Rings",              col=1, row=2 },
+    { key="neck",            label="Necks",              col=1, row=3 },
+    { key="other",           label="Other",              col=2, row=0 },
+}
+
+local FILTER_HELP = {
+    cloth           = "Cloth armor (Mage, Priest, Warlock...)",
+    leather         = "Leather armor (Druid, Rogue, Monk...)",
+    mail            = "Mail armor (Hunter, Shaman, Evoker...)",
+    plate           = "Plate armor (Warrior, Paladin, DK...)",
+    nonUsableWeapon = "Weapons your class cannot equip",
+    trinket         = "Trinkets",
+    ring            = "Rings",
+    neck            = "Neck pieces",
+    other           = "All other item types",
 }
 
 -- ============================================================
@@ -47,6 +65,73 @@ end
 local function ParseItemName(link)
     if not link then return "?" end
     return link:match("|h%[(.-)%]|h") or link:match("^%[(.-)%]$") or link
+end
+
+--- Gibt zurück ob das Popup aktiviert ist (nil = auto basierend auf Raid-Status).
+local function IsPopupEnabled()
+    local v = GuildLootDB and GuildLootDB.settings and GuildLootDB.settings.popupEnabled
+    if v == nil then return IsInRaid() end
+    return v
+end
+
+-- ============================================================
+-- Help-Panel aufbauen (einmalig)
+-- ============================================================
+
+local function BuildHelpPanel()
+    if helpPanel then return end
+
+    helpPanel = CreateFrame("Frame", "GuildLootPlayerHelpPanel", UIParent, "BackdropTemplate")
+    helpPanel:SetSize(230, 200)   -- Höhe wird dynamisch gesetzt beim Öffnen
+    helpPanel:SetFrameStrata("HIGH")
+    helpPanel:SetBackdrop({
+        bgFile   = "Interface\\DialogFrame\\UI-DialogBox-Background",
+        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+        tile = true, tileSize = 32, edgeSize = 32,
+        insets = { left=11, right=12, top=12, bottom=11 },
+    })
+    helpPanel:SetBackdropColor(0, 0, 0, 0.9)
+    helpPanel:Hide()
+
+    -- Titel
+    local title = helpPanel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    title:SetPoint("TOPLEFT", helpPanel, "TOPLEFT", 16, -12)
+    title:SetText("|cffffcc00Announce Filter|r")
+
+    -- Divider
+    local div = helpPanel:CreateTexture(nil, "BACKGROUND")
+    div:SetColorTexture(0.4, 0.4, 0.4, 1)
+    div:SetHeight(1)
+    div:SetPoint("TOPLEFT",  helpPanel, "TOPLEFT",  16, -28)
+    div:SetPoint("TOPRIGHT", helpPanel, "TOPRIGHT", -16, -28)
+
+    -- Filter-Beschreibungen
+    local y = -38
+    for _, def in ipairs(FILTER_DEFS) do
+        local nameLbl = helpPanel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        nameLbl:SetPoint("TOPLEFT", helpPanel, "TOPLEFT", 16, y)
+        nameLbl:SetText("|cffffcc00" .. def.label .. ":|r")
+
+        local descLbl = helpPanel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        descLbl:SetPoint("TOPLEFT", helpPanel, "TOPLEFT", 16, y - 13)
+        descLbl:SetPoint("TOPRIGHT", helpPanel, "TOPRIGHT", -16, y - 13)
+        descLbl:SetJustifyH("LEFT")
+        descLbl:SetTextColor(0.7, 0.7, 0.7)
+        descLbl:SetText(FILTER_HELP[def.key] or "")
+
+        y = y - 30
+    end
+
+    -- Hinweis unten
+    local hint = helpPanel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    hint:SetPoint("TOPLEFT",  helpPanel, "TOPLEFT",  16, y - 4)
+    hint:SetPoint("TOPRIGHT", helpPanel, "TOPRIGHT", -16, y - 4)
+    hint:SetJustifyH("LEFT")
+    hint:SetTextColor(0.5, 0.8, 0.5)
+    hint:SetText("Usable weapons always appear regardless of filter.")
+
+    -- Gesamthöhe setzen
+    helpPanel:SetHeight(-(y - 4) + 16 + 4)
 end
 
 -- ============================================================
@@ -146,13 +231,8 @@ local function BuildPopup()
         btn:SetScript("OnClick", function()
             if not btn:IsEnabled() then return end
             selectedPrio = i
-            -- Visuelles Feedback: gedrückter Button heller
             for j, b in ipairs(prioButtons) do
-                if j == i then
-                    b:SetAlpha(1.0)
-                else
-                    b:SetAlpha(0.6)
-                end
+                b:SetAlpha(j == i and 1.0 or 0.6)
             end
             local channel = IsInRaid() and "RAID" or (IsInGroup() and "PARTY") or "SAY"
             SendChatMessage(tostring(i), channel)
@@ -188,23 +268,61 @@ local function BuildPopup()
     winnerLabel:SetJustifyH("LEFT")
     winnerLabel:Hide()
 
-    -- Schließen-Button
+    -- ── Top-Right Button-Leiste: [✕ Close] [? Help] [☑ Enable] ──────────────
+
+    -- Schließen-Button (ganz rechts)
     local closeBtn = CreateFrame("Button", nil, popup, "UIPanelCloseButton")
     closeBtn:SetPoint("TOPRIGHT", popup, "TOPRIGHT", -2, -2)
-    closeBtn:SetScript("OnClick", function() popup:Hide() end)
+    closeBtn:SetScript("OnClick", function()
+        if helpPanel then helpPanel:Hide() end
+        popup:Hide()
+    end)
 
-    -- Announce-Filter Sektion
+    -- "?"-Button (links vom Close)
+    BuildHelpPanel()
+    local helpBtn = CreateFrame("Button", nil, popup, "UIPanelButtonTemplate")
+    helpBtn:SetSize(22, 22)
+    helpBtn:SetPoint("TOPRIGHT", popup, "TOPRIGHT", -28, -5)
+    helpBtn:SetText("i")
+    helpBtn:SetScript("OnClick", function()
+        if helpPanel:IsShown() then
+            helpPanel:Hide()
+        else
+            helpPanel:SetHeight(popup:GetHeight())
+            helpPanel:ClearAllPoints()
+            helpPanel:SetPoint("TOPLEFT", popup, "TOPRIGHT", 4, 0)
+            helpPanel:Show()
+        end
+    end)
+
+    -- Enable-Checkbox (links vom "?")
+    enableCheck = CreateFrame("CheckButton", nil, popup, "UICheckButtonTemplate")
+    enableCheck:SetSize(22, 22)
+    enableCheck:SetPoint("TOPRIGHT", popup, "TOPRIGHT", -52, -5)
+    enableCheck:SetScript("OnClick", function(self)
+        GuildLootDB.settings.popupEnabled = self:GetChecked()
+    end)
+    -- Tooltip für die Checkbox
+    enableCheck:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+        GameTooltip:AddLine("Popup enabled", 1, 1, 1)
+        GameTooltip:AddLine("Uncheck to suppress automatic\nloot announcements.", 0.7, 0.7, 0.7)
+        GameTooltip:Show()
+    end)
+    enableCheck:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    -- ── Announce-Filter Sektion ───────────────────────────────────────────────
+
     local filterLbl = popup:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     filterLbl:SetPoint("TOPLEFT", popup, "TOPLEFT", 16, -168)
     filterLbl:SetText("|cffaaaaaa Announce Filter:|r")
 
-    local colW = 100
-    for idx, def in ipairs(FILTER_DEFS) do
-        local col  = (idx - 1) % 3
-        local row  = math.floor((idx - 1) / 3)
-        local cb   = CreateFrame("CheckButton", nil, popup, "UICheckButtonTemplate")
+    local COL_X = { [0]=0, [1]=110, [2]=260 }
+    local maxRow = 0
+    for _, def in ipairs(FILTER_DEFS) do
+        local cb = CreateFrame("CheckButton", nil, popup, "UICheckButtonTemplate")
         cb:SetSize(20, 20)
-        cb:SetPoint("TOPLEFT", popup, "TOPLEFT", 16 + col * colW, -182 - row * 22)
+        cb:SetPoint("TOPLEFT", popup, "TOPLEFT", 16 + COL_X[def.col], -182 - def.row * 22)
         local lbl = cb:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         lbl:SetPoint("LEFT", cb, "RIGHT", 2, 0)
         lbl:SetText(def.label)
@@ -213,11 +331,11 @@ local function BuildPopup()
             if f then f[def.key] = self:GetChecked() end
         end)
         filterChecks[def.key] = cb
+        if def.row > maxRow then maxRow = def.row end
     end
 
     -- Frame-Höhe an Filter anpassen
-    local rows = math.ceil(#FILTER_DEFS / 3)
-    popup:SetHeight(190 + rows * 22 + 10)
+    popup:SetHeight(190 + (maxRow + 1) * 22 + 10)
 end
 
 -- ============================================================
@@ -231,12 +349,28 @@ local function RefreshFilterChecks()
     end
 end
 
+local function RefreshEnableCheck()
+    if enableCheck then
+        enableCheck:SetChecked(IsPopupEnabled())
+    end
+end
+
 -- ============================================================
 -- Public API
 -- ============================================================
 
 --- Popup anzeigen wenn ITEM_ON empfangen (Observer + Player).
+--- Respektiert popupEnabled-Setting — gibt sofort zurück wenn deaktiviert.
 function UI.ShowPlayerPopup(link, category)
+    -- Guard: popupEnabled prüfen (nil = auto)
+    local s = GuildLootDB and GuildLootDB.settings
+    if s then
+        if s.popupEnabled == nil then
+            s.popupEnabled = IsInRaid()
+        end
+        if not s.popupEnabled then return end
+    end
+
     BuildPopup()
     CancelAutoClose()
 
@@ -263,7 +397,7 @@ function UI.ShowPlayerPopup(link, category)
     -- Prio-Buttons auffrischen (dynamische Breite basierend auf Text)
     local cfg = GetPrioCfg()
     local MIN_BTN_W = 56
-    local BTN_PAD   = 16  -- Padding links+rechts innerhalb Button
+    local BTN_PAD   = 16
     local BTN_GAP   = 4
     local xOff = 16
     for i, btn in ipairs(prioButtons) do
@@ -280,7 +414,7 @@ function UI.ShowPlayerPopup(link, category)
         btn:SetPoint("TOPLEFT", popup, "TOPLEFT", xOff, -98)
         xOff = xOff + btnW + BTN_GAP
     end
-    -- Frame-Breite an Buttons anpassen (Buttons + rechter Rand 16px)
+    -- Frame-Breite an Buttons anpassen
     local requiredW = math.max(340, xOff - BTN_GAP + 16)
     popup:SetWidth(requiredW)
 
@@ -292,6 +426,7 @@ function UI.ShowPlayerPopup(link, category)
     winnerLabel:Hide()
 
     RefreshFilterChecks()
+    RefreshEnableCheck()
     popup:Show()
 end
 
@@ -299,6 +434,7 @@ end
 function UI.HidePlayerPopup()
     if popup then
         CancelAutoClose()
+        if helpPanel then helpPanel:Hide() end
         popup:Hide()
     end
 end
@@ -312,6 +448,7 @@ function UI.EnablePlayerPopupRoll()
 end
 
 --- Filter-Only-Ansicht: Popup ohne aktives Item zeigen (Dock-Klick im Player-Mode).
+--- Ignoriert popupEnabled — manuelles Öffnen funktioniert immer.
 function UI.ShowPlayerPopupFilterOnly()
     BuildPopup()
     CancelAutoClose()
@@ -325,6 +462,7 @@ function UI.ShowPlayerPopupFilterOnly()
     winnerLabel:Hide()
 
     RefreshFilterChecks()
+    RefreshEnableCheck()
     popup:Show()
 end
 
@@ -342,6 +480,7 @@ function UI.ShowPlayerPopupWin(link)
 
     -- Auto-Close nach 6 Sekunden
     autoCloseTimer = C_Timer.NewTimer(6, function()
+        if helpPanel then helpPanel:Hide() end
         popup:Hide()
         autoCloseTimer = nil
     end)

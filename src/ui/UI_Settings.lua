@@ -363,14 +363,17 @@ function UI.BuildSettingsPanel(parent)
         y = y - 4
         SectionHeader("Announce Filter")
 
+        -- 2-Spalten-Layout: links Rüstung, rechts Waffe/Schmuck/Rest
         local afDefs = {
-            { key="cloth",   label="Cloth"   },
-            { key="leather", label="Leather" },
-            { key="mail",    label="Mail"    },
-            { key="plate",   label="Plate"   },
-            { key="jewelry", label="Jewelry" },
-            { key="weapon",  label="Weapon"  },
-            { key="other",   label="Other"   },
+            { key="cloth",           label="Cloth"              },
+            { key="nonUsableWeapon", label="non usable Weapons" },
+            { key="leather",         label="Leather"            },
+            { key="trinket",         label="Trinkets"           },
+            { key="mail",            label="Mail"               },
+            { key="ring",            label="Rings"              },
+            { key="plate",           label="Plate"              },
+            { key="neck",            label="Necks"              },
+            { key="other",           label="Other"              },
         }
         local function MakeAFCheck(labelText, key, col)
             local cb = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")

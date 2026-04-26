@@ -1,10 +1,10 @@
--- GuildLoot – UI_SpielerTab.lua
--- Spieler-Tab: Build + Refresh
+-- GuildLoot – UI_PlayerTab.lua
+-- Player-Tab: Build + Refresh
 
 local GL = GuildLoot
 local UI = GL.UI
 
-local TAB_SPIELER = UI.TAB_SPIELER
+local TAB_PLAYER = UI.TAB_PLAYER
 local ColorDiff   = UI._H.ColorDiff
 
 -- ============================================================
@@ -42,7 +42,7 @@ end
 -- Spieler-Panel bauen
 -- ============================================================
 
-function UI.BuildSpielerPanel(parent)
+function UI.BuildPlayerPanel(parent)
     local panel = CreateFrame("Frame", nil, parent)
     panel:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, 0)
     panel:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", 0, 0)
@@ -69,7 +69,7 @@ function UI.BuildSpielerPanel(parent)
     div:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -4, -22)
 
     -- Scroll-Bereich
-    local scroll = CreateFrame("ScrollFrame", "GuildLootSpielerScroll", panel, "UIPanelScrollFrameTemplate")
+    local scroll = CreateFrame("ScrollFrame", "GuildLootPlayerScroll", panel, "UIPanelScrollFrameTemplate")
     scroll:SetPoint("TOPLEFT", div, "BOTTOMLEFT", 0, -2)
     scroll:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -26, 4)
     local content = CreateFrame("Frame", nil, scroll)
@@ -166,14 +166,14 @@ end
 -- Spieler-Tab Refresh
 -- ============================================================
 
-function UI.RefreshSpielerTab()
-    if UI.activeTab ~= TAB_SPIELER then return end
-    if not UI.spielerPanel or not UI.spielerPanel.content then return end
+function UI.RefreshPlayerTab()  -- war: RefreshSpielerTab
+    if UI.activeTab ~= TAB_PLAYER then return end
+    if not UI.playerPanel or not UI.playerPanel.content then return end
 
-    local scroll = UI.spielerPanel.scroll
+    local scroll = UI.playerPanel.scroll
     local w = scroll and scroll:GetWidth() or 0
     if w > 10 then
-        UI.spielerPanel.content:SetWidth(w)
+        UI.playerPanel.content:SetWidth(w)
     end
 
     for _, r in ipairs(playerRows) do r:Hide() end
@@ -182,8 +182,8 @@ function UI.RefreshSpielerTab()
     local participants = GuildLootDB.currentRaid.participants
     local absent       = GuildLootDB.currentRaid.absent
     local players      = GuildLootDB.players
-    local colW         = UI.spielerPanel.colW
-    local content      = UI.spielerPanel.content
+    local colW         = UI.playerPanel.colW
+    local content      = UI.playerPanel.content
 
     local yOff     = 0
     local zebraIdx = 0   -- separater Zähler für Zebra (Sub-Rows sollen Parity nicht brechen)
@@ -220,7 +220,7 @@ function UI.RefreshSpielerTab()
         toggleBtn:SetHighlightTexture("Interface\\Buttons\\UI-PlusButton-Hilight")
         toggleBtn:SetScript("OnClick", function()
             expandedPlayers[fullName] = not expandedPlayers[fullName]
-            UI.RefreshSpielerTab()
+            UI.RefreshPlayerTab()
         end)
         xOff = xOff + 16 + 4
 

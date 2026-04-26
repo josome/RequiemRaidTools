@@ -25,26 +25,27 @@ Player Mode ist die UI-Ebene für normale Raider ohne Raid-Assist oder Raid-Lead
 Wenn der Master Looter ein Item freigegeben hat (announced), erscheint automatisch ein **Loot-Popup**:
 
 ```
-┌─────────────────────────────────────────┐
-│  [Icon] Itemname (farbig)               │
-├─────────────────────────────────────────┤
-│  [BIS]  [OS]  [---]  [---]  [Tmog]     │
-│   ← Prio-Buttons (inaktive grau) →      │
-├─────────────────────────────────────────┤
-│  [🎲 Roll]  (aktiv wenn Roll-Phase)     │
-├─────────────────────────────────────────┤
-│  Announce-Filter:                        │
-│  ☑ Stoff   ☑ Leder   ☑ Kette           │
-│  ☑ Platte  ☑ Schmuck ☑ Waffe           │
-│  ☑ Sonstiges                            │
-└─────────────────────────────────────────┘
+┌───────────────────────────────────────────┐
+│  [Icon] Itemname (farbig)                 │
+├───────────────────────────────────────────┤
+│  [1 BIS]  [2 OS]  [---]  [---]  [5 Tmog]  │
+│   ← Prio-Buttons (inaktive grau) →        │
+├───────────────────────────────────────────┤
+│  [Roll]  (aktiv wenn Roll-Phase)          │
+├───────────────────────────────────────────┤
+│  Announce-Filter:                         │
+│  ☑ Cloth   ☑ non usable Weapons  ☑ Other│
+│  ☑ Leather ☑ Trinkets                    │
+│  ☑ Mail    ☑ Rings                       │
+│  ☑ Plate   ☑ Necks                       |
+└───────────────────────────────────────────┘
 ```
 
 ### Prio-Buttons
 
-- Die 5 Buttons zeigen die Kurznamen aus der aktuellen Raid-Session-Konfiguration (z.B. "BIS", "OS", "Tmog").
+- Die 5 Buttons zeigen die Kurznamen und die Prio Nummer der aktuellen Raid-Session-Konfiguration (z.B. "BIS", "OS", "Tmog").
 - **Inaktive Prios** (vom ML nicht aktiviert) sind ausgegraut und nicht klickbar.
-- Ein Klick postet die Priorität automatisch in den Raid-Chat — exakt wie wenn der Spieler manuell `/1`, `/2` etc. schreibt.
+- Ein Klick postet die Priorität automatisch in den Raid-Chat — exakt wie wenn der Spieler manuell `/ra 1`, `/ra 2` etc. schreibt.
 - Der zuletzt geklickte Button bleibt visuell markiert.
 
 ### Roll-Button
@@ -76,9 +77,11 @@ Der **Announce-Filter** steuert, für welche Item-Typen das Loot-Popup überhaup
 | Leder | Items mit Rüstungstyp Leather |
 | Kette | Items mit Rüstungstyp Mail |
 | Platte | Items mit Rüstungstyp Plate |
-| Schmuck | Trinkets, Ringe, Ketten |
-| Waffe | Alle Waffen |
-| Sonstiges | Alles andere (inkl. nicht-zuordenbare Items) |
+| non usable Weapons | filtert alle Waffen raus die der Spieler nicht verwenden kann |
+| Trinkets | Schmuckstücke |
+| Rings | Ringe |
+| Necks | Halsketten |
+| Other | Alles andere (inkl. nicht-zuordenbare Items) |
 
 **Token-Erkennung:** Ob ein Token für die eigene Klasse relevant ist, prüft das Addon via `IsUsableItem()` — dieselbe API die WoW intern nutzt um Items grau darzustellen. Omni-Token (für alle Klassen nutzbar) erscheinen entsprechend bei allen.
 

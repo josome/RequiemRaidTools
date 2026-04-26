@@ -61,14 +61,17 @@ local DB_DEFAULTS = {
             [5] = { active=false, shortName="",          description="" },
         },
         announceFilter = {
-            cloth   = true,
-            leather = true,
-            mail    = true,
-            plate   = true,
-            jewelry = true,
-            weapon  = true,
-            other   = true,
+            cloth           = true,
+            leather         = true,
+            mail            = true,
+            plate           = true,
+            nonUsableWeapon = true,   -- Waffen die der Spieler nicht ausrüsten kann
+            trinket         = true,
+            ring            = true,
+            neck            = true,
+            other           = true,
         },
+        popupEnabled = nil,   -- nil = auto (Raid=an, Gruppe/Solo=aus); true/false = explizit
     },
 }
 
