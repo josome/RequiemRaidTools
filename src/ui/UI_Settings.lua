@@ -351,7 +351,11 @@ function UI.BuildSettingsPanel(parent)
             local session = db.raidContainers[db.activeContainerIdx]
             if session then
                 session.priorityConfig = CopyTable(db.settings.priorities or {})
-                GL.Print("[ReqRT] Priority config applied to current Raid Session.")
+                -- Neue Prio-Config an alle Raid-Mitglieder übertragen
+                if GL.Comm and GL.Comm.SendSessionStart then
+                    GL.Comm.SendSessionStart(session.id, session.label, session.startedAt, session.priorityConfig)
+                end
+                GL.Print("[ReqRT] Priority config applied and broadcast to raid.")
             end
         end
     end)

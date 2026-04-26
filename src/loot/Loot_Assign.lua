@@ -8,8 +8,22 @@ local Loot = GL.Loot
 -- Referenz auf gemeinsamen currentItem-Zustand (gleiche Tabelle wie in Loot.lua)
 local currentItem = Loot.GetCurrentItem()
 
--- Item das noch auf GetItemInfo wartet (modul-lokal, nur hier benötigt)
+-- Item das noch auf GetItemInfo wartet (ML-seitig, ReleaseItem-Deferred)
 local pendingActivation = nil
+
+-- Popup das auf GetItemInfo wartet bevor der Filter ausgewertet werden kann (Observer-seitig)
+local pendingPopupActivation = nil
+
+-- Verzögerter OnCommItemClear-Timer nach Gewinner-Anzeige (6,5s)
+local pendingClearTimer = nil
+
+--- Bricht den verzögerten Clear-Timer ab (z.B. wenn Gewinner ✕ drückt).
+function Loot.CancelPendingClear()
+    if pendingClearTimer then
+        pendingClearTimer:Cancel()
+        pendingClearTimer = nil
+    end
+end
 
 -- Laufende Prio- und Roll-Timer abbrechen (ohne Roll-State zurückzusetzen)
 local function CancelCurrentTimers()
@@ -89,6 +103,21 @@ function Loot.ReleaseItem(itemLink)
 end
 
 function Loot.OnItemInfoReceived(itemID)
+    -- Handle pendingPopupActivation (Popup zurückgehalten weil Item-Daten fehlten)
+    if pendingPopupActivation then
+        local pid = tonumber(pendingPopupActivation.link:match("item:(%d+)"))
+        if pid == itemID then
+            local link     = pendingPopupActivation.link
+            local category = pendingPopupActivation.category
+            pendingPopupActivation = nil
+            if GL.UI and GL.UI.ShowPlayerPopup then
+                if GL.PopupFilterMatches and GL.PopupFilterMatches(link, category) then
+                    GL.UI.ShowPlayerPopup(link, category)
+                end
+            end
+        end
+    end
+
     -- Handle pendingActivation (ReleaseItem deferred)
     if pendingActivation then
         local storedID = tonumber(pendingActivation:match("item:(%d+)"))
@@ -413,9 +442,22 @@ function Loot.OnCommItemActivate(link, category)
         table.insert(pl, { link = link, name = name, itemID = itemID, quality = 0, category = category })
     end
     if GL.UI and GL.UI.RefreshLootTab then GL.UI.RefreshLootTab() end
+
+    -- Popup: Filter erst auswerten wenn Item-Daten gecacht sind.
+    -- Bei Legacy-Items (z.B. Shadowlands in Midnight) liefert GetItemInfo nil → subType unbekannt
+    -- → Filter kann Rüstungstyp nicht erkennen. Deshalb: wenn nicht gecacht, auf
+    -- GET_ITEM_INFO_RECEIVED warten und dann erneut prüfen.
     if GL.UI and GL.UI.ShowPlayerPopup then
-        if GL.PopupFilterMatches(link, category) then
-            GL.UI.ShowPlayerPopup(link, category)
+        local _, _, _, _, _, _, itemSubType = GetItemInfo(link)
+        if itemSubType ~= nil then
+            -- Item-Daten sofort verfügbar → Filter direkt auswerten
+            if GL.PopupFilterMatches and GL.PopupFilterMatches(link, category) then
+                GL.UI.ShowPlayerPopup(link, category)
+            end
+        else
+            -- Noch nicht gecacht → Laden anstoßen, Popup zurückhalten
+            pendingPopupActivation = { link = link, category = category }
+            GetItemInfo(link)  -- löst asynchrones Laden aus
         end
     end
 end
@@ -423,6 +465,7 @@ end
 --- ML hat Item abgebrochen → Observer leeren Anzeige
 function Loot.OnCommItemClear()
     if GL.IsMasterLooter() then return end
+    pendingPopupActivation = nil  -- zurückgehaltenes Popup verwerfen
     -- Item aus lokaler pendingLoot entfernen
     local link = currentItem.link
     if link then
@@ -480,12 +523,23 @@ function Loot.OnCommAssign(playerName, diff, link, category, quality, winnerPrio
         })
     end
     -- Gewinner-Popup für den lokalen Spieler
+    local isWinner = false
     if GL.UI and GL.UI.ShowPlayerPopupWin then
         local myShort = GL.ShortName(UnitName("player") or "")
         if GL.ShortName(playerName) == myShort then
             GL.UI.ShowPlayerPopupWin(link or "")
+            isWinner = true
         end
     end
-    Loot.OnCommItemClear()
+    -- OnCommItemClear ruft HidePlayerPopup auf — beim Gewinner erst nach dem auto-close
+    -- des Popups aufrufen (6s), damit die Gewinnermeldung sichtbar bleibt.
+    if isWinner then
+        pendingClearTimer = C_Timer.NewTimer(6.5, function()
+            pendingClearTimer = nil
+            Loot.OnCommItemClear()
+        end)
+    else
+        Loot.OnCommItemClear()
+    end
     if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
 end

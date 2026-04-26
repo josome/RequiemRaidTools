@@ -67,7 +67,7 @@ local function ParseItemName(link)
     return link:match("|h%[(.-)%]|h") or link:match("^%[(.-)%]$") or link
 end
 
---- Gibt zurück ob das Popup aktiviert ist (nil = auto basierend auf Raid-Status).
+--- Gibt zurück ob das Popup aktiviert ist (nil = auto: Raid → an, sonst aus).
 local function IsPopupEnabled()
     local v = GuildLootDB and GuildLootDB.settings and GuildLootDB.settings.popupEnabled
     if v == nil then return IsInRaid() end
@@ -274,8 +274,14 @@ local function BuildPopup()
     local closeBtn = CreateFrame("Button", nil, popup, "UIPanelCloseButton")
     closeBtn:SetPoint("TOPRIGHT", popup, "TOPRIGHT", -2, -2)
     closeBtn:SetScript("OnClick", function()
+        -- Verzögerten Clear-Timer abbrechen falls Gewinner-Popup früh geschlossen wird
+        if GL.Loot and GL.Loot.CancelPendingClear then GL.Loot.CancelPendingClear() end
         if helpPanel then helpPanel:Hide() end
         popup:Hide()
+        -- minimized zurücksetzen damit Toggle() beim nächsten Minimap-Klick korrekt öffnet
+        if GuildLootDB and GuildLootDB.settings then
+            GuildLootDB.settings.minimized = true
+        end
     end)
 
     -- "?"-Button (links vom Close)
@@ -362,13 +368,15 @@ end
 --- Popup anzeigen wenn ITEM_ON empfangen (Observer + Player).
 --- Respektiert popupEnabled-Setting — gibt sofort zurück wenn deaktiviert.
 function UI.ShowPlayerPopup(link, category)
-    -- Guard: popupEnabled prüfen (nil = auto)
+    -- Guard: popupEnabled prüfen (nil = auto, NICHT speichern)
+    -- forcePlayerMode überspringt den Guard (Dev-Test)
     local s = GuildLootDB and GuildLootDB.settings
-    if s then
-        if s.popupEnabled == nil then
-            s.popupEnabled = IsInRaid()
+    if s and not s.forcePlayerMode then
+        local enabled = s.popupEnabled
+        if enabled == nil then
+            enabled = IsInRaid()  -- auto: Raid → an, Gruppe/Solo → aus
         end
-        if not s.popupEnabled then return end
+        if not enabled then return end
     end
 
     BuildPopup()
@@ -434,6 +442,8 @@ end
 function UI.HidePlayerPopup()
     if popup then
         CancelAutoClose()
+        -- Verzögerten Clear-Timer abbrechen falls Gewinner-Popup früh geschlossen wird
+        if GL.Loot and GL.Loot.CancelPendingClear then GL.Loot.CancelPendingClear() end
         if helpPanel then helpPanel:Hide() end
         popup:Hide()
     end

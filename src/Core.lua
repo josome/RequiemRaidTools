@@ -363,6 +363,10 @@ function GL.ResumeContainer(ci)
     if GL.Comm and GL.Comm.SendSessionStart then
         GL.Comm.SendSessionStart(session.id, session.label or "", session.startedAt or 0)
     end
+    -- Falls wir der ML sind, unsere Rolle ankündigen
+    if GL.IsMasterLooter() and GL.Comm and GL.Comm.SendMLAnnounce then
+        GL.Comm.SendMLAnnounce(UnitName("player") or "")
+    end
     if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
 end
 
@@ -609,6 +613,10 @@ function GL.StartRaid(tier)
     GL.LoadRaidRoster()
     raid.mlName = NormalizeName(UnitName("player")) or ""
     GuildLootDB.settings.isMasterLooter = true
+    -- ML-Rolle an alle Raid-Mitglieder ankündigen (damit niemand mit altem isMasterLooter=true im SavedVariables hängt)
+    if GL.Comm and GL.Comm.SendMLAnnounce then
+        GL.Comm.SendMLAnnounce(UnitName("player") or "")
+    end
     -- Create raidMeta entry and broadcast RAID_META
     GL.EnsureRaidMeta()
     GL.Print("Raid started: " .. raid.tier .. ". " .. #raid.participants .. " players loaded.")
@@ -654,6 +662,9 @@ end
 function GL.OnCommSessionStart(sessionID, label, startedAt, sender, prioCfg)
     local myName = GL.NormalizeName(UnitName("player") or "") or ""
     if GL.NormalizeName(sender or "") == myName then return end
+    -- Wir empfangen eine Session von jemand anderem → wir sind definitiv nicht der ML.
+    -- Verhindert dass ein alter isMasterLooter=true aus den SavedVariables hängt.
+    GuildLootDB.settings.isMasterLooter = false
     local db = GuildLootDB
     for i, s in ipairs(db.raidContainers or {}) do
         if s.id == sessionID then
@@ -1238,6 +1249,11 @@ SlashCmdList["REQUIEMRAIDTOOLS"] = function(input)
             end
         else
             GL.Print("|cffff4444Kein equippables Item in den Taschen gefunden.|r")
+        end
+
+    elseif cmd == "popup" then
+        if GL.UI and GL.UI.ShowPlayerPopupFilterOnly then
+            GL.UI.ShowPlayerPopupFilterOnly()
         end
 
     elseif cmd == "playermode" then

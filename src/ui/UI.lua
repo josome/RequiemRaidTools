@@ -641,6 +641,17 @@ end
 -- ============================================================
 
 function UI.Toggle()
+    -- Player Mode: nur das Popup togglen, niemals das Hauptfenster öffnen
+    if GL.IsPlayerMode() then
+        if GuildLootDB.settings.minimized then
+            UI.Undock()  -- → ShowPlayerPopupFilterOnly, setzt minimized = false
+        else
+            if UI.HidePlayerPopup then UI.HidePlayerPopup() end
+            GuildLootDB.settings.minimized = true
+        end
+        return
+    end
+
     if GuildLootDB.settings.minimized then
         UI.Undock()
     elseif mainFrame and mainFrame:IsShown() then
