@@ -50,9 +50,9 @@ Erledigte Items werden mit zwei Checkboxen markiert:
 
 - Prio 4 erledigt: [x] getestet: [ ] Prio wird dem Observer nicht übertragen — im Session Log des Observers fehlt mit welcher Prio ein Item gewonnen wurde
 
-- erledigt: [] getestet: [] auto trade funktioniert nicht zuverlässig, item klebt am mauszeiger (eventuell)
-- erledigt: [] getestet: [] Curios erscheinen beim observer in pending loot, beim ML dafür nicht
-- erledigt: [] getestet: [] der OBS bekommt keinen session loot, -> lootlog leer :(
+- erledigt: [x] getestet: [x] auto trade funktioniert nicht zuverlässig, item klebt am mauszeiger (eventuell)
+- erledigt: [x] getestet: [] Curios erscheinen beim observer in pending loot, beim ML dafür nicht
+- erledigt: [x] getestet: [] der OBS bekommt keinen session loot, -> lootlog leer :(
 
 ## Lua Errors
 

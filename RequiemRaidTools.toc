@@ -1,8 +1,8 @@
 ## Interface: 120005
 ## Title: RequiemRaidTools
-## Notes: Strukturierte Raid-Loot-Verteilung fuer Gilden-Offiziere und Raid-Leader. Prio-System, automatische Roll-Auswertung und Echtzeit-Sync zwischen allen Raid-Mitgliedern.
+## Notes: Structured raid loot distribution for guild officers and raid leaders. Priority system, automatic roll evaluation and real-time sync between all raid members.
 ## Category: Raid
-## Version: 0.5.5.0-beta
+## Version: 0.5.5.3-beta
 ## SavedVariables: GuildLootDB GuildLootDBBackup
 ## OptionalDeps: WoWUnit
 ## X-Curse-Project-ID: 1502142
@@ -27,3 +27,4 @@ src/tests/Probe_Test.lua
 src/tests/Comm_Test.lua
 src/tests/Assign_Test.lua
 src/tests/Session_Test.lua
+src/tests/Filter_Test.lua

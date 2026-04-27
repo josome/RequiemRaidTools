@@ -33,7 +33,6 @@ local DB_DEFAULTS = {
         postToChat     = true,
         chatChannel    = "AUTO",   -- "AUTO", "RAID", "PARTY", "OFF"
         isMasterLooter = false,
-        dungeonMode    = false,
         minQuality     = 4,
         prioSeconds    = 15,
         rollSeconds    = 15,
@@ -196,6 +195,9 @@ function GL.InitDB()
     end
     MigrateCurrentRaidLegacy()
     MigrateRaidFormat()
+    -- Transient: nie aus SavedVariables übernehmen
+    GuildLootDB.settings.isMasterLooter = false
+    GuildLootDB.settings.dungeonMode    = nil
 end
 
 function GL.CreatePlayerRecord(name)

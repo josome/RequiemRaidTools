@@ -210,7 +210,6 @@ end
 function GL.IsMasterLooter()
     if not GuildLootDB or not GuildLootDB.settings then return false end
     if GuildLootDB.settings.isMasterLooter == true then return true end
-    if GuildLootDB.settings.dungeonMode    == true then return true end
     -- Auto: solo in einer Raid-Instanz (Legacy-Farming etc.)
     local _, instanceType = GetInstanceInfo()
     if instanceType == "raid" and not IsInGroup() then return true end
