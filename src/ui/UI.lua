@@ -11,7 +11,7 @@ local UI = GL.UI
 -- ============================================================
 
 local FRAME_W, FRAME_H = 720, 560
-local TAB_LOOT, TAB_PLAYER, TAB_LOG, TAB_RAID = 1, 2, 3, 4
+local TAB_LOOT, TAB_PLAYER, TAB_LOG, TAB_RAID, TAB_ROLL = 1, 2, 3, 4, 5
 UI.TAB_LOOT = TAB_LOOT
 local DIFF_COLORS = { N = "|cff1eff00", H = "|cff0070dd", M = "|cffff8000" }
 
@@ -20,6 +20,7 @@ UI.TAB_LOOT   = TAB_LOOT
 UI.TAB_PLAYER = TAB_PLAYER
 UI.TAB_LOG    = TAB_LOG
 UI.TAB_RAID   = TAB_RAID
+UI.TAB_ROLL   = TAB_ROLL
 
 -- ============================================================
 -- Hilfsfunktionen
@@ -135,9 +136,13 @@ function UI.BuildMainFrame()
     resizeGrip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
     resizeGrip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
     local resizeStartW, resizeStartH = FRAME_W, FRAME_H
+    local resizeStartX, resizeStartY = 0, 0
     resizeGrip:SetScript("OnMouseDown", function()
         resizeStartW = mainFrame:GetWidth()
         resizeStartH = mainFrame:GetHeight()
+        -- Position VOR StartSizing sichern — danach ändert WoW intern den Anker
+        resizeStartX = mainFrame:GetLeft()
+        resizeStartY = mainFrame:GetTop() - UIParent:GetTop()
         mainFrame:StartSizing("BOTTOMRIGHT")
     end)
     resizeGrip:SetScript("OnMouseUp", function()
@@ -148,10 +153,8 @@ function UI.BuildMainFrame()
         if math.abs(w - resizeStartW) < 16 and math.abs(h - resizeStartH) < 16 then
             w, h = resizeStartW, resizeStartH
         end
-        local x = mainFrame:GetLeft()
-        local y = mainFrame:GetTop() - UIParent:GetTop()
         mainFrame:ClearAllPoints()
-        mainFrame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", x, y)
+        mainFrame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", resizeStartX, resizeStartY)
         mainFrame:SetSize(w, h)
         UI.SavePosition()
     end)
@@ -291,7 +294,7 @@ function UI.BuildMainFrame()
     contentFrame:SetPoint("BOTTOMRIGHT", mainFrame, "BOTTOMRIGHT", -4, 42)
 
     -- Tab-Buttons
-    local tabNames = { "Loot", "Players", "Log", "Raid" }
+    local tabNames = { "Loot", "Players", "Log", "Raid", "Roll" }
     for i, name in ipairs(tabNames) do
         local tb = CreateFrame("Button", "GuildLootMainFrameTab" .. i, mainFrame, "CharacterFrameTabTemplate")
         tb:SetScript("OnLoad", nil)
@@ -312,10 +315,11 @@ function UI.BuildMainFrame()
     end
 
     -- Panels (in je eigener Datei definiert)
-    UI.lootPanel    = UI.BuildLootPanel(contentFrame)
+    UI.lootPanel   = UI.BuildLootPanel(contentFrame)
     UI.playerPanel = UI.BuildPlayerPanel(contentFrame)
-    UI.logPanel     = UI.BuildLogPanel(contentFrame)
-    UI.raidPanel    = UI.BuildRaidPanel(contentFrame)
+    UI.logPanel    = UI.BuildLogPanel(contentFrame)
+    UI.raidPanel   = UI.BuildRaidPanel(contentFrame)
+    UI.rollPanel   = UI.BuildRollTab(contentFrame)
 
     -- Settings-Panel
     settingsPanel = UI.BuildSettingsPanel(UIParent)
@@ -535,7 +539,7 @@ function UI.ShowStartupTab()
         UI.ShowTab(TAB_RAID)
     else
         local last = GuildLootDB.settings.lastTab
-        if last and last >= TAB_LOOT and last <= TAB_RAID then
+        if last and last >= TAB_LOOT and last <= TAB_ROLL then
             UI.ShowTab(last)
         else
             UI.ShowTab(TAB_LOOT)
@@ -550,6 +554,7 @@ function UI.ShowTab(tabID)
     UI.playerPanel:Hide()
     UI.logPanel:Hide()
     if UI.raidPanel then UI.raidPanel:Hide() end
+    if UI.rollPanel then UI.rollPanel:Hide() end
 
     for i, tb in ipairs(tabButtons) do
         if i == tabID then
@@ -571,6 +576,8 @@ function UI.ShowTab(tabID)
     elseif tabID == TAB_RAID then
         if UI.raidPanel then UI.raidPanel:Show() end
         UI.RefreshRaidTab()
+    elseif tabID == TAB_ROLL then
+        if UI.rollPanel then UI.rollPanel:Show() end
     end
 end
 
@@ -604,10 +611,14 @@ function UI.Refresh()
     if not mainFrame then return end
     UI.RefreshSessionBar()
     UI.RefreshMLButton()
-    if UI.activeTab == TAB_LOOT    then UI.RefreshLootTab()    end
+    if UI.activeTab == TAB_LOOT   then UI.RefreshLootTab()   end
     if UI.activeTab == TAB_PLAYER then UI.RefreshPlayerTab() end
-    if UI.activeTab == TAB_LOG     then UI.RefreshLogTab()     end
-    if UI.activeTab == TAB_RAID    then UI.RefreshRaidTab()    end
+    if UI.activeTab == TAB_LOG    then UI.RefreshLogTab()    end
+    if UI.activeTab == TAB_RAID   then UI.RefreshRaidTab()   end
+end
+
+function UI.IsMainFrameShown()
+    return mainFrame and mainFrame:IsShown()
 end
 
 function UI.RefreshMLButton()

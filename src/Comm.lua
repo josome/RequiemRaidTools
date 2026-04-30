@@ -125,13 +125,16 @@ function Comm.SendSessionEnd(sessionID, closedAt)
 end
 
 --- ML broadcastet raidMeta (nach Boss-Kill oder Late-Joiner-Push)
-function Comm.SendRaidMeta(sessionID, raidID, meta)
-    local parts = table.concat(meta.participants or {}, ",")
+--- @param prioCfg table|nil  aktuelle Prio-Config der Session (optional, Feld 9)
+function Comm.SendRaidMeta(sessionID, raidID, meta, prioCfg)
+    local parts  = table.concat(meta.participants or {}, ",")
+    local cfgStr = prioCfg and SerializePrioCfg(prioCfg) or ""
     SendToGroup("RAID_META" .. SEP .. (sessionID or "") .. SEP .. (raidID or "")
                            .. SEP .. (meta.tier or "") .. SEP .. (meta.difficulty or "")
                            .. SEP .. tostring(meta.startedAt or 0)
                            .. SEP .. tostring(meta.closedAt or 0)
-                           .. SEP .. parts)
+                           .. SEP .. parts
+                           .. SEP .. cfgStr)
 end
 
 --- ML schickt komplette Session an einen bestimmten Observer (Late-Join-Sync via Whisper)
@@ -258,8 +261,9 @@ local function HandleRaidMeta(parts, sender)
             table.insert(participants, p)
         end
     end
+    local prioCfg = (parts[9] and parts[9] ~= "") and DeserializePrioCfg(parts[9]) or nil
     local meta = { tier=tier, difficulty=diff, startedAt=startedAt, closedAt=closedAt, participants=participants }
-    if GL.OnCommRaidMeta then GL.OnCommRaidMeta(sessionID, raidID, meta) end
+    if GL.OnCommRaidMeta then GL.OnCommRaidMeta(sessionID, raidID, meta, prioCfg) end
 end
 
 local function HandleLootTrash(parts, sender)

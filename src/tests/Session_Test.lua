@@ -68,6 +68,8 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
             },
             unassignedRaids    = {},
         }
+        -- StartContainer sendet seit v0.5.5.5 ML_ANNOUNCE → stub damit kein Netzwerkpaket rausgeht
+        Mock(GuildLoot.Comm, "SendMLAnnounce", function() end)
         local ok, err = pcall(fn)
         GuildLootDB = origDB
         if not ok then error(err, 2) end
@@ -446,6 +448,118 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
     end
 
     -- --------------------------------------------------------
+    -- testBroadcastSessionStartObserverChain
+    -- Prüft: StartContainer → SendSessionStart (RAID-Broadcast) →
+    --        Observer empfängt via OnMessage → Session offen
+    -- --------------------------------------------------------
+    function Tests:testBroadcastSessionStartObserverChain()
+        WithTestDB(function()
+            local Comm = GuildLoot.Comm
+
+            -- ML-Seite: alle RAID-Broadcasts abfangen
+            local sentMsgs = {}
+            Mock(C_ChatInfo, "SendAddonMessage", function(_, msg)
+                table.insert(sentMsgs, msg)
+            end)
+            Mock(Comm, "_isInRaid",  function() return true end)
+            Mock(Comm, "_isInGroup", function() return true end)
+            Mock(GuildLoot,    "Print",   function() end)
+            Mock(GuildLoot.UI, "Refresh", function() end)
+
+            GuildLoot.StartContainer("BroadcastTest")
+            MockRestore()
+
+            -- SESSION_START-Nachricht heraussuchen
+            local sessionMsg = nil
+            for _, msg in ipairs(sentMsgs) do
+                if msg:find("SESSION_START", 1, true) then
+                    sessionMsg = msg; break
+                end
+            end
+            Exists(sessionMsg)
+
+            -- Observer-Seite: sauberer DB-Zustand
+            local origContainers = GuildLootDB.raidContainers
+            local origActive     = GuildLootDB.activeContainerIdx
+            GuildLootDB.raidContainers     = {}
+            GuildLootDB.activeContainerIdx = nil
+            GuildLootDB.settings.isMasterLooter = false
+            Mock(GuildLoot.UI, "Refresh", function() end)
+            Mock(GuildLoot,    "Print",   function() end)
+
+            Comm.OnMessage(sessionMsg, "FakeML-Realm")
+            MockRestore()
+
+            AreEqual(1,               #GuildLootDB.raidContainers)
+            AreEqual(1,               GuildLootDB.activeContainerIdx)
+            AreEqual("BroadcastTest", GuildLootDB.raidContainers[1].label)
+            IsFalse(GuildLootDB.settings.isMasterLooter)
+
+            GuildLootDB.raidContainers     = origContainers
+            GuildLootDB.activeContainerIdx = origActive
+        end)
+    end
+
+    -- --------------------------------------------------------
+    -- testRaidMetaAppliesPrioConfig
+    -- Prüft: OnCommRaidMeta schreibt prioCfg in raidContainers[idx].priorityConfig
+    -- --------------------------------------------------------
+    function Tests:testRaidMetaAppliesPrioConfig()
+        WithTestDB(function()
+            GuildLootDB.settings.isMasterLooter = false
+            Mock(GuildLoot,    "IsMasterLooter", function() return false end)
+            Mock(GuildLoot.UI, "Refresh",        function() end)
+
+            GuildLootDB.raidContainers     = { { id="sess-1", label="X", startedAt=1,
+                                                 lootLog={}, trashedLoot={}, raidMeta={},
+                                                 priorityConfig=nil } }
+            GuildLootDB.activeContainerIdx = 1
+
+            local cfg = {
+                [1] = { active=true,  shortName="BiS",  description="Best in Slot" },
+                [2] = { active=true,  shortName="Upgr", description="Upgrade" },
+                [3] = { active=false, shortName="",     description="" },
+                [4] = { active=false, shortName="",     description="" },
+                [5] = { active=false, shortName="",     description="" },
+            }
+            local meta = { tier="T", difficulty="H", startedAt=100, closedAt=nil, participants={} }
+            GuildLoot.OnCommRaidMeta("sess-1", "raid-1", meta, cfg)
+
+            local stored = GuildLootDB.raidContainers[1].priorityConfig
+            Exists(stored)
+            AreEqual("BiS",  stored[1].shortName)
+            IsTrue(stored[1].active)
+            AreEqual("Upgr", stored[2].shortName)
+            IsTrue(stored[2].active)
+            IsFalse(stored[3].active)
+
+            MockRestore()
+        end)
+    end
+
+    -- --------------------------------------------------------
+    -- testRaidQuerySendsMLAnnounce
+    -- Prüft: nach SESSION_SYNC-Whisper sendet ML auch ML_ANNOUNCE an die Gruppe
+    -- --------------------------------------------------------
+    function Tests:testRaidQuerySendsMLAnnounce()
+        WithTestDB(function()
+            GuildLootDB.raidContainers     = { { id="sess-1", label="X", startedAt=1,
+                                                 lootLog={}, trashedLoot={}, raidMeta={} } }
+            GuildLootDB.activeContainerIdx = 1
+
+            Mock(_G,             "UnitAffectingCombat", function() return nil end)
+            Mock(GuildLoot,      "IsMasterLooter",      function() return true end)
+            Mock(GuildLoot.Comm, "SendSessionSync",     function() end)
+            local announceArgs = nil
+            Mock(GuildLoot.Comm, "SendMLAnnounce", function(name) announceArgs = name end)
+
+            GuildLoot.OnCommRaidQuery("Observer-Realm", false)
+
+            Exists(announceArgs)
+            MockRestore()
+        end)
+    end
+
     -- testRaidQueryCombatGate
     -- Prüft: ML queued RAID_QUERY im Kampf statt sofort SendSessionSync aufzurufen
     -- --------------------------------------------------------
@@ -461,14 +575,14 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
             local syncCalled = false
             Mock(GuildLoot.Comm, "SendSessionSync",     function() syncCalled = true end)
 
-            GL._pendingSyncRequests = nil
+            GuildLoot._pendingSyncRequests = nil
             GuildLoot.OnCommRaidQuery("Observer-Realm", false)
 
             IsFalse(syncCalled)
-            Exists(GL._pendingSyncRequests)
-            IsTrue(GL._pendingSyncRequests["Observer-Realm"] == true)
+            Exists(GuildLoot._pendingSyncRequests)
+            IsTrue(GuildLoot._pendingSyncRequests["Observer-Realm"] == true)
 
-            GL._pendingSyncRequests = nil
+            GuildLoot._pendingSyncRequests = nil
             MockRestore()
         end)
     end

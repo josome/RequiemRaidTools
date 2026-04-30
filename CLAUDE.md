@@ -23,6 +23,8 @@
 
 ## Protokoll-Versionierung
 - Die Minor-Version (`0.X.y.z`) ist die Protokoll-Version. `MIN_PROTO_MINOR` in `src/Comm.lua` nur erhöhen wenn das Nachrichtenformat inkompatibel geändert wird (Felder hinzugefügt/entfernt/umsortiert). Bewusste Entscheidung bei jedem Minor-Version-Bump.
+- Bei jeder Änderung an `src/Comm.lua` (neues Telegramm, Felder geändert, Sender/Empfänger geändert) **muss** `docs/COMM_PROTOCOL.md` synchron aktualisiert werden — Größenangabe, Format-Zeile, Felder-Tabelle und ggf. die "Bekannte Einschränkungen"-Tabelle.
+- Wiki-Spiegelung: https://github.com/josome/RequiemRaidTools/wiki/COMM-Protokoll — der User pflegt das Wiki manuell aus `docs/COMM_PROTOCOL.md`.
 
 ## Projekt-Konventionen
 - Slash-Commands: `/reqrt` und `/requiemraidtools` — NICHT `/rlt`

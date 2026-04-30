@@ -11,8 +11,8 @@ local currentItem = Loot.GetCurrentItem()
 -- Item das noch auf GetItemInfo wartet (ML-seitig, ReleaseItem-Deferred)
 local pendingActivation = nil
 
--- Popup das auf GetItemInfo wartet bevor der Filter ausgewertet werden kann (Observer-seitig)
-local pendingPopupActivation = nil
+-- Popup + Roll-Tab die auf GetItemInfo warten bevor der Filter ausgewertet werden kann (Observer-seitig)
+local pendingObserverActivation = nil
 
 -- Verzögerter OnCommItemClear-Timer nach Gewinner-Anzeige (6,5s)
 local pendingClearTimer = nil
@@ -103,17 +103,16 @@ function Loot.ReleaseItem(itemLink)
 end
 
 function Loot.OnItemInfoReceived(itemID)
-    -- Handle pendingPopupActivation (Popup zurückgehalten weil Item-Daten fehlten)
-    if pendingPopupActivation then
-        local pid = tonumber(pendingPopupActivation.link:match("item:(%d+)"))
+    -- Handle pendingObserverActivation (Popup + Roll-Tab zurückgehalten weil Item-Daten fehlten)
+    if pendingObserverActivation then
+        local pid = tonumber(pendingObserverActivation.link:match("item:(%d+)"))
         if pid == itemID then
-            local link     = pendingPopupActivation.link
-            local category = pendingPopupActivation.category
-            pendingPopupActivation = nil
-            if GL.UI and GL.UI.ShowPlayerPopup then
-                if GL.PopupFilterMatches and GL.PopupFilterMatches(link, category) then
-                    GL.UI.ShowPlayerPopup(link, category)
-                end
+            local link     = pendingObserverActivation.link
+            local category = pendingObserverActivation.category
+            pendingObserverActivation = nil
+            if GL.PopupFilterMatches and GL.PopupFilterMatches(link, category) then
+                if GL.UI and GL.UI.ShowPlayerPopup then GL.UI.ShowPlayerPopup(link, category) end
+                if GL.UI and GL.UI.UpdateRollTab   then GL.UI.UpdateRollTab(link, category)   end
             end
         end
     end
@@ -452,11 +451,12 @@ function Loot.OnCommItemActivate(link, category)
         if itemSubType ~= nil then
             -- Item-Daten sofort verfügbar → Filter direkt auswerten
             if GL.PopupFilterMatches and GL.PopupFilterMatches(link, category) then
-                GL.UI.ShowPlayerPopup(link, category)
+                if GL.UI.ShowPlayerPopup then GL.UI.ShowPlayerPopup(link, category) end
+                if GL.UI.UpdateRollTab   then GL.UI.UpdateRollTab(link, category)   end
             end
         else
-            -- Noch nicht gecacht → Laden anstoßen, Popup zurückhalten
-            pendingPopupActivation = { link = link, category = category }
+            -- Noch nicht gecacht → Laden anstoßen, beide zurückhalten
+            pendingObserverActivation = { link = link, category = category }
             GetItemInfo(link)  -- löst asynchrones Laden aus
         end
     end
@@ -465,7 +465,7 @@ end
 --- ML hat Item abgebrochen → Observer leeren Anzeige
 function Loot.OnCommItemClear()
     if GL.IsMasterLooter() then return end
-    pendingPopupActivation = nil  -- zurückgehaltenes Popup verwerfen
+    pendingObserverActivation = nil  -- zurückgehaltenes Popup/Roll-Tab verwerfen
     -- Item aus lokaler pendingLoot entfernen
     local link = currentItem.link
     if link then
@@ -481,8 +481,9 @@ function Loot.OnCommItemClear()
     currentItem.winner     = nil
     currentItem.prioState  = { active = false, timeLeft = 0, timer = nil }
     currentItem.rollState  = { active = false, players  = {}, results = {}, timer = nil, timeLeft = 0 }
-    if GL.UI and GL.UI.RefreshLootTab then GL.UI.RefreshLootTab() end
+    if GL.UI and GL.UI.RefreshLootTab  then GL.UI.RefreshLootTab()  end
     if GL.UI and GL.UI.HidePlayerPopup then GL.UI.HidePlayerPopup() end
+    if GL.UI and GL.UI.ClearRollTab    then GL.UI.ClearRollTab()    end
 end
 
 --- ML hat Loot zugewiesen → Observer aktualisiert Session-Log
@@ -522,14 +523,13 @@ function Loot.OnCommAssign(playerName, diff, link, category, quality, winnerPrio
             raidID     = raidID or db.currentRaid.id or "",
         })
     end
-    -- Gewinner-Popup für den lokalen Spieler
+    -- Gewinner-Anzeige für den lokalen Spieler
     local isWinner = false
-    if GL.UI and GL.UI.ShowPlayerPopupWin then
-        local myShort = GL.ShortName(UnitName("player") or "")
-        if GL.ShortName(playerName) == myShort then
-            GL.UI.ShowPlayerPopupWin(link or "")
-            isWinner = true
-        end
+    local myShort = GL.ShortName(UnitName("player") or "")
+    if GL.ShortName(playerName) == myShort then
+        isWinner = true
+        if GL.UI and GL.UI.ShowPlayerPopupWin then GL.UI.ShowPlayerPopupWin(link or "") end
+        if GL.UI and GL.UI.ShowRollTabWin     then GL.UI.ShowRollTabWin(link or "")     end
     end
     -- OnCommItemClear ruft HidePlayerPopup auf — beim Gewinner erst nach dem auto-close
     -- des Popups aufrufen (6s), damit die Gewinnermeldung sichtbar bleibt.

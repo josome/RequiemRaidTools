@@ -399,8 +399,7 @@ function UI.ShowPlayerPopup(link, category)
     end
 
     -- Item-Name farbig
-    local itemName = ParseItemName(link)
-    popup.linkLabel:SetText("|cffA335EE" .. itemName .. "|r")
+    popup.linkLabel:SetText(GL.ColoredItemName(link))
 
     -- Prio-Buttons auffrischen (dynamische Breite basierend auf Text)
     local cfg = GetPrioCfg()
@@ -482,9 +481,8 @@ function UI.ShowPlayerPopupWin(link)
     BuildPopup()
     CancelAutoClose()
 
-    local itemName = ParseItemName(link)
     rollBtn:Hide()
-    winnerLabel:SetText("|cff00ff00You receive:|r " .. "|cffA335EE" .. itemName .. "|r")
+    winnerLabel:SetText("|cff00ff00You receive:|r " .. GL.ColoredItemName(link))
     winnerLabel:Show()
     popup:Show()
 

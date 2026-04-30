@@ -299,6 +299,11 @@ function GL.StartContainer(label)
     table.insert(db.raidContainers, session)
     db.activeContainerIdx = #db.raidContainers
     GL.Print("Session gestartet: " .. finalLabel)
+    -- Wer die Session startet, ist automatisch ML
+    db.settings.isMasterLooter = true
+    if GL.Comm and (IsInRaid() or IsInGroup()) then
+        GL.Comm.SendMLAnnounce(UnitName("player") or "")
+    end
     if GL.Comm and GL.Comm.SendSessionStart then
         GL.Comm.SendSessionStart(session.id, finalLabel, ts, session.priorityConfig)
     end
@@ -396,7 +401,7 @@ function GL.EnsureRaidMeta()
         end
         session.raidMeta[id] = meta
         if GL.IsMasterLooter() and GL.Comm and GL.Comm.SendRaidMeta then
-            GL.Comm.SendRaidMeta(session.id, id, meta)
+            GL.Comm.SendRaidMeta(session.id, id, meta, session.priorityConfig)
         end
     end
 end
@@ -700,12 +705,15 @@ function GL.OnCommSessionEnd(sessionID, closedAt)
 end
 
 --- Observer: empfängt RAID_META vom ML (neuer Boss-Kill / neuer Raid-Kontext).
-function GL.OnCommRaidMeta(sessionID, raidID, meta)
+function GL.OnCommRaidMeta(sessionID, raidID, meta, prioCfg)
     local db = GuildLootDB
     for _, s in ipairs(db.raidContainers or {}) do
         if s.id == sessionID then
             if not s.raidMeta[raidID] then
                 s.raidMeta[raidID] = meta
+            end
+            if prioCfg then
+                s.priorityConfig = prioCfg
             end
             -- currentRaid-Kontext auf neueste raidMeta setzen
             local cr = db.currentRaid
@@ -738,6 +746,9 @@ function GL.OnCommRaidQuery(sender, inCombat)
     local session = db.raidContainers[db.activeContainerIdx]
     if GL.Comm and GL.Comm.SendSessionSync then
         GL.Comm.SendSessionSync(session, sender)
+    end
+    if GL.Comm and GL.Comm.SendMLAnnounce then
+        GL.Comm.SendMLAnnounce(UnitName("player") or "")
     end
 end
 
@@ -1074,6 +1085,9 @@ local function OnEventEncounterEnd(encounterID, encounterName, difficultyID, gro
                 cr.startedAt  = cr.startedAt ~= 0 and cr.startedAt or time()
             end
             GL.EnsureRaidMeta()
+            if GL.Comm and GL.Comm.SendMLAnnounce then
+                GL.Comm.SendMLAnnounce(UnitName("player") or "")
+            end
             if GL.UI and GL.UI.AutoExpand then C_Timer.After(0, GL.UI.AutoExpand) end
         end
     end

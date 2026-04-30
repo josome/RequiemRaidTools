@@ -485,6 +485,19 @@ function GL.ExportMultiCSV(raidsList)
     return table.concat(parts, "\n")
 end
 
+--- Item-Namen farbig nach Qualität (für UI-Anzeige).
+--- Fallback auf Episch-Lila wenn Item-Daten noch nicht im Cache sind.
+function GL.ColoredItemName(link)
+    if not link then return "?" end
+    local name = link:match("|h%[(.-)%]|h") or link:match("^%[(.-)%]$") or link
+    local _, _, quality = GetItemInfo(link)
+    if quality then
+        local r, g, b = GetItemQualityColor(quality)
+        return string.format("|cff%02x%02x%02x", r * 255, g * 255, b * 255) .. name .. "|r"
+    end
+    return "|cffA335EE" .. name .. "|r"
+end
+
 --- Exportiert mehrere Raids als JSON-Array.
 function GL.ExportMultiJSON(raidsList)
     return JsonVal({
