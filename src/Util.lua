@@ -471,25 +471,16 @@ function GL.ExportCSV(raidData)
     return table.concat(lines, "\n")
 end
 
---- Exportiert mehrere Raids als einen CSV-String (ein gemeinsamer Header).
-function GL.ExportMultiCSV(raidsList)
-    local parts = {}
-    for i, raid in ipairs(raidsList) do
-        local csv = GL.ExportCSV(raid)
-        if i > 1 then
-            -- Header-Zeile entfernen
-            csv = csv:match("^[^\n]*\n(.*)$") or ""
-        end
-        if csv ~= "" then table.insert(parts, csv) end
+--- Item-Namen farbig nach Qualität (für UI-Anzeige).
+--- Fallback auf Episch-Lila wenn Item-Daten noch nicht im Cache sind.
+function GL.ColoredItemName(link)
+    if not link then return "?" end
+    local name = link:match("|h%[(.-)%]|h") or link:match("^%[(.-)%]$") or link
+    local _, _, quality = GetItemInfo(link)
+    if quality then
+        local r, g, b = GetItemQualityColor(quality)
+        return string.format("|cff%02x%02x%02x", r * 255, g * 255, b * 255) .. name .. "|r"
     end
-    return table.concat(parts, "\n")
+    return "|cffA335EE" .. name .. "|r"
 end
 
---- Exportiert mehrere Raids als JSON-Array.
-function GL.ExportMultiJSON(raidsList)
-    return JsonVal({
-        exportedAt = GL.FormatTimestamp(time()),
-        raids      = raidsList,
-        players    = GuildLootDB.players,
-    }, {})
-end

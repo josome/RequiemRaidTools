@@ -325,7 +325,10 @@ function UI.BuildLootPanel(parent)
         if each < 20 then return end
         resultScroll:SetHeight(each)
     end
-    main:HookScript("OnSizeChanged", function() C_Timer.After(0, equalizeScrolls) end)
+    main:HookScript("OnSizeChanged", function()
+        C_Timer.After(0, equalizeScrolls)
+        C_Timer.After(0, UI.RefreshSessionLoot)
+    end)
     panel:HookScript("OnShow",       function() C_Timer.After(0, equalizeScrolls) end)
 
     return panel

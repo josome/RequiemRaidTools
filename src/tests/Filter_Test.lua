@@ -75,12 +75,14 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
         MockRestore()
     end
 
-    -- Ruft OnCommItemActivate auf und gibt zurück ob ShowPlayerPopup aufgerufen wurde.
+    -- Ruft OnCommItemActivate auf und gibt zurück ob Popup/Roll-Tab aufgerufen wurden.
+    -- Beide müssen identisches Verhalten zeigen (gleicher Filter, gleicher Stale-Guard).
     local function Run(category)
-        local called = false
-        Mock(GL.UI, "ShowPlayerPopup", function() called = true end)
+        local popupCalled, rollTabCalled = false, false
+        Mock(GL.UI, "ShowPlayerPopup", function() popupCalled   = true end)
+        Mock(GL.UI, "UpdateRollTab",   function() rollTabCalled = true end)
         Loot.OnCommItemActivate(FAKE, category)
-        return called
+        return popupCalled, rollTabCalled
     end
 
     -- --------------------------------------------------------
@@ -90,49 +92,56 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
     function Tests:testNone()
         Setup(nil)
         MockItem("Cloth", "INVTYPE_CHEST")
-        IsTrue(Run("armor"))
+        local p, rt = Run("armor")
+        IsTrue(p); IsTrue(rt)
         Teardown()
     end
 
     function Tests:testCloth()
         Setup({ cloth = false })
         MockItem("Cloth", "INVTYPE_CHEST")
-        IsFalse(Run("armor"))
+        local p, rt = Run("armor")
+        IsFalse(p); IsFalse(rt)
         Teardown()
     end
 
     function Tests:testLeather()
         Setup({ leather = false })
         MockItem("Leather", "INVTYPE_CHEST")
-        IsFalse(Run("armor"))
+        local p, rt = Run("armor")
+        IsFalse(p); IsFalse(rt)
         Teardown()
     end
 
     function Tests:testMail()
         Setup({ leather = false })
         MockItem("Mail", "INVTYPE_CHEST")
-        IsTrue(Run("armor"))
+        local p, rt = Run("armor")
+        IsTrue(p); IsTrue(rt)
         Teardown()
     end
 
     function Tests:testPlate()
         Setup({ plate = false })
         MockItem("Plate", "INVTYPE_CHEST")
-        IsFalse(Run("armor"))
+        local p, rt = Run("armor")
+        IsFalse(p); IsFalse(rt)
         Teardown()
     end
 
     function Tests:testTrinket()
         Setup({ trinket = false })
         MockItem("Gem", nil)  -- subType non-nil; category="trinket" → PopupFilterMatches prüft f.trinket
-        IsFalse(Run("trinket"))
+        local p, rt = Run("trinket")
+        IsFalse(p); IsFalse(rt)
         Teardown()
     end
 
     function Tests:testTrinketOn()
         Setup({})
         MockItem("Gem", nil)
-        IsTrue(Run("trinket"))
+        local p, rt = Run("trinket")
+        IsTrue(p); IsTrue(rt)
         Teardown()
     end
 
@@ -140,7 +149,8 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
         Setup({ nonUsableWeapon = false })
         MockItem("Sword", nil)
         MockUsable(true)
-        IsTrue(Run("weapons"))
+        local p, rt = Run("weapons")
+        IsTrue(p); IsTrue(rt)
         Teardown()
     end
 
@@ -148,35 +158,40 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
         Setup({ nonUsableWeapon = false })
         MockItem("Sword", nil)
         MockUsable(false)
-        IsFalse(Run("weapons"))
+        local p, rt = Run("weapons")
+        IsFalse(p); IsFalse(rt)
         Teardown()
     end
 
     function Tests:testNeck()
         Setup({ neck = false })
         MockItem("Plate", "INVTYPE_NECK")
-        IsFalse(Run("armor"))
+        local p, rt = Run("armor")
+        IsFalse(p); IsFalse(rt)
         Teardown()
     end
 
     function Tests:testRing()
         Setup({ ring = false })
         MockItem("Plate", "INVTYPE_FINGER")
-        IsFalse(Run("armor"))
+        local p, rt = Run("armor")
+        IsFalse(p); IsFalse(rt)
         Teardown()
     end
 
     function Tests:testOther()
         Setup({ other = false })
         MockItem("Token", nil)  -- kein bekannter subType/equipLoc → other-Fallback
-        IsFalse(Run("armor"))
+        local p, rt = Run("armor")
+        IsFalse(p); IsFalse(rt)
         Teardown()
     end
 
     function Tests:testStale()
         Setup({})
-        Mock(_G, "GetItemInfo", function() return nil end)  -- nicht gecacht → kein Popup sofort
-        IsFalse(Run("armor"))
+        Mock(_G, "GetItemInfo", function() return nil end)  -- nicht gecacht → weder Popup noch Roll-Tab sofort
+        local p, rt = Run("armor")
+        IsFalse(p); IsFalse(rt)
         Teardown()
     end
 end)

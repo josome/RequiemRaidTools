@@ -349,6 +349,64 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
     end
 
     -- --------------------------------------------------------
+    -- RAID_META mit PrioConfig Roundtrip
+    -- Prüft: prioCfg wird serialisiert, übertragen und korrekt deserialisiert
+    -- --------------------------------------------------------
+    function Tests:testRaidMetaWithPrioConfig()
+        local args = nil
+        Mock(GuildLoot, "OnCommRaidMeta", function(...) args = {...} end)
+
+        local cfg = {
+            [1] = { active=true,  shortName="BiS",  description="Best in Slot" },
+            [2] = { active=true,  shortName="Upgr", description="Upgrade" },
+            [3] = { active=false, shortName="",     description="" },
+            [4] = { active=false, shortName="",     description="" },
+            [5] = { active=false, shortName="",     description="" },
+        }
+        local meta = { tier="Nerub-ar Palace", difficulty="H", startedAt=1700000000, closedAt=nil, participants={} }
+        local msg = Roundtrip(function()
+            Comm.SendRaidMeta("sess-01", "raid-99", meta, cfg)
+        end)
+
+        Exists(msg)
+        Comm.OnMessage(msg, "MockSender-Realm")
+
+        Exists(args)
+        AreEqual("sess-01", args[1])
+        AreEqual("raid-99", args[2])
+        local receivedCfg = args[4]
+        Exists(receivedCfg)
+        AreEqual("BiS",  receivedCfg[1].shortName)
+        IsTrue(receivedCfg[1].active)
+        AreEqual("Upgr", receivedCfg[2].shortName)
+        IsTrue(receivedCfg[2].active)
+        IsFalse(receivedCfg[3].active)
+        MockRestore()
+    end
+
+    -- --------------------------------------------------------
+    -- RAID_META ohne PrioConfig (Backward-Compat)
+    -- Prüft: fehlendes Feld 9 → prioCfg = nil, kein Crash
+    -- --------------------------------------------------------
+    function Tests:testRaidMetaWithoutPrioConfig()
+        local args = nil
+        Mock(GuildLoot, "OnCommRaidMeta", function(...) args = {...} end)
+
+        local meta = { tier="Nerub-ar Palace", difficulty="H", startedAt=1700000000, closedAt=nil, participants={} }
+        local msg = Roundtrip(function()
+            Comm.SendRaidMeta("sess-01", "raid-99", meta, nil)  -- kein prioCfg
+        end)
+
+        Exists(msg)
+        Comm.OnMessage(msg, "MockSender-Realm")
+
+        Exists(args)
+        AreEqual("sess-01", args[1])
+        IsFalse(args[4])  -- prioCfg = nil
+        MockRestore()
+    end
+
+    -- --------------------------------------------------------
     -- ML_DENY Roundtrip
     -- Prüft: claimantName kommt korrekt an
     -- --------------------------------------------------------

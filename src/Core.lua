@@ -182,6 +182,9 @@ local function MigrateRaidFormat()
     end
 end
 
+--- Initialisiert GuildLootDB mit Defaults falls Felder fehlen. Einmalig beim Login.
+--- Writes: db.players, db.raidContainers, db.activeContainerIdx,
+---         db.unassignedRaids, db.currentRaid, db.settings, db.raidHistory
 function GL.InitDB()
     if not GuildLootDB then GuildLootDB = {} end
     BackupDB()
@@ -200,6 +203,9 @@ function GL.InitDB()
     GuildLootDB.settings.dungeonMode    = nil
 end
 
+--- Legt einen neuen Spieler-Eintrag an falls noch nicht vorhanden.
+--- Reads:  db.players
+--- Writes: db.players[name]
 function GL.CreatePlayerRecord(name)
     if not GuildLootDB.players[name] then
         GuildLootDB.players[name] = DefaultPlayerRecord()
@@ -210,7 +216,9 @@ end
 -- Session (Container) System
 -- ============================================================
 
---- Alte raidHistory-Einträge in unassignedRaids verschieben (einmalige Migration).
+--- Migriert veraltetes db.raidHistory in db.unassignedRaids (einmalig).
+--- Reads:  db.raidHistory
+--- Writes: db.unassignedRaids, db.raidHistory
 function GL.MigrateRaidHistory()
     local db = GuildLootDB
     for _, snap in ipairs(db.raidHistory or {}) do
@@ -223,7 +231,10 @@ function GL.MigrateRaidHistory()
     end
 end
 
---- Unassigned Raid in eine Session verschieben.
+--- Verschiebt einen unassigned Raid-Snapshot in eine Session.
+--- Reads:  db.unassignedRaids, db.raidContainers
+--- Writes: db.raidContainers[ci].raidMeta, db.raidContainers[ci].lootLog,
+---         db.raidContainers[ci].trashedLoot, db.unassignedRaids
 function GL.AssignUnassignedToSession(unassignedIdx, ci)
     local db      = GuildLootDB
     local snap    = (db.unassignedRaids or {})[unassignedIdx]
@@ -259,7 +270,8 @@ function GL.AssignUnassignedToSession(unassignedIdx, ci)
     table.remove(db.unassignedRaids, unassignedIdx)
 end
 
---- Timestamp des letzten EU-Weekly-Resets (Mittwoch 07:00 Systemzeit).
+--- Gibt den Timestamp des letzten EU-Weekly-Resets zurück (Mittwoch 07:00).
+--- Pure — kein Zugriff auf globalen State.
 function GL.GetLastWeeklyReset()
     local now         = time()
     local weekday     = tonumber(date("%w", now))        -- 0=So…6=Sa
@@ -273,7 +285,13 @@ function GL.GetLastWeeklyReset()
     return resetTs
 end
 
---- Neue Session starten.
+--- Erstellt eine neue Raid-Session und setzt sie als aktiv.
+--- Reads:  db.activeContainerIdx, db.settings.priorities, db.currentRaid.tier
+--- Writes: db.raidContainers, db.activeContainerIdx, db.settings.isMasterLooter,
+---         db.currentRaid.participants (via LoadRaidRoster, falls Bosskills vorangingen),
+---         db.raidContainers[i].raidMeta (via EnsureRaidMeta, falls Bosskills vorangingen)
+--- Sends:  Comm.SendMLAnnounce, Comm.SendSessionStart,
+---         Comm.SendRaidMeta (via EnsureRaidMeta, falls Bosskills vorangingen)
 function GL.StartContainer(label)
     local db = GuildLootDB
     if db.activeContainerIdx then
@@ -299,13 +317,28 @@ function GL.StartContainer(label)
     table.insert(db.raidContainers, session)
     db.activeContainerIdx = #db.raidContainers
     GL.Print("Session gestartet: " .. finalLabel)
+    -- Wer die Session startet, ist automatisch ML
+    db.settings.isMasterLooter = true
+    -- Falls bereits Bosskills stattgefunden haben (currentRaid.tier gesetzt durch ENCOUNTER_END),
+    -- raidMeta-Eintrag retroaktiv anlegen und broadcasten.
+    if (IsInRaid() or IsInGroup()) and db.currentRaid.tier ~= "" then
+        GL.LoadRaidRoster()
+        GL.EnsureRaidMeta()
+    end
+    if GL.Comm and (IsInRaid() or IsInGroup()) then
+        GL.Comm.SendMLAnnounce(UnitName("player") or "")
+    end
     if GL.Comm and GL.Comm.SendSessionStart then
         GL.Comm.SendSessionStart(session.id, finalLabel, ts, session.priorityConfig)
     end
     if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
 end
 
---- Offene Session schließen.
+--- Schließt die aktive Session.
+--- Reads:  db.activeContainerIdx, db.raidContainers, db.currentRaid.id
+--- Writes: db.raidContainers[i].raidMeta[id].closedAt, db.raidContainers[i].closedAt,
+---         db.activeContainerIdx, db.currentRaid (via ResetCurrentRaid)
+--- Sends:  Comm.SendSessionEnd
 function GL.CloseContainer()
     local db = GuildLootDB
     if not db.activeContainerIdx then return end
@@ -330,7 +363,12 @@ function GL.CloseContainer()
     if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
 end
 
---- Geschlossene Session wieder öffnen.
+--- Öffnet eine geschlossene Session wieder.
+--- Reads:  db.activeContainerIdx, db.raidContainers[ci].raidMeta
+--- Writes: db.activeContainerIdx, db.raidContainers[ci].closedAt,
+---         db.currentRaid.id, db.currentRaid.tier, db.currentRaid.difficulty,
+---         db.currentRaid.startedAt, db.currentRaid.participants
+--- Sends:  Comm.SendSessionStart, Comm.SendMLAnnounce
 function GL.ResumeContainer(ci)
     local db = GuildLootDB
     if db.activeContainerIdx then
@@ -363,7 +401,7 @@ function GL.ResumeContainer(ci)
     end
     GL.Print("Session fortgesetzt: " .. (session.label or "?"))
     if GL.Comm and GL.Comm.SendSessionStart then
-        GL.Comm.SendSessionStart(session.id, session.label or "", session.startedAt or 0)
+        GL.Comm.SendSessionStart(session.id, session.label or "", session.startedAt or 0, session.priorityConfig)
     end
     -- Falls wir der ML sind, unsere Rolle ankündigen
     if GL.IsMasterLooter() and GL.Comm and GL.Comm.SendMLAnnounce then
@@ -372,7 +410,10 @@ function GL.ResumeContainer(ci)
     if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
 end
 
---- Stellt sicher dass raidMeta[currentRaid.id] existiert; legt es beim ersten Bosskill an.
+--- Legt raidMeta-Eintrag für currentRaid an falls noch nicht vorhanden.
+--- Reads:  db.activeContainerIdx, db.raidContainers, db.currentRaid
+--- Writes: db.raidContainers[i].raidMeta[currentRaid.id]
+--- Sends:  Comm.SendRaidMeta (nur wenn IsMasterLooter)
 function GL.EnsureRaidMeta()
     local db = GuildLootDB
     if not db.activeContainerIdx then return end
@@ -396,12 +437,13 @@ function GL.EnsureRaidMeta()
         end
         session.raidMeta[id] = meta
         if GL.IsMasterLooter() and GL.Comm and GL.Comm.SendRaidMeta then
-            GL.Comm.SendRaidMeta(session.id, id, meta)
+            GL.Comm.SendRaidMeta(session.id, id, meta, session.priorityConfig)
         end
     end
 end
 
---- currentRaid-Kontext zurücksetzen (neue ID, alles leeren).
+--- Setzt db.currentRaid auf leeren Ausgangszustand.
+--- Writes: db.currentRaid (alle Felder)
 function GL.ResetCurrentRaid()
     local cr = GuildLootDB.currentRaid
     cr.id                      = GL.GenerateRaidID("unknown", "", time())
@@ -419,7 +461,10 @@ function GL.ResetCurrentRaid()
     if GL.Loot and GL.Loot.ClearCurrentItem then GL.Loot.ClearCurrentItem() end
 end
 
---- Stellt sicher dass eine Session offen ist; erstellt "Auto KW X" falls keine aktiv.
+--- Startet eine neue Session falls keine aktiv ist.
+--- Reads:  db.activeContainerIdx
+--- Writes: indirekt via GL.StartContainer
+--- Sends:  indirekt via GL.StartContainer
 function GL.EnsureActiveSession()
     if GuildLootDB.activeContainerIdx then return end
     local kw = GL.ISOWeek(time())
@@ -430,10 +475,13 @@ end
 -- Ausgabe-Helfer
 -- ============================================================
 
+--- Gibt eine Nachricht in den Chat aus. Reiner UI-Seiteneffekt.
 function GL.Print(msg)
     print("|cff00ccff[ReqRT]|r " .. tostring(msg))
 end
 
+--- Sendet eine Nachricht in den Raid-/Party-Chat.
+--- Reads:  db.settings.chatChannel, db.settings.postToChat
 function GL.PostToRaid(msg)
     local s  = GuildLootDB.settings
     local ch = s.chatChannel or "AUTO"
@@ -458,6 +506,8 @@ function GL.PostToRaid(msg)
     SendChatMessage("[ReqRT] " .. msg, channel)
 end
 
+--- Sendet eine Nachricht als Raid Warning (oder Raid-Chat je nach Setting).
+--- Reads:  db.settings.raidWarnItem
 function GL.PostRaidWarn(msg)
     if not GuildLootDB.settings.raidWarnItem then
         GL.PostToRaid(msg)
@@ -477,6 +527,9 @@ end
 -- NormalizeName ist jetzt GL.NormalizeName (Util.lua) – hier Alias für Abwärtskompatibilität
 local NormalizeName = function(name) return GL.NormalizeName(name) end
 
+--- Liest die aktuelle Gruppe aus der WoW-API und aktualisiert currentRaid.
+--- Reads:  db.currentRaid
+--- Writes: db.currentRaid.participants, db.currentRaid.absent, db.players[*].class
 function GL.LoadRaidRoster()
     local raid = GuildLootDB.currentRaid
     raid.participants = {}
@@ -521,6 +574,9 @@ function GL.LoadRaidRoster()
     end
 end
 
+--- Bereinigt currentRaid.participants gegen aktuelle Gruppe (neue Mitglieder hinzufügen, DCs markieren).
+--- Reads:  db.activeContainerIdx, db.currentRaid.participants
+--- Writes: db.currentRaid.participants, db.currentRaid.absent
 function GL.SyncRoster()
     local raid = GuildLootDB.currentRaid
     if not GuildLootDB.activeContainerIdx then return end
@@ -597,6 +653,14 @@ local function AutoTierName()
     return date("%d.%m.%Y")
 end
 
+--- Initialisiert den currentRaid-Kontext für einen neuen Raid innerhalb der aktiven Session.
+--- Reads:  db.activeContainerIdx, db.currentRaid, db.raidContainers
+--- Writes: db.currentRaid.tier, db.currentRaid.difficulty, db.currentRaid.startedAt,
+---         db.currentRaid.id, db.currentRaid.participants,
+---         db.settings.isMasterLooter,
+---         db.raidContainers[i].raidMeta[id].closedAt
+--- Sends:  Comm.SendMLAnnounce, Comm.SendRaidMeta (via EnsureRaidMeta),
+---         Comm.SendSessionStart (via EnsureActiveSession falls keine Session offen)
 function GL.StartRaid(tier)
     -- Ensure a session is open (creates "Auto KW X" if needed)
     GL.EnsureActiveSession()
@@ -624,11 +688,6 @@ function GL.StartRaid(tier)
     GL.Print("Raid started: " .. raid.tier .. ". " .. #raid.participants .. " players loaded.")
     if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
     if GL.UI and GL.UI.ShowTab then GL.UI.ShowTab(GL.UI.TAB_LOOT) end
-end
-
-function GL.CloseRaid()
-    -- Shim: delegates to CloseContainer
-    GL.CloseContainer()
 end
 
 -- ============================================================
@@ -660,7 +719,10 @@ local function BuildSessionFromSync(sessionID, label, startedAt, prioCfg)
     }
 end
 
---- Observer: empfängt SESSION_START vom ML (neue oder wiedergeöffnete Session).
+--- Observer: empfängt SESSION_START vom ML, legt Session an oder reaktiviert sie.
+--- Reads:  db.raidContainers
+--- Writes: db.settings.isMasterLooter, db.raidContainers, db.activeContainerIdx,
+---         db.raidContainers[i].priorityConfig
 function GL.OnCommSessionStart(sessionID, label, startedAt, sender, prioCfg)
     local myName = GL.NormalizeName(UnitName("player") or "") or ""
     if GL.NormalizeName(sender or "") == myName then return end
@@ -683,7 +745,10 @@ function GL.OnCommSessionStart(sessionID, label, startedAt, sender, prioCfg)
     if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
 end
 
---- Observer: empfängt SESSION_END vom ML.
+--- Observer: empfängt SESSION_END vom ML, schließt Session lokal.
+--- Reads:  db.raidContainers, db.activeContainerIdx
+--- Writes: db.raidContainers[i].closedAt, db.activeContainerIdx,
+---         db.currentRaid (via ResetCurrentRaid)
 function GL.OnCommSessionEnd(sessionID, closedAt)
     local db = GuildLootDB
     for i, s in ipairs(db.raidContainers or {}) do
@@ -699,13 +764,20 @@ function GL.OnCommSessionEnd(sessionID, closedAt)
     if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
 end
 
---- Observer: empfängt RAID_META vom ML (neuer Boss-Kill / neuer Raid-Kontext).
-function GL.OnCommRaidMeta(sessionID, raidID, meta)
+--- Observer: empfängt RAID_META vom ML, aktualisiert raidMeta und currentRaid-Kontext.
+--- Reads:  db.raidContainers
+--- Writes: db.raidContainers[i].raidMeta[raidID], db.raidContainers[i].priorityConfig,
+---         db.currentRaid.id, db.currentRaid.tier, db.currentRaid.difficulty,
+---         db.currentRaid.startedAt, db.currentRaid.participants
+function GL.OnCommRaidMeta(sessionID, raidID, meta, prioCfg)
     local db = GuildLootDB
     for _, s in ipairs(db.raidContainers or {}) do
         if s.id == sessionID then
             if not s.raidMeta[raidID] then
                 s.raidMeta[raidID] = meta
+            end
+            if prioCfg then
+                s.priorityConfig = prioCfg
             end
             -- currentRaid-Kontext auf neueste raidMeta setzen
             local cr = db.currentRaid
@@ -723,7 +795,10 @@ function GL.OnCommRaidMeta(sessionID, raidID, meta)
     if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
 end
 
---- RAID_QUERY-Handler (ML-Seite): sendet SESSION_SYNC oder queued den Request.
+--- ML: empfängt RAID_QUERY vom Observer, schickt Session-Sync oder queued bei Combat.
+--- Reads:  db.activeContainerIdx, db.raidContainers
+--- Writes: GL._pendingSyncRequests
+--- Sends:  Comm.SendSessionSync, Comm.SendMLAnnounce
 function GL.OnCommRaidQuery(sender, inCombat)
     if not GL.IsMasterLooter() then return end
     local db = GuildLootDB
@@ -739,55 +814,13 @@ function GL.OnCommRaidQuery(sender, inCombat)
     if GL.Comm and GL.Comm.SendSessionSync then
         GL.Comm.SendSessionSync(session, sender)
     end
-end
-
---- Observer: komplette Session vom ML empfangen (Late-Join-Sync).
---- Sucht Session nach ID in raidContainers und ersetzt sie.
---- Gibt den Index zurück wenn gefunden, nil wenn neu eingefügt.
-function GL.FindOrReplaceSession(session)
-    local db = GuildLootDB
-    for i, s in ipairs(db.raidContainers or {}) do
-        if s.id == session.id then
-            db.raidContainers[i] = session
-            return i
-        end
-    end
-    table.insert(db.raidContainers, session)
-    db.activeContainerIdx = #db.raidContainers
-    return nil
-end
-
---- Lädt currentRaid-Kontext aus dem neuesten nicht-geschlossenen raidMeta-Eintrag.
-function GL.LoadLastRaidContext(session)
-    local db = GuildLootDB
-    local lastID, lastTs = nil, 0
-    for rid, meta in pairs(session.raidMeta or {}) do
-        if (meta.startedAt or 0) > lastTs and not meta.closedAt then
-            lastTs = meta.startedAt; lastID = rid
-        end
-    end
-    if lastID then
-        local meta = session.raidMeta[lastID]
-        local cr   = db.currentRaid
-        cr.id = lastID; cr.tier = meta.tier or ""; cr.difficulty = meta.difficulty or ""
-        cr.startedAt = meta.startedAt or 0
-        cr.participants = {}
-        for _, p in ipairs(meta.participants or {}) do table.insert(cr.participants, p) end
+    if GL.Comm and GL.Comm.SendMLAnnounce then
+        GL.Comm.SendMLAnnounce(UnitName("player") or "")
     end
 end
 
-function GL.OnCommSessionSync(session, sender)
-    if GL.IsMasterLooter() then return end
-    local db  = GuildLootDB
-    local idx = GL.FindOrReplaceSession(session)
-    if idx == nil then
-        GL.Print("Session synchronisiert: " .. (session.label or "?"))
-    elseif db.activeContainerIdx == idx then
-        GL.LoadLastRaidContext(session)
-    end
-    if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
-end
-
+--- Observer: empfängt ML_ANNOUNCE, aktualisiert lokalen ML-State.
+--- Writes: db.currentRaid.mlName, db.settings.isMasterLooter, GL._mlClaimTimer
 function GL.OnCommMLAnnounce(newMLName)
     -- Laufenden Claim-Timer abbrechen (Claim wurde bestätigt oder jemand anderes wurde ML)
     if GL._mlClaimTimer then GL._mlClaimTimer:Cancel(); GL._mlClaimTimer = nil end
@@ -807,6 +840,9 @@ function GL.OnCommMLAnnounce(newMLName)
     if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
 end
 
+--- ML: empfängt ML_REQUEST vom Observer, zeigt Bestätigungs-Dialog.
+--- Writes: GL._pendingMLClaim, db.settings.isMasterLooter (bei Bestätigung)
+--- Sends:  Comm.SendMLDeny (bei Ablehnung), Comm.SendMLAnnounce (bei Bestätigung)
 function GL.OnCommMLRequest(claimantName, sender)
     if not GL.IsMasterLooter() then return end
     -- Race Condition: nur einen Claim gleichzeitig erlauben
@@ -836,6 +872,8 @@ function GL.OnCommMLRequest(claimantName, sender)
     StaticPopup_Show("RLT_ML_REQUEST")
 end
 
+--- Observer: empfängt ML_DENY vom ML, bricht Claim-Versuch ab.
+--- Writes: GL._mlDenied, GL._mlClaimTimer, db.settings.isMasterLooter
 function GL.OnCommMLDeny(claimantName)
     local myName = NormalizeName(UnitName("player")) or ""
     if myName ~= NormalizeName(claimantName or "") then return end
@@ -847,17 +885,17 @@ function GL.OnCommMLDeny(claimantName)
     if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
 end
 
--- ResumeRaid is superseded by ResumeContainer(ci). Kept as no-op shim.
-function GL.ResumeRaid(idx)
-    GL.Print("ResumeRaid: use ResumeContainer(ci) instead.")
-end
 
+--- Setzt den currentRaid-Kontext zurück (Slash-Command-Handler).
+--- Writes: db.currentRaid (via ResetCurrentRaid)
 function GL.ResetRaid()
     GL.ResetCurrentRaid()
     GL.Print("Raid context has been reset.")
     if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
 end
 
+--- Gibt die Loot-History eines Spielers in den Chat aus.
+--- Reads:  db.players[*].lootHistory
 function GL.ShowHistory(targetName)
     local players = GuildLootDB.players
     -- Partial match erlauben
@@ -1013,7 +1051,7 @@ local function OnEventGroupRosterUpdate()
             if db.activeContainerIdx and GL.IsMasterLooter() then
                 local session = db.raidContainers[db.activeContainerIdx]
                 if GL.Comm and GL.Comm.SendSessionStart then
-                    GL.Comm.SendSessionStart(session.id, session.label, session.startedAt)
+                    GL.Comm.SendSessionStart(session.id, session.label, session.startedAt, session.priorityConfig)
                 end
             end
             -- Observer ohne aktive Session → Sync anfordern (max. 1x alle 5s)
@@ -1074,6 +1112,9 @@ local function OnEventEncounterEnd(encounterID, encounterName, difficultyID, gro
                 cr.startedAt  = cr.startedAt ~= 0 and cr.startedAt or time()
             end
             GL.EnsureRaidMeta()
+            if GL.Comm and GL.Comm.SendMLAnnounce then
+                GL.Comm.SendMLAnnounce(UnitName("player") or "")
+            end
             if GL.UI and GL.UI.AutoExpand then C_Timer.After(0, GL.UI.AutoExpand) end
         end
     end

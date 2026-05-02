@@ -1,5 +1,26 @@
 # Changelog
 
+## v0.5.8.0
+
+**Improvements**
+- The Observer Roll Tab has been redesigned to match the Raider popup: item icon, priority buttons, roll button, and announce filter now appear in the same layout in both places.
+- The Announce Filter has been moved from the Settings panel to the Roll Tab and the Raider popup, where it is easier to adjust on the fly during a raid (e.g. filter out rings after you receive your BIS ring).
+
+**Bug Fixes**
+- Fixed the ML checkbox and the dock/minimize button in the main window title bar not responding to clicks.
+- Fixed right-click on the minimap button in Raider Mode opening the filter popup instead of the main window.
+
+## v0.5.7.0
+
+**Bug Fixes**
+- Fixed priority configuration not being transferred to Observers when a session was resumed or when a new group member joined mid-session. Observers would fall back to their own local priority settings instead of using the Master Looter's configuration.
+- Fixed a session showing loot entries but no Raid entry when the Master Looter started the session after boss kills had already occurred. The session now retroactively creates the raid context entry and broadcasts it to all Observers.
+
+**Improvements**
+- Minimap button click behaviour is now role-dependent: in Player Mode, left-click opens the Loot Popup and right-click opens the main window; for Master Looter and Observers the assignments are reversed.
+- The Loot Popup title bar now shows the current addon version.
+- The Help panel in the Loot Popup now has a scrollbar for longer content.
+
 ## v0.5.5.0-beta
 
 **New Features**
