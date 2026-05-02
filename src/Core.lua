@@ -314,6 +314,25 @@ function GL.StartContainer(label)
         raidMeta       = {},
         priorityConfig = CopyTable(db.settings.priorities or {}),
     }
+    local orphaned = db.currentRaid and db.currentRaid.pendingLoot
+    if orphaned and #orphaned > 0 then
+        local legacyTs = time()
+        local legacy = {
+            id             = string.format("legacy-%08x", legacyTs),
+            label          = "Legacy Loot",
+            startedAt      = legacyTs,
+            closedAt       = legacyTs,
+            pendingLoot    = orphaned,
+            lootLog        = {},
+            trashedLoot    = {},
+            raidMeta       = {},
+            priorityConfig = CopyTable(db.settings.priorities or {}),
+        }
+        table.insert(db.raidContainers, legacy)
+        db.currentRaid.pendingLoot = {}
+        GL.Print(string.format("%d Item(s) in Legacy-Session gesichert.", #legacy.pendingLoot))
+    end
+
     table.insert(db.raidContainers, session)
     db.activeContainerIdx = #db.raidContainers
     GL.Print("Session gestartet: " .. finalLabel)
@@ -360,6 +379,37 @@ function GL.CloseContainer()
     if GL.Comm and GL.Comm.SendSessionEnd then
         GL.Comm.SendSessionEnd(sessionID, closedAt)
     end
+    if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
+end
+
+--- Verschiebt alle pendingLoot-Items einer geschlossenen Session in die aktive Session.
+--- Reads:  db.activeContainerIdx, db.raidContainers[sourceCI].pendingLoot
+--- Writes: db.raidContainers (remove source), db.activeContainerIdx (korrigiert),
+---         db.raidContainers[activeIdx].pendingLoot
+function GL.MergeSessionIntoActive(sourceCI)
+    local db = GuildLootDB
+    if not db.activeContainerIdx then
+        GL.Print("Kein aktive Session zum Mergen.")
+        return
+    end
+    if sourceCI == db.activeContainerIdx then
+        GL.Print("Kann aktive Session nicht mit sich selbst mergen.")
+        return
+    end
+    local source = db.raidContainers[sourceCI]
+    if not source then return end
+    local activeSession = db.raidContainers[db.activeContainerIdx]
+    local items = source.pendingLoot or {}
+    local count = #items
+    for _, item in ipairs(items) do
+        table.insert(activeSession.pendingLoot, item)
+    end
+    local sourceLabel = source.label
+    table.remove(db.raidContainers, sourceCI)
+    if sourceCI < db.activeContainerIdx then
+        db.activeContainerIdx = db.activeContainerIdx - 1
+    end
+    GL.Print(string.format("%d Item(s) aus '%s' übernommen.", count, sourceLabel))
     if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
 end
 
@@ -1342,6 +1392,13 @@ SlashCmdList["REQUIEMRAIDTOOLS"] = function(input)
     elseif cmd == "testmulti" then
         if GL.Test and GL.Test.SimulateMultiRoll then
             GL.Test.SimulateMultiRoll(arg ~= "" and arg or nil)
+        else
+            GL.Print("Test mode not loaded.")
+        end
+
+    elseif cmd == "testpending" then
+        if GL.Test and GL.Test.SimulatePending then
+            GL.Test.SimulatePending(arg ~= "" and arg or nil)
         else
             GL.Print("Test mode not loaded.")
         end

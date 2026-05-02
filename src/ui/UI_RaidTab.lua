@@ -187,6 +187,19 @@ function UI.BuildRaidPanel(parent)
     end)
     panel.assignBtn = assignBtn
 
+    -- Merge
+    local mergeBtn = CreateFrame("Button", nil, cs, "UIPanelButtonTemplate")
+    mergeBtn:SetSize(60, 22)
+    mergeBtn:SetPoint("LEFT", assignBtn, "RIGHT", 4, 0)
+    mergeBtn:SetText("Merge")
+    mergeBtn:SetEnabled(false)
+    mergeBtn:SetScript("OnClick", function()
+        if selectedRaid and selectedRaid.ci then
+            GL.MergeSessionIntoActive(selectedRaid.ci)
+        end
+    end)
+    panel.mergeBtn = mergeBtn
+
     -- ---- Liste (links) ----
     local listFrame = CreateFrame("Frame", nil, panel, "BackdropTemplate")
     listFrame:SetBackdrop({
@@ -277,6 +290,15 @@ local function UpdateControlStrip()
     local checkedCount = 0
     for _ in pairs(checkedUnassigned) do checkedCount = checkedCount + 1 end
     panel.assignBtn:SetText(checkedCount > 1 and ("Assign (" .. checkedCount .. ")") or "Assign")
+
+    -- Merge: geschlossene Session selektiert + aktive Session offen (andere)
+    local canMerge = selectedRaid and selectedRaid.ci
+                  and selectedRaid.raidID == nil
+                  and db.activeContainerIdx
+                  and selectedRaid.ci ~= db.activeContainerIdx
+                  and db.raidContainers[selectedRaid.ci]
+                  and db.raidContainers[selectedRaid.ci].closedAt ~= nil
+    panel.mergeBtn:SetEnabled(canMerge and true or false)
 end
 
 -- ============================================================

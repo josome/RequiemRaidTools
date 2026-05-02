@@ -65,6 +65,7 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
                 participants            = { "Myriella-Malfurion" },
                 currentKillParticipants = {},
                 absent                  = {},
+                pendingLoot             = {},
             },
             unassignedRaids    = {},
         }
@@ -640,6 +641,162 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
             AreEqual("Blah", GuildLootDB.settings.priorities[1].shortName)
             AreEqual("Blub", GuildLootDB.settings.priorities[2].shortName)
             AreEqual(nil,    GuildLootDB.activeContainerIdx)
+
+            MockRestore()
+        end)
+    end
+
+    -- --------------------------------------------------------
+    -- testLegacySessionCreatedWhenPendingLootExists
+    -- Prüft: StartContainer legt Legacy-Session an wenn pendingLoot Items enthält
+    -- --------------------------------------------------------
+    function Tests:testLegacySessionCreatedWhenPendingLootExists()
+        WithTestDB(function()
+            MockSideEffects()
+
+            GuildLootDB.currentRaid.pendingLoot = {
+                { link="|Hitem:1|h[Schwert]|h|r", name="Schwert", itemID=1, quality=4, category="1h" },
+                { link="|Hitem:2|h[Helm]|h|r",    name="Helm",    itemID=2, quality=4, category="head" },
+            }
+
+            GuildLoot.StartContainer("Neue Session")
+
+            -- Legacy-Session + neue Session
+            AreEqual(2,              #GuildLootDB.raidContainers)
+            AreEqual("Legacy Loot",  GuildLootDB.raidContainers[1].label)
+            AreEqual("Neue Session", GuildLootDB.raidContainers[2].label)
+            -- Legacy-Session ist sofort geschlossen
+            Exists(GuildLootDB.raidContainers[1].closedAt)
+            IsTrue(GuildLootDB.raidContainers[1].closedAt > 0)
+            -- Legacy-Session enthält die Items
+            AreEqual(2, #GuildLootDB.raidContainers[1].pendingLoot)
+            -- Neue Session ist aktiv
+            AreEqual(2, GuildLootDB.activeContainerIdx)
+
+            MockRestore()
+        end)
+    end
+
+    -- --------------------------------------------------------
+    -- testNoLegacySessionWhenPendingLootEmpty
+    -- Prüft: StartContainer legt keine Legacy-Session an wenn pendingLoot leer ist
+    -- --------------------------------------------------------
+    function Tests:testNoLegacySessionWhenPendingLootEmpty()
+        WithTestDB(function()
+            MockSideEffects()
+
+            GuildLootDB.currentRaid.pendingLoot = {}
+
+            GuildLoot.StartContainer("Normale Session")
+
+            AreEqual(1,                #GuildLootDB.raidContainers)
+            AreEqual("Normale Session", GuildLootDB.raidContainers[1].label)
+            AreEqual(1,                GuildLootDB.activeContainerIdx)
+
+            MockRestore()
+        end)
+    end
+
+    -- --------------------------------------------------------
+    -- testLegacySessionClearsPendingLoot
+    -- Prüft: Nach StartContainer ist currentRaid.pendingLoot leer
+    -- --------------------------------------------------------
+    function Tests:testLegacySessionClearsPendingLoot()
+        WithTestDB(function()
+            MockSideEffects()
+
+            GuildLootDB.currentRaid.pendingLoot = {
+                { link="|Hitem:1|h[Schwert]|h|r", name="Schwert", itemID=1, quality=4, category="1h" },
+            }
+
+            GuildLoot.StartContainer("Session")
+
+            AreEqual(0, #GuildLootDB.currentRaid.pendingLoot)
+
+            MockRestore()
+        end)
+    end
+
+    -- --------------------------------------------------------
+    -- testMergeMovesItemsToActiveSession
+    -- Prüft: MergeSessionIntoActive verschiebt pendingLoot-Items in aktive Session
+    -- --------------------------------------------------------
+    function Tests:testMergeMovesItemsToActiveSession()
+        WithTestDB(function()
+            MockSideEffects()
+
+            -- Legacy-Session (geschlossen, Index 1)
+            GuildLootDB.raidContainers = {
+                { id="legacy-1", label="Legacy Loot", startedAt=1000, closedAt=1000,
+                  pendingLoot = {
+                      { link="|Hitem:1|h[A]|h|r", name="A", itemID=1, quality=4, category="head" },
+                      { link="|Hitem:2|h[B]|h|r", name="B", itemID=2, quality=4, category="neck" },
+                  },
+                  lootLog={}, trashedLoot={}, raidMeta={}, priorityConfig={} },
+                { id="sess-1", label="Neue Session", startedAt=2000, closedAt=nil,
+                  pendingLoot={}, lootLog={}, trashedLoot={}, raidMeta={}, priorityConfig={} },
+            }
+            GuildLootDB.activeContainerIdx = 2
+
+            GuildLoot.MergeSessionIntoActive(1)
+
+            -- Nur noch eine Session (Legacy entfernt)
+            AreEqual(1, #GuildLootDB.raidContainers)
+            -- Items in aktiver Session
+            AreEqual(2, #GuildLootDB.raidContainers[1].pendingLoot)
+            AreEqual("A", GuildLootDB.raidContainers[1].pendingLoot[1].name)
+            AreEqual("B", GuildLootDB.raidContainers[1].pendingLoot[2].name)
+
+            MockRestore()
+        end)
+    end
+
+    -- --------------------------------------------------------
+    -- testMergeCorrectesActiveIdx
+    -- Prüft: activeContainerIdx wird um 1 reduziert wenn Source-Index kleiner war
+    -- --------------------------------------------------------
+    function Tests:testMergeCorrectesActiveIdx()
+        WithTestDB(function()
+            MockSideEffects()
+
+            GuildLootDB.raidContainers = {
+                { id="legacy-1", label="Legacy Loot", startedAt=1000, closedAt=1000,
+                  pendingLoot={{ link="|Hitem:1|h[X]|h|r", name="X", itemID=1, quality=4, category="head" }},
+                  lootLog={}, trashedLoot={}, raidMeta={}, priorityConfig={} },
+                { id="sess-1", label="Aktive Session", startedAt=2000, closedAt=nil,
+                  pendingLoot={}, lootLog={}, trashedLoot={}, raidMeta={}, priorityConfig={} },
+            }
+            GuildLootDB.activeContainerIdx = 2
+
+            GuildLoot.MergeSessionIntoActive(1)
+
+            -- Index muss auf 1 korrigiert worden sein
+            AreEqual(1, GuildLootDB.activeContainerIdx)
+
+            MockRestore()
+        end)
+    end
+
+    -- --------------------------------------------------------
+    -- testMergeWithoutActiveSessionIsNoop
+    -- Prüft: MergeSessionIntoActive tut nichts wenn keine aktive Session existiert
+    -- --------------------------------------------------------
+    function Tests:testMergeWithoutActiveSessionIsNoop()
+        WithTestDB(function()
+            MockSideEffects()
+
+            GuildLootDB.raidContainers = {
+                { id="legacy-1", label="Legacy Loot", startedAt=1000, closedAt=1000,
+                  pendingLoot={{ link="|Hitem:1|h[X]|h|r", name="X", itemID=1, quality=4, category="head" }},
+                  lootLog={}, trashedLoot={}, raidMeta={}, priorityConfig={} },
+            }
+            GuildLootDB.activeContainerIdx = nil
+
+            GuildLoot.MergeSessionIntoActive(1)
+
+            -- Nichts verändert
+            AreEqual(1, #GuildLootDB.raidContainers)
+            AreEqual(1, #GuildLootDB.raidContainers[1].pendingLoot)
 
             MockRestore()
         end)

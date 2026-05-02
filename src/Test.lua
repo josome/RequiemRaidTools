@@ -280,6 +280,68 @@ function GL.Test.AddLootEntry()
     if GL.UI and GL.UI.RefreshLootTab then GL.UI.RefreshLootTab() end
 end
 
+-- Füllt currentRaid.pendingLoot mit count Items (ohne Session zu starten).
+-- Verwendung: /reqrt testpending [anzahl]   (default 2)
+function GL.Test.SimulatePending(count)
+    count = tonumber(count) or 2
+    if count < 1 or count > 10 then
+        GL.Print("testpending: count muss zwischen 1 und 10 liegen.")
+        return
+    end
+    if GuildLootDB.activeContainerIdx then
+        GL.Print("testpending: Session ist offen — erst schließen.")
+        return
+    end
+    local chosen = nil
+    for bag = 0, 4 do
+        for slot = 1, C_Container.GetContainerNumSlots(bag) do
+            local link = C_Container.GetContainerItemLink(bag, slot)
+            if link then
+                local name, _, rarity, _, _, _, _, _, equipLoc = GetItemInfo(link)
+                local isEquip = equipLoc and equipLoc ~= "" and equipLoc ~= "INVTYPE_NON_EQUIP_IGNORE"
+                if rarity and rarity >= 4 and isEquip then
+                    chosen = { link = link, name = name, equipLoc = equipLoc, quality = rarity }
+                    break
+                end
+            end
+        end
+        if chosen then break end
+    end
+    if not chosen then
+        GL.Print("testpending: Kein episches Equip-Item im Inventar gefunden.")
+        return
+    end
+    local itemID   = tonumber(chosen.link:match("item:(%d+)"))
+    local _, _, _, _, _, _, _, _, equipLoc = GetItemInfo(chosen.link)
+    local category = GL.GetItemCategory(itemID, equipLoc or chosen.equipLoc, chosen.quality)
+    local realm = GetRealmName() or "Realm"
+    local pl = GuildLootDB.currentRaid.pendingLoot
+    for _ = 1, count do
+        table.insert(pl, {
+            link     = chosen.link,
+            name     = chosen.name,
+            itemID   = itemID,
+            quality  = chosen.quality,
+            category = category,
+        })
+    end
+    local fakePlayers = {
+        "TestPlayer1-" .. realm,
+        "TestPlayer2-" .. realm,
+        "TestPlayer3-" .. realm,
+        "TestPlayer4-" .. realm,
+        "TestPlayer5-" .. realm,
+        "TestPlayer6-" .. realm,
+    }
+    local participants = GuildLootDB.currentRaid.participants
+    for _, name in ipairs(fakePlayers) do
+        local found = false
+        for _, p in ipairs(participants) do if p == name then found = true; break end end
+        if not found then table.insert(participants, name) end
+    end
+    GL.Print(string.format("testpending: %d× %s in pendingLoot.", count, chosen.name))
+end
+
 -- Simuliert einen Mehrfach-Drop (count > 1) mit Cross-Tier-Kandidaten.
 -- Testet: count-Erkennung, Cross-Tier StartRoll, Top-N FinalizeRoll, Assign All.
 -- Verwendung: /reqrt testmulti [anzahl]   (default 2)
