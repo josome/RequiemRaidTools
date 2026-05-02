@@ -24,6 +24,7 @@ function UI.BuildRollTab(parent)
     rollPanel:Hide()
 
     widget = UI.BuildLootAnnounceWidget(rollPanel)
+    widget:ShowFilterOnly()  -- initialer Zustand: keine Buttons (wie Popup ohne Item)
 
     UI.rollPanel = rollPanel
     return rollPanel
@@ -64,5 +65,5 @@ end
 --- Tab-Inhalt leeren nach ITEM_OFF oder ASSIGN.
 function UI.ClearRollTab()
     if not rollPanel then return end
-    widget:Clear()
+    widget:ShowFilterOnly()  -- Buttons ausblenden wie im Popup (kein Item = kein Prio/Roll)
 end

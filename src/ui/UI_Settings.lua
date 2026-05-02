@@ -9,26 +9,7 @@ local UI = GL.UI
 -- ============================================================
 
 function UI.BuildSettingsPanel(parent)
-    local outerPanel = CreateFrame("Frame", "GuildLootSettingsPanel", parent, "BackdropTemplate")
-    outerPanel:SetBackdrop({
-        bgFile   = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-        edgeSize = 8,
-        insets   = { left = 4, right = 4, top = 4, bottom = 4 },
-    })
-    outerPanel:SetBackdropColor(0.05, 0.05, 0.08, 1)
-
-    -- ScrollFrame damit der Inhalt bei vielen Einstellungen scrollbar ist
-    local scroll = CreateFrame("ScrollFrame", nil, outerPanel, "UIPanelScrollFrameTemplate")
-    scroll:SetPoint("TOPLEFT",     outerPanel, "TOPLEFT",     4,  -4)
-    scroll:SetPoint("BOTTOMRIGHT", outerPanel, "BOTTOMRIGHT", -26, 4)
-
-    local panel = CreateFrame("Frame", nil, scroll)
-    panel:SetHeight(1)
-    scroll:SetScrollChild(panel)
-    scroll:HookScript("OnSizeChanged", function(self)
-        panel:SetWidth(self:GetWidth())
-    end)
+    local outerPanel, panel = UI.CreateSidePanel("GuildLootSettingsPanel", parent, "Settings")
 
     local y = -12  -- laufende Y-Position
 

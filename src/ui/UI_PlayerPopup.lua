@@ -53,38 +53,11 @@ end
 local function BuildHelpPanel()
     if helpPanel then return end
 
-    local PANEL_W   = 230
-    local CONTENT_W = PANEL_W - 14 - 28  -- linker Rand + Scrollbar
-
-    helpPanel = CreateFrame("Frame", "GuildLootPlayerHelpPanel", UIParent, "BackdropTemplate")
-    helpPanel:SetSize(PANEL_W, 200)
+    local content
+    helpPanel, content = UI.CreateSidePanel("GuildLootPlayerHelpPanel", UIParent, "Announce Filter")
+    helpPanel:SetSize(230, 200)
     helpPanel:SetFrameStrata("HIGH")
-    helpPanel:SetBackdrop({
-        bgFile   = "Interface\\DialogFrame\\UI-DialogBox-Background",
-        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-        tile = true, tileSize = 32, edgeSize = 32,
-        insets = { left=11, right=12, top=12, bottom=11 },
-    })
-    helpPanel:SetBackdropColor(0, 0, 0, 0.9)
     helpPanel:Hide()
-
-    local title = helpPanel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    title:SetPoint("TOPLEFT", helpPanel, "TOPLEFT", 16, -12)
-    title:SetText("|cffffcc00Announce Filter|r")
-
-    local div = helpPanel:CreateTexture(nil, "BACKGROUND")
-    div:SetColorTexture(0.4, 0.4, 0.4, 1)
-    div:SetHeight(1)
-    div:SetPoint("TOPLEFT",  helpPanel, "TOPLEFT",  16, -28)
-    div:SetPoint("TOPRIGHT", helpPanel, "TOPRIGHT", -16, -28)
-
-    local sf = CreateFrame("ScrollFrame", "GuildLootHelpPanelScroll", helpPanel, "UIPanelScrollFrameTemplate")
-    sf:SetPoint("TOPLEFT",     helpPanel, "TOPLEFT",     14, -32)
-    sf:SetPoint("BOTTOMRIGHT", helpPanel, "BOTTOMRIGHT", -28, 10)
-
-    local content = CreateFrame("Frame", nil, sf)
-    content:SetWidth(CONTENT_W)
-    sf:SetScrollChild(content)
 
     local y = -4
     for _, def in ipairs(UI.FILTER_DEFS) do
@@ -94,7 +67,7 @@ local function BuildHelpPanel()
 
         local descLbl = content:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         descLbl:SetPoint("TOPLEFT",  content, "TOPLEFT",  2, y - 13)
-        descLbl:SetWidth(CONTENT_W - 4)
+        descLbl:SetPoint("TOPRIGHT", content, "TOPRIGHT", -2, y - 13)
         descLbl:SetJustifyH("LEFT")
         descLbl:SetTextColor(0.7, 0.7, 0.7)
         descLbl:SetText(FILTER_HELP[def.key] or "")
@@ -102,8 +75,8 @@ local function BuildHelpPanel()
     end
 
     local hint = content:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    hint:SetPoint("TOPLEFT", content, "TOPLEFT", 2, y - 4)
-    hint:SetWidth(CONTENT_W - 4)
+    hint:SetPoint("TOPLEFT",  content, "TOPLEFT",  2, y - 4)
+    hint:SetPoint("TOPRIGHT", content, "TOPRIGHT", -2, y - 4)
     hint:SetJustifyH("LEFT")
     hint:SetTextColor(0.5, 0.8, 0.5)
     hint:SetText("Usable weapons always appear regardless of filter.")

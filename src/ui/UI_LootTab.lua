@@ -325,9 +325,11 @@ function UI.BuildLootPanel(parent)
         if each < 20 then return end
         resultScroll:SetHeight(each)
     end
+    sessionScroll:HookScript("OnSizeChanged", function(self)
+        sessionContent:SetWidth(self:GetWidth())
+    end)
     main:HookScript("OnSizeChanged", function()
         C_Timer.After(0, equalizeScrolls)
-        C_Timer.After(0, UI.RefreshSessionLoot)
     end)
     panel:HookScript("OnShow",       function() C_Timer.After(0, equalizeScrolls) end)
 
@@ -764,8 +766,6 @@ end
 function UI.RefreshSessionLoot()
     local content = UI.lootPanel and UI.lootPanel.sessionContent
     if not content then return end
-    local sw = UI.lootPanel.sessionScroll and UI.lootPanel.sessionScroll:GetWidth() or 0
-    if sw > 10 then content:SetWidth(sw) end
 
     for _, r in ipairs(sessionLootRows) do ReleaseSessionRow(r) end
     sessionLootRows = {}

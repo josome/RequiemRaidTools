@@ -76,6 +76,55 @@ UI._H = {
     MakeItemLinkBtn = MakeItemLinkBtn,
 }
 
+--- Erstellt ein Standard-Seiten-Panel: DialogBox-Backdrop + ScrollFrame + Content-Frame.
+--- Alle Panels erhalten automatisch einen X-Button zum Ausblenden.
+--- Die Gesamt-Transparenz erbt das Panel vom Parent via SetAlpha() — hier kein eigener Wert.
+--- @param frameName  string|nil  Globaler Frame-Name (oder nil)
+--- @param parent     Frame       Parent-Frame
+--- @param title      string|nil  Titelzeile mit Trennlinie (nil = kein Header)
+--- @return outerFrame, content   Äußeres Frame und scrollbares Content-Frame
+function UI.CreateSidePanel(frameName, parent, title)
+    local outer = CreateFrame("Frame", frameName, parent, "BackdropTemplate")
+    outer:SetBackdrop({
+        bgFile   = "Interface\\DialogFrame\\UI-DialogBox-Background",
+        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+        tile = true, tileSize = 32, edgeSize = 32,
+        insets = { left=11, right=12, top=12, bottom=11 },
+    })
+    outer:SetBackdropColor(0, 0, 0, 1.0)
+
+    local closeBtn = CreateFrame("Button", nil, outer, "UIPanelCloseButton")
+    closeBtn:SetSize(18, 18)
+    closeBtn:SetPoint("TOPRIGHT", outer, "TOPRIGHT", 2, 2)
+    closeBtn:SetScript("OnClick", function() outer:Hide() end)
+
+    local scrollTop = -14
+    if title then
+        local lbl = outer:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        lbl:SetPoint("TOPLEFT", outer, "TOPLEFT", 16, -12)
+        lbl:SetText("|cffffcc00" .. title .. "|r")
+        local div = outer:CreateTexture(nil, "BACKGROUND")
+        div:SetColorTexture(0.4, 0.4, 0.4, 1)
+        div:SetHeight(1)
+        div:SetPoint("TOPLEFT",  outer, "TOPLEFT",  16, -28)
+        div:SetPoint("TOPRIGHT", outer, "TOPRIGHT", -16, -28)
+        scrollTop = -32
+    end
+
+    local sf = CreateFrame("ScrollFrame", nil, outer, "UIPanelScrollFrameTemplate")
+    sf:SetPoint("TOPLEFT",     outer, "TOPLEFT",     14, scrollTop)
+    sf:SetPoint("BOTTOMRIGHT", outer, "BOTTOMRIGHT", -28, 12)
+
+    local content = CreateFrame("Frame", nil, sf)
+    content:SetHeight(1)
+    sf:SetScrollChild(content)
+    sf:HookScript("OnSizeChanged", function(self)
+        content:SetWidth(self:GetWidth())
+    end)
+
+    return outer, content
+end
+
 -- ============================================================
 -- Frame-Globals & Status
 -- ============================================================

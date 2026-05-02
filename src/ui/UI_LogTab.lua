@@ -42,31 +42,14 @@ local function ShowPlayerPicker(entry)
     if not mf then return end
 
     if not playerPickerPanel then
-        playerPickerPanel = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
-        playerPickerPanel:SetBackdrop({
-            bgFile   = "Interface\\DialogFrame\\UI-DialogBox-Background",
-            edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-            tile = true, tileSize = 16, edgeSize = 16,
-            insets = { left=4, right=4, top=4, bottom=4 },
-        })
+        local inner
+        playerPickerPanel, inner = UI.CreateSidePanel(nil, UIParent, "Reassign Loot")
         playerPickerPanel:SetFrameStrata("DIALOG")
         playerPickerPanel:SetClampedToScreen(true)
         playerPickerPanel:SetWidth(200)
         playerPickerPanel:SetPoint("TOPRIGHT",    mf, "TOPLEFT",    -4, 0)
         playerPickerPanel:SetPoint("BOTTOMRIGHT", mf, "BOTTOMLEFT", -4, 0)
 
-        -- X-Button zum Schließen ohne Auswahl
-        local closeBtn = CreateFrame("Button", nil, playerPickerPanel, "UIPanelCloseButton")
-        closeBtn:SetSize(18, 18)
-        closeBtn:SetPoint("TOPRIGHT", playerPickerPanel, "TOPRIGHT", 2, 2)
-        closeBtn:SetScript("OnClick", function() playerPickerPanel:Hide() end)
-
-        local scroll = CreateFrame("ScrollFrame", nil, playerPickerPanel, "UIPanelScrollFrameTemplate")
-        scroll:SetPoint("TOPLEFT",     playerPickerPanel, "TOPLEFT",     6,  -20)
-        scroll:SetPoint("BOTTOMRIGHT", playerPickerPanel, "BOTTOMRIGHT", -26, 6)
-        local inner = CreateFrame("Frame", nil, scroll)
-        inner:SetWidth(scroll:GetWidth())
-        scroll:SetScrollChild(inner)
         playerPickerPanel.inner = inner
     end
 
@@ -111,16 +94,15 @@ function UI.BuildLogPanel(parent)
     panel:SetScript("OnHide", function()
         if playerPickerPanel then playerPickerPanel:Hide() end
     end)
-    panel:SetScript("OnSizeChanged", function()
-        UI.RefreshLogTab()
-    end)
-
     local scroll = CreateFrame("ScrollFrame", "GuildLootLogScroll", panel, "UIPanelScrollFrameTemplate")
     scroll:SetPoint("TOPLEFT",     panel, "TOPLEFT",  4,  -4)
     scroll:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -26, 4)
     local content = CreateFrame("Frame", nil, scroll)
     content:SetSize(scroll:GetWidth(), 1)
     scroll:SetScrollChild(content)
+    scroll:HookScript("OnSizeChanged", function(self)
+        content:SetWidth(self:GetWidth())
+    end)
     panel.content = content
 
     return panel
@@ -204,8 +186,6 @@ function UI.RefreshLogTab()
     local log = (idx and db.raidContainers and db.raidContainers[idx])
                 and db.raidContainers[idx].lootLog or {}
     local content = UI.logPanel.content
-    local sw = UI.logPanel.content:GetParent():GetWidth()
-    if sw > 10 then content:SetWidth(sw) end
     local yOff    = 0
     local isML    = GL.IsMasterLooter()
 
