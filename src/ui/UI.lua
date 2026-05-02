@@ -11,7 +11,7 @@ local UI = GL.UI
 -- ============================================================
 
 local FRAME_W, FRAME_H = 720, 560
-local TAB_LOOT, TAB_PLAYER, TAB_LOG, TAB_RAID, TAB_ROLL = 1, 2, 3, 4, 5
+local TAB_LOOT, TAB_LOG, TAB_RAID, TAB_ROLL, TAB_PLAYER = 1, 2, 3, 4, 5
 UI.TAB_LOOT = TAB_LOOT
 local DIFF_COLORS = { N = "|cff1eff00", H = "|cff0070dd", M = "|cffff8000" }
 
@@ -114,50 +114,60 @@ function UI.BuildMainFrame()
     mainFrame:SetPoint("CENTER")
     mainFrame:SetMovable(true)
     mainFrame:EnableMouse(true)
-    mainFrame:RegisterForDrag("LeftButton")
-    mainFrame:SetScript("OnDragStart", mainFrame.StartMoving)
-    mainFrame:SetScript("OnDragStop", function(self)
-        self:StopMovingOrSizing()
-        local x = self:GetLeft()
-        local y = self:GetTop() - UIParent:GetTop()
-        self:ClearAllPoints()
-        self:SetPoint("TOPLEFT", UIParent, "TOPLEFT", x, y)
-        UI.SavePosition()
-    end)
     mainFrame:SetToplevel(true)
+
     mainFrame:SetResizable(true)
     mainFrame:SetResizeBounds(720, 500, 1400, 1000)
+
+    -- Titelzeile als Move-Zone (AceGUI-Muster: kein RegisterForDrag auf dem Hauptframe,
+    -- damit StartMoving und StartSizing nie gleichzeitig auf demselben Frame aktiv sind)
+    local mover = CreateFrame("Frame", nil, mainFrame)
+    mover:SetPoint("TOPLEFT",  mainFrame, "TOPLEFT",  0, 0)
+    mover:SetPoint("TOPRIGHT", mainFrame, "TOPRIGHT", 0, 0)
+    mover:SetHeight(22)
+    mover:SetFrameLevel(mainFrame:GetFrameLevel() + 1)
+    mover:EnableMouse(true)
+    mover:SetScript("OnMouseDown", function(self, button)
+        if button ~= "LeftButton" then return end
+        mainFrame:StartMoving()
+    end)
+    mover:SetScript("OnMouseUp", function(self, button)
+        if button ~= "LeftButton" then return end
+        mainFrame:StopMovingOrSizing()
+        if UI.SavePosition then UI.SavePosition() end
+    end)
 
     -- Resize-Grip (untere rechte Ecke)
     local resizeGrip = CreateFrame("Button", nil, mainFrame)
     resizeGrip:SetSize(16, 16)
-    resizeGrip:SetPoint("BOTTOMRIGHT", mainFrame, "BOTTOMRIGHT", -2, 2)
+    resizeGrip:SetPoint("BOTTOMRIGHT", -2, 2)
+    resizeGrip:SetFrameLevel(mainFrame:GetFrameLevel() + 10)
+    resizeGrip:EnableMouse(true)
+
     resizeGrip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
     resizeGrip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
     resizeGrip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
-    local resizeStartW, resizeStartH = FRAME_W, FRAME_H
-    local resizeStartX, resizeStartY = 0, 0
-    resizeGrip:SetScript("OnMouseDown", function()
-        resizeStartW = mainFrame:GetWidth()
-        resizeStartH = mainFrame:GetHeight()
-        -- Position VOR StartSizing sichern — danach ändert WoW intern den Anker
-        resizeStartX = mainFrame:GetLeft()
-        resizeStartY = mainFrame:GetTop() - UIParent:GetTop()
+
+    local resizeStartW, resizeStartH
+
+    resizeGrip:SetScript("OnMouseDown", function(self, button)
+        if button ~= "LeftButton" then return end
+        resizeStartW, resizeStartH = mainFrame:GetSize()
         mainFrame:StartSizing("BOTTOMRIGHT")
     end)
-    resizeGrip:SetScript("OnMouseUp", function()
+
+    resizeGrip:SetScript("OnMouseUp", function(self, button)
+        if button ~= "LeftButton" then return end
         mainFrame:StopMovingOrSizing()
-        local w = mainFrame:GetWidth()
-        local h = mainFrame:GetHeight()
-        -- Kein echter Drag (nur Klick) → gespeicherte Größe beibehalten
-        if math.abs(w - resizeStartW) < 16 and math.abs(h - resizeStartH) < 16 then
-            w, h = resizeStartW, resizeStartH
+        local w, h = mainFrame:GetSize()
+        -- Klick ohne echtes Ziehen → Größe beibehalten
+        if resizeStartW and resizeStartH and math.abs(w - resizeStartW) < 2 and math.abs(h - resizeStartH) < 2 then
+            mainFrame:SetSize(resizeStartW, resizeStartH)
         end
-        mainFrame:ClearAllPoints()
-        mainFrame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", resizeStartX, resizeStartY)
-        mainFrame:SetSize(w, h)
-        UI.SavePosition()
+        if UI.SavePosition then UI.SavePosition() end
     end)
+
+
 
     -- Titelzeile
     local version = C_AddOns.GetAddOnMetadata("RequiemRaidTools", "Version") or "?"
@@ -245,12 +255,16 @@ function UI.BuildMainFrame()
         GL.Print("Master Looter: " .. (GuildLootDB.settings.isMasterLooter and "|cff00ff00ON|r" or "|cffff4444OFF|r"))
         if UI.RefreshLootTab then UI.RefreshLootTab() end
     end)
+    -- mover liegt auf GetFrameLevel()+1 → interaktive Buttons darüber heben
+    mlCheck:SetFrameLevel(mover:GetFrameLevel() + 1)
+    settingsBtn:SetFrameLevel(mover:GetFrameLevel() + 1)
     UI.mlCheck = mlCheck
 
     -- Andocken-Button
     local minBtn = CreateFrame("Button", nil, mainFrame, "UIPanelButtonTemplate")
     minBtn:SetSize(32, 18)
     minBtn:SetPoint("TOPLEFT", mainFrame, "TOPLEFT", 4, -2)
+    minBtn:SetFrameLevel(mover:GetFrameLevel() + 1)
     minBtn:SetText("«")
     minBtn:SetScript("OnClick", UI.ToggleMinimize)
     minBtn:SetScript("OnEnter", function(self)
@@ -294,7 +308,7 @@ function UI.BuildMainFrame()
     contentFrame:SetPoint("BOTTOMRIGHT", mainFrame, "BOTTOMRIGHT", -4, 42)
 
     -- Tab-Buttons
-    local tabNames = { "Loot", "Players", "Log", "Raid", "Roll" }
+    local tabNames = { "Loot", "Log", "Raid", "Roll", "Players" }
     for i, name in ipairs(tabNames) do
         local tb = CreateFrame("Button", "GuildLootMainFrameTab" .. i, mainFrame, "CharacterFrameTabTemplate")
         tb:SetScript("OnLoad", nil)
@@ -311,6 +325,7 @@ function UI.BuildMainFrame()
         tb:SetScript("OnClick", function(self)
             UI.ShowTab(self:GetID())
         end)
+        if i == TAB_PLAYER then tb:Hide() end  -- Players tab: no function yet
         tabButtons[i] = tb
     end
 
@@ -650,6 +665,26 @@ end
 -- ============================================================
 -- Toggle / Minimize / Auto-Expand
 -- ============================================================
+
+--- Öffnet das Hauptfenster direkt – ignoriert IsPlayerMode.
+--- Wird vom Minimap-Button (Rechtsklick im Raider-Mode) verwendet.
+function UI.OpenMainWindow()
+    if GuildLootDB.settings.minimized then
+        if dockTab then dockTab:Hide() end
+        GuildLootDB.settings.minimized = false
+        if not mainFrame then UI.BuildMainFrame() end
+        UI.LoadPosition()
+        mainFrame:Show()
+        UI.Refresh()
+        UI.ShowStartupTab()
+    elseif mainFrame and mainFrame:IsShown() then
+        UI.Dock()
+    else
+        if not mainFrame then UI.BuildMainFrame() end
+        mainFrame:Show()
+        UI.Refresh()
+    end
+end
 
 function UI.Toggle()
     -- Player Mode: nur das Popup togglen, niemals das Hauptfenster öffnen

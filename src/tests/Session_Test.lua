@@ -274,6 +274,9 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
 
             GuildLoot.StartContainer("Resume-Test")
             local session = GuildLootDB.raidContainers[1]
+            -- raidMeta zurücksetzen: StartContainer kann EnsureRaidMeta aufrufen wenn
+            -- der User sich in einem Raid befindet, was zu konkurrierenden Einträgen führt.
+            session.raidMeta = {}
             -- raidMeta manuell befüllen damit ResumeContainer currentRaid laden kann
             session.raidMeta["raid-99"] = {
                 tier        = "Nerub-ar Palace",
@@ -556,6 +559,88 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
             GuildLoot.OnCommRaidQuery("Observer-Realm", false)
 
             Exists(announceArgs)
+            MockRestore()
+        end)
+    end
+
+    -- --------------------------------------------------------
+    -- testObserverPrioFromSession
+    -- Prüft: Observer übernimmt prioCfg aus SESSION_START (BIS/OS),
+    --        nicht seine lokalen settings.priorities (Blah/Blub)
+    -- --------------------------------------------------------
+    function Tests:testObserverPrioFromSession()
+        WithTestDB(function()
+            GuildLootDB.settings.isMasterLooter = false
+            GuildLootDB.settings.priorities = {
+                [1] = { active=true,  shortName="Blah", description="Lokal 1" },
+                [2] = { active=true,  shortName="Blub", description="Lokal 2" },
+                [3] = { active=false, shortName="",     description="" },
+                [4] = { active=false, shortName="",     description="" },
+                [5] = { active=false, shortName="",     description="" },
+            }
+            Mock(GuildLoot,    "IsMasterLooter", function() return false end)
+            Mock(GuildLoot.UI, "Refresh",        function() end)
+            Mock(GuildLoot,    "Print",          function() end)
+
+            local mlCfg = {
+                [1] = { active=true,  shortName="BIS", description="Best in Slot" },
+                [2] = { active=true,  shortName="OS",  description="Off Spec" },
+                [3] = { active=false, shortName="",    description="" },
+                [4] = { active=false, shortName="",    description="" },
+                [5] = { active=false, shortName="",    description="" },
+            }
+            GuildLoot.OnCommSessionStart("sess-prio", "Raidnacht", 1000, "ML-Realm", mlCfg)
+
+            local session = GuildLootDB.raidContainers[1]
+            Exists(session)
+            local cfg = session.priorityConfig
+            Exists(cfg)
+            AreEqual("BIS", cfg[1].shortName)
+            AreEqual("OS",  cfg[2].shortName)
+            IsTrue(cfg[1].active)
+            IsTrue(cfg[2].active)
+
+            -- Lokale Prios unverändert
+            AreEqual("Blah", GuildLootDB.settings.priorities[1].shortName)
+            AreEqual("Blub", GuildLootDB.settings.priorities[2].shortName)
+
+            MockRestore()
+        end)
+    end
+
+    -- --------------------------------------------------------
+    -- testObserverLocalPriosUnchangedAfterSessionEnd
+    -- Prüft: Nach SESSION_END sind settings.priorities (Blah/Blub) noch unverändert
+    -- --------------------------------------------------------
+    function Tests:testObserverLocalPriosUnchangedAfterSessionEnd()
+        WithTestDB(function()
+            GuildLootDB.settings.isMasterLooter = false
+            GuildLootDB.settings.priorities = {
+                [1] = { active=true,  shortName="Blah", description="Lokal 1" },
+                [2] = { active=true,  shortName="Blub", description="Lokal 2" },
+                [3] = { active=false, shortName="",     description="" },
+                [4] = { active=false, shortName="",     description="" },
+                [5] = { active=false, shortName="",     description="" },
+            }
+            Mock(GuildLoot,    "IsMasterLooter", function() return false end)
+            Mock(GuildLoot.UI, "Refresh",        function() end)
+            Mock(GuildLoot,    "Print",          function() end)
+
+            local mlCfg = {
+                [1] = { active=true,  shortName="BIS", description="Best in Slot" },
+                [2] = { active=true,  shortName="OS",  description="Off Spec" },
+                [3] = { active=false, shortName="",    description="" },
+                [4] = { active=false, shortName="",    description="" },
+                [5] = { active=false, shortName="",    description="" },
+            }
+            GuildLoot.OnCommSessionStart("sess-prio", "Raidnacht", 1000, "ML-Realm", mlCfg)
+            GuildLoot.OnCommSessionEnd("sess-prio", 2000)
+
+            -- Nach Session-Ende: lokale Prios immer noch unverändert
+            AreEqual("Blah", GuildLootDB.settings.priorities[1].shortName)
+            AreEqual("Blub", GuildLootDB.settings.priorities[2].shortName)
+            AreEqual(nil,    GuildLootDB.activeContainerIdx)
+
             MockRestore()
         end)
     end

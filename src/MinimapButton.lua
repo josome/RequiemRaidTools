@@ -21,7 +21,7 @@ local btn = CreateFrame("Button", "RequiemRaidToolsMinimapButton", Minimap)
 btn:SetSize(32, 32)
 btn:SetFrameStrata("MEDIUM")
 btn:EnableMouse(true)
-btn:RegisterForClicks("LeftButtonUp")
+btn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 btn:RegisterForDrag("LeftButton")
 btn:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
 
@@ -40,8 +40,20 @@ btn.icon = icon   -- ← wichtig für ButtonBin / MBB / Bazooka etc.
 
 -- ── Klick ────────────────────────────────────────────────────────────────────
 btn:SetScript("OnClick", function(self, button)
-    if button == "LeftButton" then
-        if GL.UI and GL.UI.Toggle then GL.UI.Toggle() end
+    if GL.IsPlayerMode and GL.IsPlayerMode() then
+        -- Raider Mode: Links = Popup, Rechts = Hauptfenster (direkt, kein IsPlayerMode-Guard)
+        if button == "LeftButton" then
+            if GL.UI and GL.UI.ShowPlayerPopupFilterOnly then GL.UI.ShowPlayerPopupFilterOnly() end
+        elseif button == "RightButton" then
+            if GL.UI and GL.UI.OpenMainWindow then GL.UI.OpenMainWindow() end
+        end
+    else
+        -- ML / Observer: Links = Hauptfenster, Rechts = Popup
+        if button == "LeftButton" then
+            if GL.UI and GL.UI.Toggle then GL.UI.Toggle() end
+        elseif button == "RightButton" then
+            if GL.UI and GL.UI.ShowPlayerPopupFilterOnly then GL.UI.ShowPlayerPopupFilterOnly() end
+        end
     end
 end)
 
@@ -65,7 +77,13 @@ end)
 btn:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
     GameTooltip:AddLine("RequiemRaidTools", 1, 0.8, 0)
-    GameTooltip:AddLine("Left-click: Open/close window", 0.9, 0.9, 0.9)
+    if GL.IsPlayerMode and GL.IsPlayerMode() then
+        GameTooltip:AddLine("Left-click: Loot Announce popup", 0.9, 0.9, 0.9)
+        GameTooltip:AddLine("Right-click: Open/close window", 0.9, 0.9, 0.9)
+    else
+        GameTooltip:AddLine("Left-click: Open/close window", 0.9, 0.9, 0.9)
+        GameTooltip:AddLine("Right-click: Loot Announce popup", 0.9, 0.9, 0.9)
+    end
     GameTooltip:AddLine("Drag: Change position", 0.9, 0.9, 0.9)
     GameTooltip:Show()
 end)
