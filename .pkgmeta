@@ -6,8 +6,6 @@ ignore:
   - test
   - docs
   - analyzer
-  - src/Test.lua
-  - src/tests
   - CHANGELOG.md
   - README.md
   - CLAUDE.md
