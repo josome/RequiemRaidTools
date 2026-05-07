@@ -21,17 +21,24 @@ function Loot.OnTradeShow()
         -- Re-Check nach Delay
         if #Loot._pendingTrades == 0 then return end
 
-        -- Handelspartner-Name aus dem Trade-Frame lesen
+        -- Handelspartner-Name: primär TradeFrame-Element, Fallback UnitName("NPC")
+        -- "NPC" ist in WoW das Unit-ID für den aktuellen Interaktionspartner (Handel, Händler...).
+        local partnerName = ""
         local recipientFrame = TradeFrameRecipientNameText
-        if not recipientFrame then return end
-        -- WoW-Farbcodes entfernen + Whitespace trimmen
-        local rawText = strtrim(recipientFrame:GetText() or "")
-        local cleanText = strtrim(rawText:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""))
-        -- Cross-Realm-Suffix entfernen: "Name(*)" oder "Name (Realm)" → "Name"
-        -- (RCLootCouncil-Pattern: TRADE_SHOW liefert bei Cross-Realm "Name(*)" statt "Name-Realm")
-        cleanText = strtrim(cleanText:gsub("%s*%(.*%)$", ""))
-        local partnerName = GL.ShortName(cleanText)
-        if partnerName == "" then return end
+        if recipientFrame then
+            local rawText = strtrim(recipientFrame:GetText() or "")
+            local cleanText = strtrim(rawText:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""))
+            -- Cross-Realm-Suffix entfernen: "Name(*)" oder "Name (Realm)" → "Name"
+            cleanText = strtrim(cleanText:gsub("%s*%(.*%)$", ""))
+            partnerName = GL.ShortName(cleanText)
+        end
+        if partnerName == "" then
+            partnerName = GL.ShortName(UnitName("NPC") or "")
+        end
+        if partnerName == "" then
+            GL.Print("[ReqRT] Auto-Trade: Handelspartner-Name konnte nicht ermittelt werden.")
+            return
+        end
 
         -- Bis zu 6 Zuweisungen für diesen Spieler in Staging verschieben (WoW-Limit: 6 Slots).
         -- Rest bleibt in _pendingTrades für das nächste Handelsfenster.

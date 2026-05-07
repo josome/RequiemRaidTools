@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.5.9.5
+
+**Bug Fixes**
+- Fixed auto-trade not working after a WoW patch changed the trade frame internals. The trade partner's name is now resolved via `UnitName("NPC")` as a fallback when `TradeFrameRecipientNameText` is unavailable or empty.
+
 ## v0.5.8.0
 
 **Improvements**
