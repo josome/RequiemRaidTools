@@ -112,6 +112,7 @@ function Loot.OnItemInfoReceived(itemID)
             pendingObserverActivation = nil
             if GL.PopupFilterMatches and GL.PopupFilterMatches(link, category) then
                 if GL.UI and GL.UI.ShowPlayerPopup then GL.UI.ShowPlayerPopup(link, category) end
+                if GL.UI and GL.UI.PlayLootAnnounceSound then GL.UI.PlayLootAnnounceSound() end
                 if GL.UI and GL.UI.UpdateRollTab   then GL.UI.UpdateRollTab(link, category)   end
             end
         end
@@ -452,6 +453,7 @@ function Loot.OnCommItemActivate(link, category)
             -- Item-Daten sofort verfügbar → Filter direkt auswerten
             if GL.PopupFilterMatches and GL.PopupFilterMatches(link, category) then
                 if GL.UI.ShowPlayerPopup then GL.UI.ShowPlayerPopup(link, category) end
+                if GL.UI.PlayLootAnnounceSound then GL.UI.PlayLootAnnounceSound() end
                 if GL.UI.UpdateRollTab   then GL.UI.UpdateRollTab(link, category)   end
             end
         else

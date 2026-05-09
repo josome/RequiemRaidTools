@@ -12,6 +12,7 @@ local UI = GL.UI
 local popup          = nil   -- das Frame
 local helpPanel      = nil   -- Filter-Beschreibungs-Panel (links vom Popup)
 local enableCheck    = nil   -- Checkbox: Popup aktiviert/deaktiviert
+local soundCheck     = nil   -- Checkbox: Sound aktiviert/deaktiviert
 local widget         = nil   -- LootAnnounceWidget
 local autoCloseTimer = nil
 
@@ -44,6 +45,15 @@ end
 
 local function RefreshEnableCheck()
     if enableCheck then enableCheck:SetChecked(IsPopupEnabled()) end
+end
+
+local function IsSoundEnabled()
+    local s = GuildLootDB and GuildLootDB.settings
+    return s == nil or s.popupSoundEnabled ~= false  -- default: an
+end
+
+local function RefreshSoundCheck()
+    if soundCheck then soundCheck:SetChecked(IsSoundEnabled()) end
 end
 
 -- ============================================================
@@ -114,7 +124,7 @@ local function BuildPopup()
     local version = (C_AddOns and C_AddOns.GetAddOnMetadata("RequiemRaidTools", "Version")) or "?"
     titleBar:SetText("|cffffcc00Loot Announce|r |cff888888v" .. version .. "|r")
 
-    -- ── Top-Right: [✕ Close] [i Help] [☑ Enable] ─────────────
+    -- ── Top-Right: [🔊 Sound] [☑ Enable] [i Help] [✕ Close] ────
 
     local closeBtn = CreateFrame("Button", nil, popup, "UIPanelCloseButton")
     closeBtn:SetPoint("TOPRIGHT", popup, "TOPRIGHT", -2, -2)
@@ -142,6 +152,24 @@ local function BuildPopup()
             helpPanel:Show()
         end
     end)
+
+    soundCheck = CreateFrame("CheckButton", nil, popup, "UICheckButtonTemplate")
+    soundCheck:SetSize(22, 22)
+    soundCheck:SetPoint("TOPRIGHT", popup, "TOPRIGHT", -76, -5)
+    soundCheck:SetScript("OnClick", function(self)
+        GuildLootDB.settings.popupSoundEnabled = self:GetChecked()
+    end)
+    soundCheck:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+        GameTooltip:AddLine("Sound enabled", 1, 1, 1)
+        GameTooltip:AddLine("Play a sound when a loot\nannouncement arrives.", 0.7, 0.7, 0.7)
+        GameTooltip:Show()
+    end)
+    soundCheck:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    local speakerIcon = soundCheck:CreateTexture(nil, "OVERLAY")
+    speakerIcon:SetSize(14, 14)
+    speakerIcon:SetPoint("RIGHT", soundCheck, "LEFT", -2, 0)
+    speakerIcon:SetTexture("Interface\\Common\\VoiceChat-Speaker")
 
     enableCheck = CreateFrame("CheckButton", nil, popup, "UICheckButtonTemplate")
     enableCheck:SetSize(22, 22)
@@ -185,7 +213,15 @@ function UI.ShowPlayerPopup(link, category)
     popup:SetWidth(math.max(340, (widget.requiredWidth or 340)))
 
     RefreshEnableCheck()
+    RefreshSoundCheck()
     popup:Show()
+end
+
+--- Sound abspielen wenn eine Loot-Ankündigung eintrifft.
+function UI.PlayLootAnnounceSound()
+    if IsSoundEnabled() then
+        PlaySound(SOUNDKIT.RAID_WARNING)
+    end
 end
 
 --- Popup ausblenden (ITEM_OFF).
@@ -211,6 +247,7 @@ function UI.ShowPlayerPopupFilterOnly()
     CancelAutoClose()
     widget:ShowFilterOnly()
     RefreshEnableCheck()
+    RefreshSoundCheck()
     popup:Show()
 end
 

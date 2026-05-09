@@ -79,8 +79,9 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
     -- Beide müssen identisches Verhalten zeigen (gleicher Filter, gleicher Stale-Guard).
     local function Run(category)
         local popupCalled, rollTabCalled = false, false
-        Mock(GL.UI, "ShowPlayerPopup", function() popupCalled   = true end)
-        Mock(GL.UI, "UpdateRollTab",   function() rollTabCalled = true end)
+        Mock(GL.UI, "ShowPlayerPopup",       function() popupCalled   = true end)
+        Mock(GL.UI, "UpdateRollTab",         function() rollTabCalled = true end)
+        Mock(GL.UI, "PlayLootAnnounceSound", function() end)  -- verhindert RAID_WARNING-Sound im Test
         Loot.OnCommItemActivate(FAKE, category)
         return popupCalled, rollTabCalled
     end
