@@ -23,6 +23,8 @@
   - [testMLAnnounceRoundtrip](#testmlannounceroundtrip)
   - [testMLRequestRoundtrip](#testmlrequestroundtrip)
   - [testMLDenyRoundtrip](#testmldenyroundtrip)
+  - [testRaidMetaWithPrioConfig](#testraidmetawithprioconfig)
+  - [testRaidMetaWithoutPrioConfig](#testraidmetawithoutprioconfig)
   - [testMLGuard](#testmlguard)
   - [testSelfFilter](#testselffilter)
   - [testSelfFilterLoopback](#testselffilterloopback)
@@ -113,9 +115,9 @@ Setzt intern drei Mocks (SendAddonMessage, IsInRaid, IsInGroup), ruft `sendFn()`
 **Prüft konkret:**
 - SessionID, Label, Timestamp kommen korrekt an
 - Sender-Name wird als 4. Argument durchgereicht (Observer braucht ihn um den ML zu identifizieren)
-- `SerializePrioCfg` + `DeserializePrioCfg` werden implizit getestet: `active`, `shortName` der ersten beiden Prios korrekt, `active=false` bei Prio 3
+- `SerializePrioCfg` + `DeserializePrioCfg` werden implizit getestet: alle 5 Prios, inkl. Prio 4 (`active=true, shortName="Transmog"`) und Prio 5 (`active=false`)
 
-**Warum wichtig:** PrioCfg-Serialisierung ist ein eigenes Format (Semikolon/Doppelpunkt-separiert) — Roundtrip-Test erkennt stille Bugs in beiden Richtungen.
+**Warum wichtig:** PrioCfg-Serialisierung ist ein eigenes Format (Semikolon/Doppelpunkt-separiert) — Roundtrip-Test erkennt stille Bugs in beiden Richtungen. Prio 4 wurde gezielt ergänzt nachdem sie in einer früheren Version nicht korrekt übertragen wurde.
 
 ---
 
@@ -186,6 +188,26 @@ Setzt intern drei Mocks (SendAddonMessage, IsInRaid, IsInGroup), ruft `sendFn()`
 **Testet:** `Comm.SendMLDeny` → `Comm.OnMessage` → `GL.OnCommMLDeny`
 
 **Prüft:** `claimantName` kommt korrekt an.
+
+---
+
+### `testRaidMetaWithPrioConfig`
+
+**Testet:** `Comm.SendRaidMeta` mit `prioCfg` → `Comm.OnMessage` → `GL.OnCommRaidMeta`
+
+**Prüft konkret:**
+- `prioCfg` wird als Feld 9 serialisiert und vollständig deserialisiert
+- Alle 5 Prios, inkl. Prio 4 (`active=true, shortName="Transmog"`) und Prio 5 (`active=false`)
+
+**Warum wichtig:** Regressionsschutz für den Prio-4-Bug (war in einer früheren Version nicht korrekt übertragen worden).
+
+---
+
+### `testRaidMetaWithoutPrioConfig`
+
+**Testet:** `Comm.SendRaidMeta` ohne `prioCfg` (nil) → Rückwärtskompatibilität
+
+**Prüft:** `args[4]` ist `nil` — fehlendes Feld 9 führt zu keinem Crash.
 
 ---
 

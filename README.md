@@ -11,14 +11,15 @@ In WoW-Raids übernimmt der **Master Looter (ML)** die Kontrolle darüber, wer w
 Alle Raid-Mitglieder mit installiertem Addon sehen denselben Stand wie der ML — in Echtzeit, ohne manuellen Abgleich.
 
 **Kernfunktionen:**
-- Automatische Loot-Erkennung und Pending-Liste (Warbound-Items werden automatisch gefiltert)
-- Prio-System (BIS / OS / Transmog) mit konfigurierbaren Timern
+- Automatische Loot-Erkennung und Pending-Liste (nicht ausrüstbare Items werden automatisch gefiltert)
+- Prio-System mit bis zu 5 frei konfigurierbaren Prio-Slots (Standard: BIS / OS / Transmog)
 - Automatische `/roll`-Auswertung mit Tie-Re-Roll
 - Echtzeit-Sync zwischen ML und allen Observern (auch Late-Joiner)
 - Auto-Handel: Item wird beim Öffnen des Handelsfensters automatisch eingelegt
 - Mehrere Kopien desselben Items in einem Roll-Vorgang
-- Session-Log mit Boss-Quelle, Prio und Track pro Item
-- Raid-Historie mit Export als JSON oder CSV
+- Raid-Sessions mit Log (Boss-Quelle, Prio, Kategorie pro Item)
+- Legacy Loot: Items die vor dem Session-Start droppen werden automatisch gesichert
+- Export als JSON oder CSV
 
 ---
 
@@ -30,99 +31,110 @@ Alle Raid-Mitglieder mit installiertem Addon sehen denselben Stand wie der ML �
 
 ---
 
-## Erste Schritte
+## UI-Ebenen
 
-1. `/reqrt` eingeben → Hauptfenster öffnet sich
-2. **ML-Checkbox** oben rechts aktivieren → Master Looter Modus an
-3. Im **Raid-Tab** auf **Start Raid** klicken → Raid beginnt, alle Observer werden automatisch synchronisiert
-4. Boss töten → Loot-Fenster öffnen → Items erscheinen automatisch in der **Pending Loot** Liste
+Das Addon passt sich automatisch an die Rolle des Spielers im Raid an:
 
----
+| Rolle | Bedingung | UI |
+|---|---|---|
+| **Master Looter (ML)** | ML-Checkbox aktiviert | Volles Hauptfenster, alle Funktionen aktiv |
+| **Observer** | Raid-Assist oder Raid-Lead, kein ML | Hauptfenster read-only + Roll-Tab |
+| **Raider** | Im Raid ohne Assist/Lead | Nur Loot-Popup + Announce-Filter |
 
-## Zonen-Verhalten
-
-| Zone | Addon |
-|------|-------|
-| Raid-Instanz | aktiv |
-| Open World | aktiv |
-| Dungeon / Tiefen (Delve) | versteckt |
-| Arena / Schlachtfeld | versteckt |
-
-Das Addon zeigt bzw. versteckt sich automatisch beim Betreten einer Zone — kein manueller Eingriff nötig.
+Außerhalb eines Raids (solo, Dungeon, Party) ist der Raider-Modus inaktiv — alle Spieler sehen das volle Fenster.
 
 ---
 
 ## Master Looter Workflow
 
+> Detaillierte Verhaltens-Referenz: [Wiki → Master Looter](https://github.com/josome/RequiemRaidTools/wiki/Masterlooter)
+
 ### Schritt-für-Schritt
 
-1. **Raid starten** → Raiddaten (Name, Datum, ML-Name, Timer-Settings) werden an alle Observer gesendet
+1. **Session starten** → `/reqrt start [Tier-Name]` oder Button im Raid-Tab → Session-Daten werden an alle Observer gesendet
 2. **Boss töten** → Loot-Fenster öffnen → Items landen in **Pending Loot**
-3. **ML klickt ein Item** → Prio-Phase startet (Standard: 15 Sek., konfigurierbar)
-4. **Spieler melden Prio** per Chat:
-
-   | Eingabe | Bedeutung |
-   |---------|-----------|
-   | `1` | BIS – Best in Slot |
-   | `2` | OS – Offspec |
-   | `4` | Transmog |
-
-5. **Prio-Phase endet** → Roll-Phase startet automatisch
-6. **Spieler `/roll`en** → Ergebnisse erscheinen live im Addon (DE + EN Systemnachrichten werden erkannt)
+3. **ML klickt ein Item** → Prio-Phase startet (Standard: 15 Sek.)
+4. **Spieler melden Prio** per Raid-Chat (z.B. `1` für BIS, `2` für OS)
+5. **Prio-Phase endet** → Roll-Phase startet automatisch für berechtigte Spieler
+6. **Spieler `/roll`en** → Ergebnisse erscheinen live im Addon
 7. **Gewinner wird ermittelt**: Prio-Tier aufsteigend, Roll-Wert absteigend, bei Gleichstand automatischer Tie-Re-Roll
 8. **ML klickt Assign** → Spieler erhält die Zuweisung, Observer werden informiert
 9. **Handelsfenster öffnen** → Item wird automatisch in den Trade-Slot gelegt
 
-### Prio-Priorität beim Roll
+### Prio-System
 
-Wenn weniger Kandidaten als Item-Kopien vorhanden: Das Addon füllt automatisch aus der nächsten Prio-Stufe auf (BIS → OS → Transmog), sodass kein Roll unnötig ist.
+Bis zu 5 Prio-Slots, frei konfigurierbar im Settings-Panel. Standard:
+
+| Slot | Kürzel | Bedeutung |
+|------|--------|-----------|
+| 1 | BIS | Best in Slot |
+| 2 | OS | Off-Spec |
+| 4 | Tmog | Transmog |
+
+Inaktive Slots werden ausgegraut und sind nicht wählbar. Prio-Namen werden beim Session-Start an alle Observer und Raider übertragen.
 
 ---
 
-## Mehrere Kopien desselben Items (Multi-Winner Roll)
+## Raid-Sessions
+
+Loot wird in **Raid Sessions** erfasst. Eine Session umfasst einen oder mehrere Raids (Boss-Kills) und bleibt erhalten bis sie manuell geschlossen wird.
+
+- **Start**: Session-Start überträgt Metadaten und Prio-Konfiguration an alle
+- **Close / Resume**: Geschlossene Sessions können fortgesetzt werden — alle Observer werden erneut synchronisiert
+- **Legacy Loot**: Droppt Loot bevor eine Session gestartet wurde, legt das Addon automatisch eine geschlossene "Legacy"-Session an und sichert die Items darin
+- **Merge**: Eine Legacy-Session kann per Button in die aktive Session gemergt werden
+
+---
+
+## Mehrere Kopien desselben Items
 
 Droppt dasselbe Item mehrfach (z.B. 2× dasselbe Trinket):
 
-- Das Addon erkennt die Anzahl automatisch — es gibt **einen** Roll-Vorgang für alle Kopien
-- Gewinner werden von oben der Rangliste gefüllt (Top-N gewinnen)
+- Das Addon erkennt die Anzahl automatisch — ein Roll-Vorgang für alle Kopien
+- Top-N der Rangliste gewinnen
 - Statt "Assign" erscheint **"Assign All (N)"** — ein Klick vergibt alle Kopien gleichzeitig
-- Im Raid-Tab und Log werden alle Gewinner separat eingetragen
 
 ---
 
 ## Auto-Handel
 
-Nach der Zuweisung muss der ML das Item **manuell nicht mehr in den Trade-Slot ziehen**:
+Nach der Zuweisung zieht der ML das Item nicht mehr manuell:
 
 1. ML öffnet Handelsfenster mit dem Gewinner
-2. Addon erkennt den Handelspartner automatisch
+2. Addon erkennt den Handelspartner automatisch (auch Cross-Realm)
 3. Passendes Item wird aus den Taschen des ML gesucht und automatisch in den Trade-Slot gelegt
 4. Funktioniert auch bei mehreren Items pro Handelssitzung (bis zu 6 Slots)
 
 ---
 
-## Multi-Client Synchronisation
+## Observer & Raider
 
-### Observer-Sync
-Alle Raid-Mitglieder mit installiertem Addon sehen in Echtzeit:
-- Welches Item gerade verteilt wird
-- Wer welche Prio gemeldet hat
-- Roll-Ergebnisse live
-- Finale Zuweisung inkl. Prio des Gewinners
+> Vollständige Dokumentation: [Wiki → Raider Mode](https://github.com/josome/RequiemRaidTools/wiki/Raider-Mode)
+
+### Observer (Raid-Assist / Raid-Lead)
+- Sieht das volle Hauptfenster im read-only Modus
+- Erhält den **Roll-Tab**: identischer Inhalt wie das Raider-Popup (Item, Prio-Buttons, Roll-Button, Gewinner-Anzeige, Announce-Filter)
+- Wird automatisch synchronisiert wenn der ML eine Session startet oder nach einem Boss-Kill
+
+### Raider (ohne Assist/Lead)
+- Sieht ein kompaktes **Loot-Popup** wenn der ML ein Item announced
+- Prio-Buttons zeigen die konfigurierten Slot-Namen der aktuellen Session
+- Roll-Button wird aktiv wenn der ML die Roll-Phase startet und der Raider berechtigt ist
+- **Announce-Filter**: steuert für welche Item-Typen das Popup erscheint (Cloth, Leather, Trinkets, Rings …)
+- Minimap-Button: Links = Popup, Rechts = Hauptfenster
 
 ### Late-Joiner
-Tritt ein Spieler dem Raid bei, wenn ein Raid bereits aktiv ist:
-- Sein Client fragt automatisch nach dem aktuellen Raid-Zustand
-- Der ML-Client antwortet mit allen Raiddaten
-- Der neue Client ist sofort synchron
+Tritt ein Spieler dem Raid bei wenn eine Session bereits läuft, fragt sein Client automatisch nach dem aktuellen Stand. Der ML antwortet mit allen Session-Daten — der neue Client ist sofort synchron.
 
-### ML-Übergabe
-Ein Observer möchte die ML-Rolle übernehmen:
-1. Observer aktiviert die ML-Checkbox im Fenster
-2. Der aktuelle ML sieht ein Bestätigungs-Popup mit 15 Sekunden Zeit
-3. **OK**: Rolle wird übertragen, alle Observer werden informiert
-4. **Nein**: Claim wird abgelehnt, Observer bleibt Observer
-5. **Timeout** (15s keine Reaktion): Übergabe erfolgt automatisch
+---
+
+## ML-Übergabe
+
+1. Observer aktiviert die ML-Checkbox
+2. Aktueller ML sieht ein Bestätigungs-Popup (15 Sek.)
+3. **OK** → Rolle übertragen, alle Observer informiert
+4. **Nein** → Claim abgelehnt
+5. **Timeout** (15s) → Übergabe erfolgt automatisch
 
 ---
 
@@ -130,12 +142,12 @@ Ein Observer möchte die ML-Rolle übernehmen:
 
 | Bereich | Inhalt | Aktionen |
 |---------|--------|----------|
-| **Pending Loot** | Erkannte, noch nicht vergebene Items | Aktivieren (→), In Trash verschieben (✗) |
-| **Trash Bin** | Verworfene Items (wiederherstellbar) | Wiederherstellen (↑), Dauerhaft löschen (🗑) |
+| **Pending Loot** | Erkannte, noch nicht vergebene Items | Aktivieren, In Trash verschieben |
+| **Trash Bin** | Verworfene Items (wiederherstellbar) | Wiederherstellen, Dauerhaft löschen |
 
-Items im Trash sind **nicht verloren** — sie können jederzeit zurück in Pending verschoben werden.
+Items im Trash sind nicht verloren — sie können jederzeit zurück in Pending verschoben werden.
 
-> Items aus dem Inventar können per **Drag & Drop** auf den `>>` Button manuell zur Pending List hinzugefügt werden (z.B. wenn der ML vergessen hat den ML-Modus zu aktivieren).
+> Items aus dem Inventar können per **Drag & Drop** auf den `>>` Button manuell zur Pending List hinzugefügt werden.
 
 ---
 
@@ -143,19 +155,11 @@ Items im Trash sind **nicht verloren** — sie können jederzeit zurück in Pend
 
 | Tab | Inhalt |
 |-----|--------|
-| **Loot** | Aktives Item · Prio-Kandidaten · Roll-Ergebnisse · Session-Log |
-| **Spieler** | Roster mit Loot-Statistiken pro Spieler (Waffe, Trinket, Set, Sonstiges) |
-| **Log** | Chronologisches Protokoll aller Zuweisungen: Spieler, Boss, Track, Kategorie, Prio, Item |
-| **Raid** | Raid starten/beenden · Raid-Historie · Export |
-
----
-
-## Raid-Historie & Resume
-
-- Beendete Raids werden automatisch in der Historie gespeichert
-- Alle Daten bleiben erhalten: Teilnehmer, Loot-Log, Pending, Trash
-- **Resume**: Einen alten Raid aus der Liste auswählen → "Resume Raid" → alle Observer werden erneut synchronisiert
-- Export einzelner Raids (aktiv oder Historie) als JSON oder CSV
+| **Loot** | Aktives Item · Prio-Kandidaten · Roll-Ergebnisse |
+| **Log** | Chronologisches Protokoll aller Zuweisungen · Export |
+| **Raid** | Session starten/schließen · Session-Liste · Merge |
+| **Roll** | Roll-Tab für Observer (Item, Prio, Roll, Gewinner) |
+| **Spieler** | Roster mit Loot-Statistiken pro Spieler |
 
 ---
 
@@ -166,12 +170,8 @@ Items im Trash sind **nicht verloren** — sie können jederzeit zurück in Pend
 ### CSV-Spalten
 `RaidID · Tier · Difficulty · Track · Date · Status · Player · Item · Category · Prio · Timestamp`
 
-- `Status`: `Assigned` oder `Trashed`
-- `Track`: Champion / Hero / Mythic
-- Google Sheets kompatibel (UTF-8, RFC-4180 Quotes)
-
 ### JSON
-Vollständiges Snapshot-Format mit Raid-Metadaten und allen Spieler-Statistiken. Kompatibel mit dem mitgelieferten **Analyzer** (`analyzer/analyzer.html`).
+Vollständiges Snapshot-Format mit Session-Metadaten und allen Spieler-Statistiken. Kompatibel mit dem mitgelieferten **Analyzer** (`analyzer/analyzer.html`).
 
 ---
 
@@ -190,16 +190,16 @@ Im Ordner `analyzer/` liegt `analyzer.html` — ein eigenständiges Web-Tool fü
 
 ## Einstellungen
 
-| Einstellung | Optionen | Standard |
-|-------------|----------|---------|
-| Min. Qualität | Selten / Episch / Legendär | Episch |
-| Nicht ausrüstbare Items ausblenden | Ja / Nein | Ja |
-| Kategorie-Filter | Waffen / Trinkets / Set-Items / Sonstiges | alle an |
-| Prio-Phase Timer | 10 / 15 / 20 / 30 / 45 / 60 Sek. | 15 Sek. |
-| Roll-Phase Timer | 10 / 15 / 20 / 30 Sek. | 15 Sek. |
-| Chat-Kanal | Auto / Raid / Instanz / Gruppe / Aus | Auto |
-| Item-Ankündigung als Raid-Warning | Ja / Nein | Ja |
-| Export-Format | JSON / CSV | JSON |
+| Einstellung | Standard |
+|-------------|---------|
+| Min. Qualität | Episch |
+| Nicht ausrüstbare Items ausblenden | Ja |
+| Prio-Phase Timer | 15 Sek. |
+| Roll-Phase Timer | 15 Sek. |
+| Chat-Kanal | Auto |
+| Item-Ankündigung als Raid-Warning | Ja |
+| Gewinner per Whisper benachrichtigen | Ja |
+| Export-Format | JSON |
 
 ---
 
@@ -209,39 +209,21 @@ Im Ordner `analyzer/` liegt `analyzer.html` — ein eigenständiges Web-Tool fü
 |--------|-------------|
 | `/reqrt` | Fenster öffnen/schließen |
 | `/reqrt ml` | Master Looter Modus umschalten |
-| `/reqrt start [Name]` | Raid starten (optional mit Tier-Name) |
-| `/reqrt reset` | Raid zurücksetzen (zweifache Bestätigung) |
-| `/reqrt history [Spieler]` | Letzte 10 Items eines Spielers anzeigen |
-| `/reqrt cleanup` | Leere/fehlerhafte Einträge aus der Historie entfernen |
-
-### Test-Befehle (Entwicklung)
-
-| Befehl | Beschreibung |
-|--------|-------------|
-| `/reqrt test` | Test-Item aus dem Inventar in Pending-Loot einfügen |
-| `/reqrt testprio` | Prio-Phase mit Fake-Kandidaten simulieren |
-| `/reqrt testroll` | Roll-Phase mit Fake-Kandidaten simulieren |
-| `/reqrt testmulti [N]` | Multi-Item-Drop simulieren (N Kopien) |
-| `/reqrt testentry` | Fertigen Loot-Log-Eintrag direkt einfügen |
-
----
-
-## UI
-
-- **Dock-Tab**: Fenster dockt als schmale Leiste am linken Bildschirmrand an (`«`-Button)
-- **Dock-Tab**: zeigt ML-Status (☑/☐) und Raid-Status (☑/☐) auf einen Blick
-- **Dock-Tab ziehbar**: Position am Rand per Drag anpassen (wird gespeichert)
-- **Vollständig skalierbar**: Fenster per Drag (Titelleiste) verschieben, per Grip (unten rechts) in der Größe anpassen
-- **Einstellungen**: Zahnrad-Icon öffnet Panel rechts neben dem Hauptfenster
-- **Position persistent**: Fensterposition, -größe und Dock-Zustand bleiben über Sessions erhalten
+| `/reqrt start [Tier]` | Neue Raid-Session starten |
+| `/reqrt history [Spieler]` | Letzte Loot-Einträge eines Spielers |
+| `/reqrt reset` | Session zurücksetzen (zweifache Bestätigung) |
+| `/reqrt backup` | Datenbank sichern |
+| `/reqrt restore` | Datenbank aus Backup wiederherstellen |
+| `/reqrt cleanup` | Leere/fehlerhafte Einträge entfernen |
+| `/reqrt dbinfo` | Datenbankinfo anzeigen |
 
 ---
 
 ## Technisches
 
-- **SavedVariable**: `GuildLootDB`
-- **Addon-Kommunikation**: Prefix `RequiemRLT`
-- **WoW Interface**: 120001
+- **SavedVariable**: `GuildLootDB`, `GuildLootDBBackup`
+- **Addon-Kommunikation**: Prefix `RequiemRLT`, Trennzeichen Tab `\t` — [Wiki → COMM-Protokoll](https://github.com/josome/RequiemRaidTools/wiki/COMM-Protokoll)
+- **WoW Interface**: 120005 (Midnight 12.0.5)
 - **Sprache**: Deutsch
 
 ---
