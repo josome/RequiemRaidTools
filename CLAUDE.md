@@ -26,6 +26,16 @@
 - Bei jeder Änderung an `src/Comm.lua` (neues Telegramm, Felder geändert, Sender/Empfänger geändert) **muss** `docs/COMM_PROTOCOL.md` synchron aktualisiert werden — Größenangabe, Format-Zeile, Felder-Tabelle und ggf. die "Bekannte Einschränkungen"-Tabelle.
 - Wiki-Spiegelung: https://github.com/josome/RequiemRaidTools/wiki/COMM-Protokoll — der User pflegt das Wiki manuell aus `docs/COMM_PROTOCOL.md`.
 
+## Wiki
+- Lokales Wiki-Repo: `D:\work\WOWAddons\RequiemRaidTools.wiki` — bei Wiki-Änderungen dort direkt bearbeiten und pushen, nie temporäre Klone anlegen.
+- Raider Mode: https://github.com/josome/RequiemRaidTools/wiki/Raider-Mode (`Raider-Mode.md`)
+- COMM-Protokoll: https://github.com/josome/RequiemRaidTools/wiki/COMM-Protokoll (`COMM-Protokoll.md`)
+
+## Tests
+- Unit-Tests laufen via WoWUnit automatisch beim `/reload` im Spiel — vorausgesetzt `devMode` ist aktiv (`GuildLootDB.settings.devMode = true`).
+- `/reqrt test` ist ein Entwickler-Hilfscommand (fügt ein Fake-Loot-Item ein) und hat mit dem WoWUnit-Testrunner nichts zu tun.
+- Jede Test-Lua-Datei (`src/tests/Foo_Test.lua`) hat eine gleichnamige Dokumentations-Datei (`src/tests/Foo_Test.md`). Bei jeder Änderung an einer `*_Test.lua` **muss** die zugehörige `.md` synchron aktualisiert werden (neue Tests dokumentieren, entfernte streichen).
+
 ## Projekt-Konventionen
 - Slash-Commands: `/reqrt` und `/requiemraidtools` — NICHT `/rlt`
 - UI-Begriff für Sessions: **"Raid Session"** (intern `container`/`raidContainer`)

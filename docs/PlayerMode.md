@@ -1,26 +1,26 @@
-# Player Mode — Dokumentation
+# Raider Mode — Dokumentation
 
 ## Übersicht
 
 RequiemRaidTools kennt drei UI-Ebenen, abhängig von der Rolle des Spielers im Raid:
 
-| Rolle | Bedingung | UI | Minimap-Button |
-|---|---|---|---|
-| **Master Looter (ML)** | `isMasterLooter = true` | Volles Hauptfenster, alle Funktionen aktiv | Hauptfenster toggle |
-| **Observer** | Raid-Assist oder Raid-Lead, aber kein ML | Volles Hauptfenster, Buttons read-only; Loot-Popup | Hauptfenster toggle |
-| **Player** | Im Raid, aber kein Assist/Lead/ML | Nur Loot-Popup + Filter-Konfiguration | **ausschließlich Popup toggle** |
+| Rolle | Bedingung | UI | MMB Links | MMB Rechts |
+|---|---|---|---|---|
+| **Master Looter (ML)** | `isMasterLooter = true` | Volles Hauptfenster, alle Funktionen aktiv | Hauptfenster toggle | Popup (Filter-Only) |
+| **Observer** | Raid-Assist oder Raid-Lead, aber kein ML | Volles Hauptfenster read-only + Roll-Tab | Hauptfenster toggle | Popup (Filter-Only) |
+| **Raider** | Im Raid, aber kein Assist/Lead/ML | Nur Loot-Popup + Filter-Konfiguration | Popup (Filter-Only) | Hauptfenster öffnen |
 
-> **Außerhalb eines Raids** (solo, Dungeon, kein Raid): Player Mode ist inaktiv → volles Hauptfenster für alle. Der ML-Toggle (`/reqrt ml`) bleibt immer zugänglich.
+> **Außerhalb eines Raids** (solo, Dungeon, kein Raid): Raider Mode ist inaktiv → volles Hauptfenster für alle. Der ML-Toggle (`/reqrt ml`) bleibt immer zugänglich.
 
 ---
 
-## Player Mode
+## Raider Mode
 
-### Was ist Player Mode?
+### Was ist Raider Mode?
 
-Player Mode ist die UI-Ebene für normale Raider ohne Raid-Assist oder Raid-Lead. Das große ML-/Observer-Fenster (Loot-Tab, Spieler-Tab, Log, Raid-Verwaltung) ist für diese Spieler nicht relevant — sie brauchen nur zu wissen wann ein Item announced wird und welche Prio sie drücken sollen.
+Raider Mode ist die UI-Ebene für normale Raider ohne Raid-Assist oder Raid-Lead. Das große ML-/Observer-Fenster (Loot-Tab, Spieler-Tab, Log, Raid-Verwaltung) ist für diese Spieler nicht relevant — sie brauchen nur zu wissen wann ein Item announced wird und welche Prio sie drücken sollen.
 
-### Was sieht ein Player?
+### Was sieht ein Raider?
 
 Wenn der Master Looter ein Item freigegeben hat (announced), erscheint automatisch ein **Loot-Popup**:
 
@@ -43,11 +43,13 @@ Wenn der Master Looter ein Item freigegeben hat (announced), erscheint automatis
 
 ### Minimap-Button
 
-Für Player gilt: der Minimap-Button öffnet und schließt **ausschließlich das Popup** — das Hauptfenster wird nie geöffnet. Das ist die einzige Rolle bei der der MMB-Klick nicht das Hauptfenster toggelt.
+| Rolle | Linksklick | Rechtsklick |
+|---|---|---|
+| **ML** | Hauptfenster toggle (`UI.Toggle()`) | Popup Filter-Only (`UI.ShowPlayerPopupFilterOnly()`) |
+| **Observer** | Hauptfenster toggle (`UI.Toggle()`) | Popup Filter-Only (`UI.ShowPlayerPopupFilterOnly()`) |
+| **Raider** | Popup Filter-Only (`UI.ShowPlayerPopupFilterOnly()`) | Hauptfenster öffnen (`UI.OpenMainWindow()`) |
 
-- **1. Klick**: Popup öffnet sich in Filter-Only-Ansicht (kein aktives Item)
-- **2. Klick**: Popup schließt sich
-- **✕-Button** im Popup: schließt das Popup, nächster MMB-Klick öffnet es wieder
+Raider können das Hauptfenster per Rechtsklick öffnen — `UI.OpenMainWindow()` umgeht den `IsPlayerMode()`-Guard. So können auch Raider z.B. den Session-Log einsehen.
 
 > `/reqrt popup` öffnet das Popup immer in Filter-Only-Ansicht, unabhängig von der Rolle.
 
@@ -112,12 +114,13 @@ Die **☑ Enable-Checkbox** oben rechts im Popup steuert ob das Popup bei einem 
 
 ### Wo den Filter einstellen?
 
-**Player** (kein Assist/Lead im Raid):
+**Raider** (kein Assist/Lead im Raid):
 - Die Filter-Checkboxen sind dauerhaft am unteren Rand des Loot-Popups sichtbar und dort direkt bearbeitbar.
 - Über den Minimap-Button oder `/reqrt popup` öffnet sich das Popup in einer Filter-Only-Ansicht zur Vorkonfiguration.
 
 **Observer** (Raid-Assist/Lead ohne ML):
-- Der Announce-Filter-Abschnitt ist im Settings-Panel (Zahnrad-Icon) sichtbar und bearbeitbar.
+- Erhält den Roll-Tab (Tab 4) im Hauptfenster — identischer Inhalt wie das Raider-Popup (Icon, Prio-Buttons, Roll-Button, Gewinner-Label, Announce-Filter). Kein separates Popup.
+- Der Announce-Filter-Abschnitt ist im Roll-Tab und im Settings-Panel (Zahnrad-Icon) sichtbar und bearbeitbar.
 
 **ML:**
 - Kein Announce-Filter (der ML sieht alle announced Items selbst).
@@ -131,7 +134,7 @@ Die **☑ Enable-Checkbox** oben rechts im Popup steuert ob das Popup bei einem 
 | **Wer** | ML | Observer / Player (privat) |
 | **Wann** | Beim Öffnen einer Leiche | Beim Empfang eines ITEM_ON |
 | **Was** | Welche Items in die ML-Pending-Liste kommen | Welche announced Items den Popup triggern |
-| **Wo** | Settings-Panel (ML) | Popup (Player) / Settings-Panel (Observer) |
+| **Wo** | Settings-Panel (ML) | Popup (Raider) / Settings-Panel (Observer) |
 
 ---
 
@@ -154,18 +157,18 @@ GL.IsPlayerMode()    -- true wenn im Raid, aber weder ML noch Assist/Lead
 - `OnCommSessionStart` setzt `isMasterLooter = false` wenn der Sender nicht der lokale Spieler ist
 - `StartRaid` und `ResumeContainer` senden nach dem Setzen von `isMasterLooter = true` ein `ML_ANNOUNCE` an alle Raid-Mitglieder
 
-### Comm-Nachrichten die den Popup steuern
+### Comm-Nachrichten die Popup und Roll-Tab steuern
 
 Alle benötigten Nachrichten existieren im Protokoll (kein Protokoll-Bump nötig):
 
-| Nachricht | Wirkung |
-|---|---|
-| `SESSION_START` | Liefert `prioCfg` → Prio-Button-Beschriftungen, setzt isMasterLooter=false |
-| `ML_ANNOUNCE` | Setzt isMasterLooter korrekt auf allen Clients |
-| `ITEM_ON` | Popup erscheint (wenn Filter passt und popupEnabled) |
-| `ITEM_OFF` | Popup verschwindet |
-| `ROLL_START` | Roll-Button wird aktiv (wenn Spieler in Liste) |
-| `ASSIGN` | Gewinner-Anzeige (wenn lokaler Spieler) oder stilles Schließen |
+| Nachricht | Wirkung Raider (Popup) | Wirkung Observer (Roll-Tab) |
+|---|---|---|
+| `SESSION_START` | prioCfg → Prio-Button-Beschriftungen, isMasterLooter=false | identisch |
+| `ML_ANNOUNCE` | isMasterLooter korrekt setzen | identisch |
+| `ITEM_ON` | Popup erscheint (wenn Filter passt und popupEnabled) | Roll-Tab aktualisiert sich, Hauptfenster wechselt automatisch auf Roll-Tab |
+| `ITEM_OFF` | Popup verschwindet | Roll-Tab zeigt Filter-Only |
+| `ROLL_START` | Roll-Button aktiv (wenn Spieler in Liste) | identisch |
+| `ASSIGN` | Gewinner-Anzeige (wenn lokaler Spieler), sonst stilles Schließen | identisch |
 
 ### Filter-Speicherung
 
@@ -189,6 +192,6 @@ Privat pro Spieler, wird **nicht** per Comm übertragen.
 
 | Command | Funktion |
 |---|---|
-| `/reqrt playermode` | `forcePlayerMode`-Flag toggeln — ML kann Popup solo testen |
+| `/reqrt playermode` | `forcePlayerMode`-Flag toggeln — ML kann Raider Mode solo testen |
 | `/reqrt simitem` | Erstes equippables Bag-Item als ITEM_ON simulieren (respektiert Filter) |
 | `/reqrt popup` | Öffnet Popup in Filter-Only-Ansicht (immer, unabhängig von Rolle) |

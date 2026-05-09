@@ -105,11 +105,11 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
         Mock(GuildLoot, "OnCommSessionStart", function(...) args = {...} end)
 
         local cfg = {
-            [1] = { active=true,  shortName="BiS",  description="Best in Slot" },
-            [2] = { active=true,  shortName="Upgr", description="Upgrade" },
-            [3] = { active=false, shortName="",     description="" },
-            [4] = { active=false, shortName="",     description="" },
-            [5] = { active=false, shortName="",     description="" },
+            [1] = { active=true,  shortName="BiS",     description="Best in Slot" },
+            [2] = { active=true,  shortName="Upgr",    description="Upgrade" },
+            [3] = { active=false, shortName="",        description="" },
+            [4] = { active=true,  shortName="Transmog", description="Transmog" },
+            [5] = { active=false, shortName="",        description="" },
         }
         local msg = Roundtrip(function()
             Comm.SendSessionStart("sess-01", "KW 15 2026", 1700000000, cfg)
@@ -124,10 +124,13 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
         AreEqual(1700000000,         args[3])
         AreEqual("MockSender-Realm", args[4])
         Exists(args[5])
-        AreEqual("BiS",  args[5][1].shortName)
+        AreEqual("BiS",      args[5][1].shortName)
         IsTrue(args[5][1].active)
-        AreEqual("Upgr", args[5][2].shortName)
+        AreEqual("Upgr",     args[5][2].shortName)
         IsFalse(args[5][3].active)
+        IsTrue(args[5][4].active)
+        AreEqual("Transmog", args[5][4].shortName)
+        IsFalse(args[5][5].active)
         MockRestore()
     end
 
@@ -357,11 +360,11 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
         Mock(GuildLoot, "OnCommRaidMeta", function(...) args = {...} end)
 
         local cfg = {
-            [1] = { active=true,  shortName="BiS",  description="Best in Slot" },
-            [2] = { active=true,  shortName="Upgr", description="Upgrade" },
-            [3] = { active=false, shortName="",     description="" },
-            [4] = { active=false, shortName="",     description="" },
-            [5] = { active=false, shortName="",     description="" },
+            [1] = { active=true,  shortName="BiS",     description="Best in Slot" },
+            [2] = { active=true,  shortName="Upgr",    description="Upgrade" },
+            [3] = { active=false, shortName="",        description="" },
+            [4] = { active=true,  shortName="Transmog", description="Transmog" },
+            [5] = { active=false, shortName="",        description="" },
         }
         local meta = { tier="Nerub-ar Palace", difficulty="H", startedAt=1700000000, closedAt=nil, participants={} }
         local msg = Roundtrip(function()
@@ -376,11 +379,14 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
         AreEqual("raid-99", args[2])
         local receivedCfg = args[4]
         Exists(receivedCfg)
-        AreEqual("BiS",  receivedCfg[1].shortName)
+        AreEqual("BiS",      receivedCfg[1].shortName)
         IsTrue(receivedCfg[1].active)
-        AreEqual("Upgr", receivedCfg[2].shortName)
+        AreEqual("Upgr",     receivedCfg[2].shortName)
         IsTrue(receivedCfg[2].active)
         IsFalse(receivedCfg[3].active)
+        IsTrue(receivedCfg[4].active)
+        AreEqual("Transmog", receivedCfg[4].shortName)
+        IsFalse(receivedCfg[5].active)
         MockRestore()
     end
 
