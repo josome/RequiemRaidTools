@@ -169,16 +169,30 @@ function UI.BuildLootPanel(parent)
     panel.pendingContent = pendingContent
     panel.pendingScroll  = pendingScroll
 
-    -- Empty-State: Schatztruhe wenn keine Items pending
+    -- Empty-State: tanzende Spielerfigur wenn keine Items pending
     local emptyFrame = CreateFrame("Frame", nil, sidebar)
     emptyFrame:SetPoint("TOPLEFT",     pendingScroll, "TOPLEFT",     0, 0)
     emptyFrame:SetPoint("BOTTOMRIGHT", pendingScroll, "BOTTOMRIGHT", 0, 0)
     emptyFrame:SetFrameLevel(pendingScroll:GetFrameLevel() + 2)
-    local emptyTex = emptyFrame:CreateTexture(nil, "ARTWORK")
-    emptyTex:SetTexture("Interface\\Icons\\INV_Misc_Chest_Special")
-    emptyTex:SetSize(64, 64)
-    emptyTex:SetPoint("CENTER", emptyFrame, "CENTER", 0, 0)
-    emptyTex:SetAlpha(0.35)
+    local danceModel = CreateFrame("PlayerModel", nil, emptyFrame)
+    danceModel:SetSize(200, 240)
+    danceModel:SetPoint("BOTTOM", emptyFrame, "BOTTOM", 0, 5)
+    danceModel:SetUnit("player")
+    danceModel:SetAnimation(69)
+    danceModel:SetAlpha(0.55)
+-- Modell bei jedem Show neu initialisieren (verhindert leere Frames nach /reload)
+    emptyFrame:SetScript("OnShow", function()
+        danceModel:SetUnit("player")
+        danceModel:SetAnimation(69)
+    end)
+    -- Gestaltänderung (z.B. Druide) aktualisiert das Modell sofort
+    emptyFrame:RegisterEvent("UNIT_MODEL_CHANGED")
+    emptyFrame:SetScript("OnEvent", function(self, event, unitID)
+        if unitID == "player" and self:IsShown() then
+            danceModel:SetUnit("player")
+            danceModel:SetAnimation(69)
+        end
+    end)
     emptyFrame:Hide()
     panel.pendingEmptyTex = emptyFrame
 
@@ -494,7 +508,8 @@ function UI.RefreshLootTab()
 
     -- Empty-State Textur
     if UI.lootPanel.pendingEmptyTex then
-        if #items == 0 and not isTrashed then
+        if #items == 0 and not isTrashed
+           and GuildLootDB.settings.danceEmptyState ~= false then
             UI.lootPanel.pendingEmptyTex:Show()
         else
             UI.lootPanel.pendingEmptyTex:Hide()

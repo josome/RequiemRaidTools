@@ -41,6 +41,7 @@ local DB_DEFAULTS = {
         minimapAngle = 45,
         lastTab      = nil,
         raidWarnItem   = true,
+        danceEmptyState = true,
         whisperWinner  = true,
         exportFormat = "JSON",  -- "JSON" | "CSV"
         commLoopback = false,   -- true: eigene Addon-Nachrichten empfangen (nur für Tests)

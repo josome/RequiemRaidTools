@@ -202,6 +202,8 @@ function UI.BuildSettingsPanel(parent)
 
     MakeCheck("Announce item start as raid warning", "raidWarnItem")
     MakeCheck("Whisper winner on assign", "whisperWinner")
+    local cbDance = MakeCheck("Tanzende Figur bei leerem Loot", "danceEmptyState")
+    cbDance:HookScript("OnClick", function() UI.RefreshLootTab() end)
 
     -- Export Format Dropdown
     local expFmtLbl = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
