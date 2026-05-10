@@ -16,12 +16,17 @@ local ADDON_VERSION   = (C_AddOns and C_AddOns.GetAddOnMetadata and C_AddOns.Get
                      or (GetAddOnMetadata and GetAddOnMetadata("RequiemRaidTools", "Version"))
                      or "0.5"  -- Fallback mit gültiger Minor-Version
 local MIN_PROTO_MINOR = 5  -- älteste kompatible Minor-Version
-local VERSION_WARN_COOLDOWN = 60  -- Sekunden zwischen Warnungen pro Sender
+local VERSION_WARN_COOLDOWN = 300  -- Sekunden zwischen Warnungen pro Sender (5 min)
 local versionWarnedAt = {}  -- sender -> GetTime() der letzten Warnung
 
 local function MinorVersion(v)
-    local minor = v:match("^%d+%.(%d+)")
-    return tonumber(minor) or 0
+    local major, minor = v:match("^(%d+)%.(%d+)")
+    major = tonumber(major) or 0
+    minor = tonumber(minor) or 0
+    -- Ab Major 1: Protokoll-Wert = major*10+minor (1.0.x → 10, 1.1.x → 11 …)
+    -- Damit liegt 1.0.x immer über MIN_PROTO_MINOR=5 (0.x-Ära)
+    if major >= 1 then return major * 10 + minor end
+    return minor
 end
 
 -- Prefix beim Laden registrieren
@@ -342,18 +347,25 @@ function Comm.OnMessage(msg, sender)
     local canWarn = (now - lastWarn) >= VERSION_WARN_COOLDOWN
     if senderMinor < MIN_PROTO_MINOR then
         if canWarn then
-            GL.Print("|cffff4444[ReqRT] " .. GL.ShortName(sender or "?")
+            GL.Print("|cffff4444[ReqRT] " .. (sender or "?")
                      .. " hat v" .. senderVersion
                      .. " — inkompatibel (min Minor: " .. MIN_PROTO_MINOR
                      .. "). Bitte Addon aktualisieren.|r")
             versionWarnedAt[sender] = now
         end
         return
-    elseif senderMinor ~= localMinor then
+    elseif senderMinor < localMinor then
         if canWarn then
-            GL.Print("|cffff8800[ReqRT] Protokoll-Version mismatch: "
-                     .. GL.ShortName(sender or "?") .. " hat v" .. senderVersion
-                     .. ", lokal v" .. ADDON_VERSION .. "|r")
+            GL.Print("|cffff8800[ReqRT] " .. (sender or "?")
+                     .. " hat eine ältere Version (v" .. senderVersion
+                     .. ") — bitte Addon aktualisieren.|r")
+            versionWarnedAt[sender] = now
+        end
+    elseif senderMinor > localMinor then
+        if canWarn then
+            GL.Print("|cffff8800[ReqRT] Deine Version (v" .. ADDON_VERSION
+                     .. ") ist älter als die von " .. (sender or "?")
+                     .. " (v" .. senderVersion .. ") — bitte Addon aktualisieren.|r")
             versionWarnedAt[sender] = now
         end
     end
