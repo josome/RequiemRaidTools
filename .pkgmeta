@@ -4,8 +4,11 @@ manual-changelog: CHANGELOG.md
 
 ignore:
   - test
+  - tests
+  - spec
   - docs
   - analyzer
+  - .github
   - CHANGELOG.md
   - README.md
   - CLAUDE.md

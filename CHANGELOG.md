@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.0.0.0
+
+**New Features**
+- **Dancing character** — When the pending loot list is empty, your character dances in the sidebar as a fun visual. Can be disabled in the Settings panel ("Tanzende Figur bei leerem Loot").
+- **Loot sound** — A sound plays when a new item is added to the pending loot list. Can be toggled in the Loot Popup.
+- **Priority 4 (Transmog)** — The fourth priority slot is now enabled by default with the label "Transmog".
+
+**Internal**
+- Standalone unit test runner via busted + GitHub Actions CI (all 66 tests run on every push).
+
 ## v0.5.9.5
 
 **Bug Fixes**
