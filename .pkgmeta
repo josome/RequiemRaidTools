@@ -2,6 +2,11 @@ package-as: RequiemRaidTools
 
 manual-changelog: CHANGELOG.md
 
+externals:
+  Libs/LibStub: https://repos.wowace.com/wow/libstub/trunk
+  Libs/CallbackHandler-1.0: https://repos.wowace.com/wow/callbackhandler/trunk/CallbackHandler-1.0
+  Libs/LibDataBroker-1.1: https://github.com/tekkub/libdatabroker-1-1.git
+  Libs/LibDBIcon-1.0: https://github.com/Stanzilla/LibDBIcon.git
 ignore:
   - test
   - tests
