@@ -10,7 +10,7 @@ local icon = LibStub("LibDBIcon-1.0")
 
 local dataobj = LDB:NewDataObject("RequiemRaidTools", {
     type = "launcher",
-    icon = "Interface\\Icons\\INV_Misc_QuestionMark",
+    icon = "Interface\\AddOns\\RequiemRaidTools\\Media\\icon",
     OnClick = function(self, button)
         if GL.IsPlayerMode and GL.IsPlayerMode() then
             -- Raider Mode: Links = Popup, Rechts = Hauptfenster
@@ -45,6 +45,12 @@ local f = CreateFrame("Frame")
 f:RegisterEvent("PLAYER_LOGIN")
 f:SetScript("OnEvent", function()
     if not RequiemRaidToolsMinimapIconDB then RequiemRaidToolsMinimapIconDB = {} end
+    if RequiemRaidToolsMinimapIconDB.showInCompartment == nil then
+        RequiemRaidToolsMinimapIconDB.showInCompartment = true
+    end
     icon:Register("RequiemRaidTools", dataobj, RequiemRaidToolsMinimapIconDB)
+    icon:RemoveButtonBorder("RequiemRaidTools")
+    icon:SetButtonSize("RequiemRaidTools", 30)
+    icon:SetButtonIcon("RequiemRaidTools", nil, 29)
     GL.UI.minimapBtn = icon:GetMinimapButton("RequiemRaidTools")
 end)
