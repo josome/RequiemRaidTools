@@ -18,3 +18,4 @@ ignore:
   - README.md
   - CLAUDE.md
   - RequiemRaidTools.code-workspace
+  - pics
