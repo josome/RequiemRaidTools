@@ -173,6 +173,23 @@ Geprüft wird: Wird `GL.UI.ShowPlayerPopup` aufgerufen oder geblockt, abhängig 
 
 ---
 
+### `testUnknownCategory`
+
+**Testet:** Unbekannte `category` (z.B. neu geplanter Filter) → Default-Verhalten (Popup wird gezeigt). Fixiert das Verhalten bevor `PopupFilterMatches` auf eine Dispatch-Tabelle umgestellt wird (Refactoring-Paket B1).
+
+**Setup:** `{}`, `category = "doesnotexist"`  
+**Erwartet:** `ShowPlayerPopup` aufgerufen
+
+---
+
+### `testFilterRulesTable_AllMappings`
+
+**Testet:** Parametrisierter Snapshot über alle bekannten Filter-Kategorien → expected match/no-match. Ruft `GL.PopupFilterMatches(link, category, skipUsableCheck)` direkt auf, statt durch `OnCommItemActivate`. Verhindert dass die geplante Dispatch-Tabelle (Refactoring B1, `FILTER_RULES`) ein Mapping versehentlich verändert.
+
+**Abgedeckte Mappings:** Cloth/Leather/Mail/Plate (subType), Neck/Ring (equipLoc), Trinket, Other-Fallback, nicht-benutzbare Waffe mit `nonUsableWeapon=false`.
+
+---
+
 ## Was diese Tests nicht abdecken
 
 | Bereich | Warum nicht abgedeckt |

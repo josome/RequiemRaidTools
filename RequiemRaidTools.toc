@@ -33,3 +33,4 @@ src/tests/Assign_Test.lua
 src/tests/Trade_Test.lua
 src/tests/Session_Test.lua
 src/tests/Filter_Test.lua
+src/tests/Util_Test.lua

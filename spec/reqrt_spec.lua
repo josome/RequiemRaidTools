@@ -13,9 +13,58 @@ dofile("src/tests/Assign_Test.lua")
 dofile("src/tests/Session_Test.lua")
 dofile("src/tests/Trade_Test.lua")
 dofile("src/tests/Filter_Test.lua")
+dofile("src/tests/Util_Test.lua")
 
 -- ADDON_LOADED feuern → alle _loader-Frames registrieren ihre Suites bei WoWUnit
 FireEvent("ADDON_LOADED", "RequiemRaidTools")
 
 -- Suites bei busted als describe/it registrieren
 WoWUnit.RegisterWithBusted(describe, it)
+
+-- ============================================================
+-- API-Snapshot — fängt Load-Order-Regressionen ab (Paket D1).
+-- Wenn Core.lua aufgespalten wird, müssen all diese Funktionen
+-- weiterhin nach dem Load existieren. Schlägt an, sobald eine
+-- Funktion fehlt oder vor Definition referenziert wurde.
+-- ============================================================
+describe("ReqRT.API", function()
+    local function expectFunction(path)
+        it(path .. " ist definiert", function()
+            local cur = _G.GuildLoot
+            assert(cur ~= nil, "GuildLoot nicht geladen")
+            for segment in path:gmatch("[^%.]+") do
+                if segment == "GuildLoot" then
+                    -- skip
+                else
+                    cur = cur[segment]
+                    assert(cur ~= nil, path .. " — Segment '" .. segment .. "' ist nil")
+                end
+            end
+            assert(type(cur) == "function",
+                path .. " ist " .. type(cur) .. ", erwartet function")
+        end)
+    end
+
+    -- Core / Session
+    expectFunction("GuildLoot.StartContainer")
+    expectFunction("GuildLoot.CloseContainer")
+    expectFunction("GuildLoot.ResetCurrentRaid")
+    expectFunction("GuildLoot.LoadRaidRoster")
+    expectFunction("GuildLoot.EnsureRaidMeta")
+
+    -- Util
+    expectFunction("GuildLoot.ShortName")
+    expectFunction("GuildLoot.GetActivePrios")
+    expectFunction("GuildLoot.GetPrioLabel")
+    expectFunction("GuildLoot.ParseLootInput")
+
+    -- Comm
+    expectFunction("GuildLoot.Comm.OnMessage")
+    expectFunction("GuildLoot.Comm.SendAssign")
+    expectFunction("GuildLoot.Comm.SendSessionStart")
+    expectFunction("GuildLoot.Comm.SendMLAnnounce")
+
+    -- Loot
+    expectFunction("GuildLoot.Loot.AssignLootConfirm")
+    expectFunction("GuildLoot.Loot.OnCommAssign")
+end)

@@ -802,6 +802,164 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
         end)
     end
 
+    -- ============================================================
+    -- C1: GL.DeleteSession(ci) — PENDING (Funktion existiert noch nicht).
+    -- Heute löscht UI_RaidTab.lua:149-168 direkt via table.remove.
+    -- Wenn die Extraktion kommt, müssen diese Tests Cases abdecken.
+    -- ============================================================
+
+    local function HasDeleteSession()
+        return type(GuildLoot.DeleteSession) == "function"
+    end
+
+    local function MarkPending(reason)
+        local p = rawget(_G, "pending")
+        if type(p) == "function" then p(reason) end
+    end
+
+    function Tests:testDeleteSession_RemovesFromContainers()
+        if not HasDeleteSession() then
+            MarkPending("C1 not yet implemented — GL.DeleteSession")
+            return
+        end
+        WithTestDB(function()
+            MockSideEffects()
+            GuildLootDB.raidContainers = {
+                { id="A", label="A" }, { id="B", label="B" }, { id="C", label="C" }
+            }
+            GuildLootDB.activeContainerIdx = nil
+
+            GuildLoot.DeleteSession(2)
+
+            AreEqual(2, #GuildLootDB.raidContainers)
+            AreEqual("A", GuildLootDB.raidContainers[1].id)
+            AreEqual("C", GuildLootDB.raidContainers[2].id)
+            MockRestore()
+        end)
+    end
+
+    function Tests:testDeleteSession_ClearsActiveIdxWhenDeletingActive()
+        if not HasDeleteSession() then
+            MarkPending("C1 not yet implemented — GL.DeleteSession")
+            return
+        end
+        WithTestDB(function()
+            MockSideEffects()
+            GuildLootDB.raidContainers = { { id="A" }, { id="B" } }
+            GuildLootDB.activeContainerIdx = 2
+
+            GuildLoot.DeleteSession(2)
+
+            AreEqual(nil, GuildLootDB.activeContainerIdx)
+            MockRestore()
+        end)
+    end
+
+    function Tests:testDeleteSession_KeepsActiveIdxWhenDeletingOther()
+        if not HasDeleteSession() then
+            MarkPending("C1 not yet implemented — GL.DeleteSession")
+            return
+        end
+        WithTestDB(function()
+            MockSideEffects()
+            GuildLootDB.raidContainers = { { id="A" }, { id="B" }, { id="C" } }
+            GuildLootDB.activeContainerIdx = 3
+
+            GuildLoot.DeleteSession(1)
+
+            -- Nach Löschen des ersten Eintrags rückt 3 auf 2 — Test fixiert diese Erwartung
+            AreEqual(2, GuildLootDB.activeContainerIdx)
+            MockRestore()
+        end)
+    end
+
+    function Tests:testDeleteSession_OutOfBoundsIndex_NoOp()
+        if not HasDeleteSession() then
+            MarkPending("C1 not yet implemented — GL.DeleteSession")
+            return
+        end
+        WithTestDB(function()
+            MockSideEffects()
+            GuildLootDB.raidContainers = { { id="A" } }
+            GuildLootDB.activeContainerIdx = 1
+
+            -- Darf nicht crashen; Bestand bleibt unverändert
+            GuildLoot.DeleteSession(99)
+
+            AreEqual(1, #GuildLootDB.raidContainers)
+            AreEqual(1, GuildLootDB.activeContainerIdx)
+            MockRestore()
+        end)
+    end
+
+    -- ============================================================
+    -- C2: GL.MigratePendingLoot() — PENDING (Funktion existiert noch nicht).
+    -- Heute ist die Migration inline in StartContainer (Core.lua:318-334).
+    -- Wenn extrahiert, soll sie direkt aufrufbar und idempotent sein.
+    -- ============================================================
+
+    local function HasMigratePendingLoot()
+        return type(GuildLoot.MigratePendingLoot) == "function"
+    end
+
+    function Tests:testMigratePendingLoot_CreatesLegacyContainer()
+        if not HasMigratePendingLoot() then
+            MarkPending("C2 not yet implemented — GL.MigratePendingLoot")
+            return
+        end
+        WithTestDB(function()
+            MockSideEffects()
+            GuildLootDB.currentRaid.pendingLoot = {
+                { link="|Hitem:1|h|r", time=time() },
+                { link="|Hitem:2|h|r", time=time() },
+            }
+
+            GuildLoot.MigratePendingLoot()
+
+            AreEqual(1, #GuildLootDB.raidContainers)
+            AreEqual(2, #GuildLootDB.raidContainers[1].pendingLoot)
+            AreEqual(0, #GuildLootDB.currentRaid.pendingLoot)
+            MockRestore()
+        end)
+    end
+
+    function Tests:testMigratePendingLoot_Idempotent()
+        if not HasMigratePendingLoot() then
+            MarkPending("C2 not yet implemented — GL.MigratePendingLoot")
+            return
+        end
+        WithTestDB(function()
+            MockSideEffects()
+            GuildLootDB.currentRaid.pendingLoot = {
+                { link="|Hitem:1|h|r", time=time() },
+            }
+
+            GuildLoot.MigratePendingLoot()
+            GuildLoot.MigratePendingLoot()  -- zweiter Aufruf
+
+            -- Nur ein Legacy-Container, nicht zwei
+            AreEqual(1, #GuildLootDB.raidContainers)
+            MockRestore()
+        end)
+    end
+
+    function Tests:testMigratePendingLoot_EmptyPending_NoOp()
+        if not HasMigratePendingLoot() then
+            MarkPending("C2 not yet implemented — GL.MigratePendingLoot")
+            return
+        end
+        WithTestDB(function()
+            MockSideEffects()
+            GuildLootDB.currentRaid.pendingLoot = {}
+
+            GuildLoot.MigratePendingLoot()
+
+            -- Kein Legacy-Container für leere pendingLoot
+            AreEqual(0, #GuildLootDB.raidContainers)
+            MockRestore()
+        end)
+    end
+
     -- testRaidQueryCombatGate
     -- Prüft: ML queued RAID_QUERY im Kampf statt sofort SendSessionSync aufzurufen
     -- --------------------------------------------------------

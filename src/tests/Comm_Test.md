@@ -247,13 +247,66 @@ Setzt intern drei Mocks (SendAddonMessage, IsInRaid, IsInGroup), ruft `sendFn()`
 
 ---
 
+### `testVersionWarn_IncompatibleOld`
+
+**Testet:** Nachricht mit `senderMinor < MIN_PROTO_MINOR` (5) erzeugt eine Inkompatibilitäts-Warnung und der Dispatch wird abgebrochen.
+
+**Setup:** Mock auf `GuildLoot.Print` und `GuildLoot.Loot.OnCommItemActivate`. Künstliche Nachricht `"0.4\tITEM_ON\t..."`.
+
+**Prüft:** Handler nicht aufgerufen, Warnung enthält Substring "inkompatibel".
+
+---
+
+### `testVersionWarn_OlderButCompatible_HandlerStillCalled`
+
+**Testet:** Sender-Minor < lokal-Minor (aber ≥ MIN_PROTO_MINOR) → Warnung möglich, Dispatch erfolgt trotzdem.
+
+**Prüft:** Handler aufgerufen.
+
+---
+
+### `testVersionWarn_NewerSender_HandlerStillCalled`
+
+**Testet:** Sender-Minor > lokal-Minor → Warnung "Deine Version ... älter" + Dispatch.
+
+**Prüft:** Handler aufgerufen, Warnung enthält "älter".
+
+---
+
+### `testVersionWarn_Cooldown`
+
+**Testet:** Zwei Nachrichten innerhalb von `VERSION_WARN_COOLDOWN` (300 s) vom selben Sender erzeugen nur **eine** Warnung.
+
+**Setup:** `GetTime` gemockt, zwei `OnMessage`-Aufrufe mit 60 s Abstand.
+
+**Prüft:** Zweite Nachricht erhöht `#prints` nicht.
+
+---
+
+### `testVersionWarn_NoVersionPrefix`
+
+**Testet:** Nachricht ohne Version-Trennzeichen erzeugt spezielle Warnung und early-return.
+
+**Prüft:** Handler nicht aufgerufen, Warnung enthält "ohne Version".
+
+---
+
+### `testSelfFilter_DispatchStopsCompletely`
+
+**Testet:** Self-Filter (Loopback off) stoppt den **gesamten** Dispatch — nicht nur einen einzelnen Handler. Verifiziert, dass auch unbeteiligte Handler (`OnCommItemClear`) bei Self-Filter nicht angefasst werden.
+
+**Setup:** `commLoopback = false`. Mocks auf `OnCommItemActivate` und `OnCommItemClear`.
+
+**Prüft:** Beide Handler nicht aufgerufen.
+
+---
+
 ## Was diese Tests nicht abdecken
 
 | Bereich | Warum nicht abgedeckt |
 |---------|-----------------------|
 | Echte Netzwerkübertragung | Kein zweiter WoW-Client im Testlauf; kein Addon-Bus im Unit-Test |
 | Nachrichtenlänge (WoW-Limit: 255 Zeichen) | Kein Längencheck in der Testsuite; sehr lange Item-Links oder PrioCfg könnten truncated werden |
-| Protokoll-Versionskompatibilität (Minor-Mismatch) | Kein Test der eine ältere Protokollversion simuliert |
 | UI-Reaktionen | UI-Layer ist nicht Gegenstand der Comm-Tests |
 | `LOOT_TRASH` | Kein Handler-Mock möglich — schreibt direkt in GuildLootDB |
 | `SendSessionSync` (Whisper-Serie) | Mehrere Nachrichten, eigener Test bei Bedarf |

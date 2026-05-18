@@ -144,6 +144,29 @@ Source-Index (1) < `activeContainerIdx` (2). Nach Merge: `activeContainerIdx == 
 
 ---
 
+## Refactoring-Vorbereitung (PENDING-Tests)
+
+Diese Tests gaten sich selbst über `type(GuildLoot.X) == "function"`. Solange die Refactorings (Paket C1/C2 des Code-Reviews) nicht umgesetzt sind, werden sie no-op-passed; sobald die Funktion existiert, prüfen sie das Verhalten.
+
+### C1 — `GuildLoot.DeleteSession(ci)`
+
+| Test | Was wird geprüft |
+|------|------------------|
+| `testDeleteSession_RemovesFromContainers` | Eintrag wird aus `raidContainers` entfernt |
+| `testDeleteSession_ClearsActiveIdxWhenDeletingActive` | Löschen der aktiven Session nullt `activeContainerIdx` |
+| `testDeleteSession_KeepsActiveIdxWhenDeletingOther` | Bei Löschen einer Session vor der aktiven rückt der Index korrekt vor |
+| `testDeleteSession_OutOfBoundsIndex_NoOp` | Ungültiger Index crasht nicht und ändert nichts |
+
+### C2 — `GuildLoot.MigratePendingLoot()`
+
+| Test | Was wird geprüft |
+|------|------------------|
+| `testMigratePendingLoot_CreatesLegacyContainer` | Direktaufruf erzeugt Legacy-Container, `currentRaid.pendingLoot` wird geleert |
+| `testMigratePendingLoot_Idempotent` | Zweiter Aufruf erzeugt keinen zweiten Legacy-Container |
+| `testMigratePendingLoot_EmptyPending_NoOp` | Leeres `currentRaid.pendingLoot` → kein Legacy-Container |
+
+---
+
 ## Was diese Tests nicht abdecken
 
 | Bereich | Warum nicht abgedeckt |
