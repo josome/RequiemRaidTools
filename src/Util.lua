@@ -239,6 +239,20 @@ function GL.IsPlayerMode()
     return true
 end
 
+-- Slot-spezifische Filter (equipLoc → filterKey)
+local EQUIPLOC_FILTER = {
+    INVTYPE_NECK   = "neck",
+    INVTYPE_FINGER = "ring",
+}
+
+-- Rüstungstyp-Filter (itemSubType → filterKey)
+local ARMOR_FILTER = {
+    Cloth   = "cloth",
+    Leather = "leather",
+    Mail    = "mail",
+    Plate   = "plate",
+}
+
 --- Announce-Filter: soll dieses Item den Popup triggern?
 --- skipUsableCheck = true: IsUsableItem-Prüfung überspringen (z.B. forcePlayerMode)
 --- Gibt true zurück wenn Item-Daten noch nicht gecacht (false positive besser als verpasstes Item).
@@ -251,26 +265,24 @@ function GL.PopupFilterMatches(link, category, skipUsableCheck)
         if not skipUsableCheck then
             local isUsable = IsUsableItem(link)
             if isUsable ~= false then return true end   -- usable oder noch nicht gecacht → zeigen
-            return f.nonUsableWeapon ~= false            -- nicht-usable → Filter prüfen
         end
-        return f.nonUsableWeapon ~= false
+        return f.nonUsableWeapon ~= false               -- nicht-usable → Filter prüfen
     end
 
     -- Trinkets haben eigenen Filter-Key
     if category == "trinket" then return f.trinket ~= false end
 
-    -- Ring/Neck via equipLoc; Rüstungstyp via itemSubType.
+    -- Ring/Neck via equipLoc, Rüstungstyp via itemSubType.
     -- IsUsableItem wird hier bewusst NICHT verwendet:
     --   • Legacy-Items (z.B. Shadowlands in Midnight) sind auf fremden Clients oft nicht gecacht →
     --     GetItemInfo liefert nil, IsUsableItem liefert false → fälschlicherweise blockiert.
     --   • Die Checkbox-Filter (cloth/leather/mail/plate/other) sind die korrekte Steuerung.
     local _, _, _, _, _, _, itemSubType, _, itemEquipLoc = GetItemInfo(link)
-    if itemEquipLoc == "INVTYPE_NECK"   then return f.neck    ~= false end
-    if itemEquipLoc == "INVTYPE_FINGER" then return f.ring    ~= false end
-    if itemSubType  == "Cloth"          then return f.cloth   ~= false end
-    if itemSubType  == "Leather"        then return f.leather ~= false end
-    if itemSubType  == "Mail"           then return f.mail    ~= false end
-    if itemSubType  == "Plate"          then return f.plate   ~= false end
+    local slotKey = EQUIPLOC_FILTER[itemEquipLoc]
+    if slotKey then return f[slotKey] ~= false end
+
+    local matKey = ARMOR_FILTER[itemSubType]
+    if matKey then return f[matKey] ~= false end
 
     -- Nicht klassifizierbar (Item noch nicht gecacht, Token, sonstiges) → other-Filter.
     -- Absichtlich kein IsUsableItem-Check: false-positive (Item wird gezeigt obwohl nicht nutzbar)
