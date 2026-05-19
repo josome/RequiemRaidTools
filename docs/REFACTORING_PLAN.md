@@ -1,9 +1,9 @@
 # Refactoring-Plan & Risikobewertung
 
 **Stand:** 2026-05-19
-**Branch:** `feature/util-tests` (Test-Vorbereitung + Paket-A Quick Wins A5/A2/A3 umgesetzt)
-**Test-Status:** 119 busted-Tests grün (lokal + CI), 10 pending marks gelistet
-**TOC:** 1.0.1.1
+**Branch:** `feature/util-tests` (Test-Vorbereitung + Paket-A Quick Wins A5/A2/A3 + Paket T2 Coverage-Lücken umgesetzt)
+**Test-Status:** 198 busted-Tests grün (lokal + CI), 10 pending marks gelistet
+**TOC:** 1.0.1.2
 **Anwender-Tests (in-game):** noch offen — siehe Abschnitt 7
 
 ## Fortschritt
@@ -15,6 +15,11 @@
 | **A5** GL.ShortName Bug-Fix | ✅ umgesetzt | `56ccb2d` (Merge `3b805f5`) |
 | **A2** GL.ShowItemTooltip | ✅ umgesetzt (10 Call-Sites zusammengeführt) | `b280e9a` (Merge `7ef5ea1`) |
 | **A3** GL.FindSessionByID | ✅ umgesetzt (2 Lookups zusammengeführt) | `2ab4bf7` (Merge `ef24806`) |
+| **T2.1** Roll-Suite (Loot_Roll.lua) | ✅ umgesetzt (16 Tests) | `3e83877` |
+| **T2.2** Migration-Suite (Core.lua) | ✅ umgesetzt (16 Tests) | `afda0de` |
+| **T2.3** Loot-Lifecycle-Suite (Loot.lua) | ✅ umgesetzt (22 Tests) | `33a8707` |
+| **T2.4** Export-Suite (Util.lua) | ✅ umgesetzt (10 Tests) | `a2297cc` |
+| **T2.5** Util-Test erweitert | ✅ umgesetzt (16 Tests) | `dc8060a` |
 | **A4** getSessionPriorityConfig | ⏳ offen | — |
 | **A1** UI-Helpers (Backdrop, FontString, COLORS) | ⏳ offen | — |
 | **B1** FILTER_RULES-Tabelle | ⏳ offen | — |
@@ -140,7 +145,21 @@ Ziel des Plans: Schrittweise Verbesserungen in kleinen, getesteten Paketen — k
 ## 4. Test-Status
 
 **Externer Runner:** `busted spec/reqrt_spec.lua` (GitHub Actions, lokal via scoop-luarocks).
-**Stand:** 119 Tests grün, 0 failures, 0 errors, 10 Pending-Marks gelistet (A1×2, B4×1, C1×4, C2×3).
+**Stand:** 198 Tests grün, 0 failures, 0 errors, 10 Pending-Marks gelistet (A1×2, B4×1, C1×4, C2×3).
+
+### 4.0 Coverage-Δ durch Paket T2
+
+| Modul | vor T2 | nach T2 | Δ |
+|-------|------:|------:|---|
+| `Comm.lua` | ~95% | ~95% | unverändert |
+| `Loot_Trade.lua` | 100% | 100% | unverändert |
+| `Util.lua` | ~25% | ~75% | +50pp (Exports, GetItemCategory, DetectDifficulty, NormalizeName) |
+| `Core.lua` (Migration-Pfade) | 0% | ~90% | +90pp (InitDB inkl. Legacy-Migrations geschützt) |
+| `Loot_Assign.lua` | ~25% | ~25% | unverändert (kein T2-Fokus) |
+| `Loot.lua` | ~10% | ~85% | +75pp (OnLootOpened, OnLootRollStart, Trash-Ops) |
+| `Loot_Roll.lua` | ~15% | ~85% | +70pp (Tie-Logik vollständig getestet) |
+| UI-Module | 0% | 0% | UI bleibt outside Standalone-Loader |
+| **API gesamt** | ~40–50% | **~75–80%** | **+30pp** |
 
 ### 4.1 Bestehende Coverage
 
@@ -152,7 +171,11 @@ Ziel des Plans: Schrittweise Verbesserungen in kleinen, getesteten Paketen — k
 | `ReqRT.Session` | 30 | Lifecycle, Resume, LateJoiner, LegacySession, Merge, DeleteSession (pending), MigratePendingLoot (pending) |
 | `ReqRT.Trade` | 8 | Name-Lookup, 6-Item-Limit, Success/Cancel |
 | `ReqRT.Filter` | 15 | Slot/Rüstung/Stale + Unknown-Category + Parametrisiert |
-| `ReqRT.Util` | 21 | ShortName, GetActivePrios/PrioLabel, FindSessionByID (pending), ShowItemTooltip (pending), UI-Common (pending), Tab-Registry (pending) |
+| `ReqRT.Util` | 37 | ShortName, ActivePrios/PrioLabel, FindSessionByID, ShowItemTooltip, GetItemCategory, DiffIDToString, DetectDifficulty, NormalizeName, UI-Common (pending), Tab-Registry (pending) |
+| `ReqRT.Roll` | 16 | StartRoll, OnSystemMessage (DE/EN), FinalizeRoll inkl. Tie-Re-Roll, CancelRoll, OnCommRollStart |
+| `ReqRT.Migration` | 16 | InitDB Defaults+Migration, MigrateRaidHistory, legacy-lootLog, legacy-raids-Array, BackupDB |
+| `ReqRT.Loot` | 22 | OnLootOpened, OnLootRollStart, AddItemManually, TryAddPendingItem-Filter, Trash-Ops, Reset/Cancel |
+| `ReqRT.Export` | 10 | ExportCSV (Header, Assigned/Trashed, Escaping, Active-Session-Default), ExportJSON (Top-Level, Fallback, Escaping) |
 | `ReqRT.API` | 15 | API-Snapshot für D1-Load-Order-Schutz |
 
 ### 4.2 Tests pro Refactoring-Paket
@@ -200,15 +223,16 @@ Skala: 🟢 niedrig · 🟡 mittel · 🟠 mittel-hoch · 🔴 hoch
 | C2 MigratePendingLoot | 🟠 | **🟡** | 3 Direkt-Tests + 3 bestehende Legacy-Session-Tests in Session_Test |
 | C3 BuildRaidPanel | 🟡 | 🟡 | UI, manuell |
 | C4 commLoopback | 🟢 | 🟢 | + expliziter Dispatch-Stops-Completely-Test |
-| D1 Core.lua split | 🔴 | **🟠** | API-Snapshot fängt 15 zentrale Funktionen ab — Load-Order-Brüche detektierbar |
+| D1 Core.lua split | 🔴 | **🟡** | API-Snapshot **+ Migration_Test (16 Tests)** schützen Migrations- und Load-Order-Pfade |
 | D2 UI.lua split | 🟠 | 🟠 | UI, manuell |
+| Loot-Refactorings (jeglich) | implizit 🟠 | **🟢** | Loot_Test (22) + Roll_Test (16) decken jetzt 85% von Loot.lua + Loot_Roll.lua ab |
 
 ### 5.2 Risiko-Achsen
 
-- **Test-Abdeckung gut:** Comm, Filter, Session, Assign — Refactorings dort werden durch automatische Tests rückversichert.
+- **Test-Abdeckung gut:** Comm, Filter, Session, Assign, **Roll, Migration, Loot, Export** — Refactorings dort werden durch automatische Tests rückversichert.
 - **UI bleibt blind:** A1, B2, B4, C3, D2 brauchen manuelle Klick-Verifikation (UI-Module nicht im Standalone-Loader).
 - **Echtes Datenrisiko:** nur C1 (Session-Delete) und C2 (PendingLoot-Migration) — beide mit TDD-Verträgen abgesichert, aber sollten zusätzlich mit DB-Backup-Snapshot vor Test im echten Client laufen.
-- **Load-Order-Risiko (D1):** Tests fangen Load-Order-Fehler erst nach erfolgreichem Load. API-Snapshot reduziert das Risiko, aber zirkuläre Abhängigkeiten zwischen den neuen Modulen können erst beim Login auffallen.
+- **Load-Order-Risiko (D1):** Tests fangen Load-Order-Fehler erst nach erfolgreichem Load. API-Snapshot + Migration_Test reduzieren das Risiko, aber zirkuläre Abhängigkeiten zwischen den neuen Modulen können erst beim Login auffallen.
 
 ### 5.3 Mitigation pro Risiko-Stufe
 
@@ -225,7 +249,8 @@ Skala: 🟢 niedrig · 🟡 mittel · 🟠 mittel-hoch · 🔴 hoch
 
 1. ~~**A5 zuerst** — echter Bug-Fix, isoliert, 1 Zeile, Tests vorhanden.~~ ✅
 2. ~~**A2 + A3** — klare Wrapper, wenige Call-Sites, Tests aktivieren sich automatisch.~~ ✅
-3. **A1 + A4** — mehr Call-Sites; A1 braucht visuelle Sichtprüfung. ← **nächstes**
+3. ~~**T2 Coverage-Lücken** — Roll, Migration, Loot, Export, Util-Erweiterung (80 neue Tests).~~ ✅
+4. **A1 + A4** — mehr Call-Sites; A1 braucht visuelle Sichtprüfung. ← **nächstes**
 4. **Paket B komplett** — von Tests gestützt, klarer Erweiterbarkeits-Gewinn.
 5. **C1 + C2** mit DB-Backup-Snapshot und auf eigenem Branch.
 6. **C3** als reines UI-Refactoring auf Branch.
