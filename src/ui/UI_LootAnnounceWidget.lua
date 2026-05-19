@@ -67,9 +67,7 @@ function UI.BuildLootAnnounceWidget(parent, yStart)
     icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
     iconBtn:SetScript("OnEnter", function(self)
         if w._link and w._link:find("|H") then
-            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:SetHyperlink(w._link)
-            GameTooltip:Show()
+            GL.ShowItemTooltip(w._link, self, "ANCHOR_RIGHT")
         end
     end)
     iconBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -89,9 +87,7 @@ function UI.BuildLootAnnounceWidget(parent, yStart)
     end)
     nameBtn:SetScript("OnEnter", function(self)
         if w._link and w._link:find("|H") then
-            GameTooltip:SetOwner(self, "ANCHOR_BOTTOMRIGHT")
-            GameTooltip:SetHyperlink(w._link)
-            GameTooltip:Show()
+            GL.ShowItemTooltip(w._link, self, "ANCHOR_BOTTOMRIGHT")
         end
     end)
     nameBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)

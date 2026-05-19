@@ -218,9 +218,7 @@ function UI.BuildLootPanel(parent)
     activeItemIcon:SetScript("OnEnter", function(self)
         local ci = GL.Loot.GetCurrentItem()
         if ci and ci.link then
-            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:SetHyperlink(ci.link)
-            GameTooltip:Show()
+            GL.ShowItemTooltip(ci.link, self, "ANCHOR_RIGHT")
         end
     end)
     activeItemIcon:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -242,9 +240,7 @@ function UI.BuildLootPanel(parent)
     activeItemHover:SetScript("OnEnter", function(self)
         local ci = GL.Loot.GetCurrentItem()
         if ci and ci.link then
-            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:SetHyperlink(ci.link)
-            GameTooltip:Show()
+            GL.ShowItemTooltip(ci.link, self, "ANCHOR_RIGHT")
         end
     end)
     activeItemHover:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -463,9 +459,7 @@ function UI.RefreshLootTab()
         if pIcon then pendingIconTex:SetTexture(pIcon) end
         pendingIcon:EnableMouse(true)
         pendingIcon:SetScript("OnEnter", function(self)
-            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:SetHyperlink(item.link)
-            GameTooltip:Show()
+            GL.ShowItemTooltip(item.link, self, "ANCHOR_RIGHT")
         end)
         pendingIcon:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
@@ -492,9 +486,7 @@ function UI.RefreshLootTab()
         linkLbl:SetText(item.link or item.name or "?")
 
         linkBtn:SetScript("OnEnter", function(self)
-            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:SetHyperlink(item.link)
-            GameTooltip:Show()
+            GL.ShowItemTooltip(item.link, self, "ANCHOR_RIGHT")
         end)
         linkBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
@@ -826,17 +818,13 @@ function UI.RefreshSessionLoot()
 
             row.iconFrame:SetScript("OnEnter", function(self)
                 if entry.item then
-                    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-                    GameTooltip:SetHyperlink(entry.item)
-                    GameTooltip:Show()
+                    GL.ShowItemTooltip(entry.item, self, "ANCHOR_RIGHT")
                 end
             end)
             row.iconFrame:SetScript("OnLeave", function() GameTooltip:Hide() end)
             row.itemHover:SetScript("OnEnter", function(self)
                 if entry.item then
-                    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-                    GameTooltip:SetHyperlink(entry.item)
-                    GameTooltip:Show()
+                    GL.ShowItemTooltip(entry.item, self, "ANCHOR_RIGHT")
                 end
             end)
             row.itemHover:SetScript("OnLeave", function() GameTooltip:Hide() end)

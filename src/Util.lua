@@ -326,6 +326,21 @@ function GL.ShortName(fullName)
 end
 
 -- ============================================================
+-- Tooltip
+-- ============================================================
+
+--- Zeigt einen Item-Tooltip am angegebenen Frame an.
+--- @param link string         Item-Link (Pflicht; nil → no-op)
+--- @param ownerFrame Frame?   Owner-Frame (Default: UIParent)
+--- @param anchor string?      WoW-Anchor (Default: "ANCHOR_CURSOR")
+function GL.ShowItemTooltip(link, ownerFrame, anchor)
+    if not link then return end
+    GameTooltip:SetOwner(ownerFrame or UIParent, anchor or "ANCHOR_CURSOR")
+    GameTooltip:SetHyperlink(link)
+    GameTooltip:Show()
+end
+
+-- ============================================================
 -- Raid-ID
 -- ============================================================
 

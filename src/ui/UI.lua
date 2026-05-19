@@ -60,9 +60,7 @@ local function MakeItemLinkBtn(parent, leftAnchorFrame, xOff, link, displayText)
     if link and link ~= "" then
         btn:EnableMouse(true)
         btn:SetScript("OnEnter", function(self)
-            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:SetHyperlink(link)
-            GameTooltip:Show()
+            GL.ShowItemTooltip(link, self, "ANCHOR_RIGHT")
         end)
         btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     end
