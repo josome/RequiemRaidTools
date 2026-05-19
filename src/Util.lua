@@ -145,14 +145,23 @@ end
 -- Prioritäten-Hilfsfunktionen
 -- ============================================================
 
+--- Liefert die priorityConfig aus der aktiven Raid Session, mit Fallback auf
+--- settings.priorities und leerer Tabelle als letztem Anker.
+local function getSessionPriorityConfig()
+    local db = GuildLootDB
+    if not db then return {} end
+    local idx = db.activeContainerIdx
+    if idx and db.raidContainers and db.raidContainers[idx]
+       and db.raidContainers[idx].priorityConfig then
+        return db.raidContainers[idx].priorityConfig
+    end
+    return (db.settings and db.settings.priorities) or {}
+end
+
 --- Gibt sortierte Liste aktiver Prio-Nummern (1-5) zurück.
 --- Liest aus priorityConfig der aktiven Raid Session, Fallback auf settings.
 function GL.GetActivePrios()
-    local db  = GuildLootDB
-    local cfg = (db.activeContainerIdx and db.raidContainers
-                 and db.raidContainers[db.activeContainerIdx]
-                 and db.raidContainers[db.activeContainerIdx].priorityConfig)
-                or (db.settings and db.settings.priorities) or {}
+    local cfg = getSessionPriorityConfig()
     local result = {}
     for i = 1, 5 do
         if cfg[i] and cfg[i].active then table.insert(result, i) end
@@ -165,12 +174,7 @@ end
 --- Liest aus priorityConfig der aktiven Raid Session, Fallback auf settings.
 function GL.GetPrioLabel(n)
     if not n then return "" end
-    local db  = GuildLootDB
-    local cfg = (db.activeContainerIdx and db.raidContainers
-                 and db.raidContainers[db.activeContainerIdx]
-                 and db.raidContainers[db.activeContainerIdx].priorityConfig)
-                or (db.settings and db.settings.priorities) or {}
-    local p = cfg[n]
+    local p = getSessionPriorityConfig()[n]
     if p and p.shortName and p.shortName ~= "" then return p.shortName end
     return "Prio " .. tostring(n)
 end
