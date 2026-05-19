@@ -310,6 +310,44 @@ local msgHandlers = {
     ML_DENY       = HandleMLDeny,
 }
 
+-- ============================================================
+-- Version-Checks für eingehende Nachrichten
+-- ============================================================
+
+-- Regel-Tabelle: jeder Eintrag prüft eine Versions-Konstellation und
+-- formatiert die Warnnachricht. skipDispatch=true bricht die OnMessage-
+-- Verarbeitung nach der Warnung ab (für strikt inkompatible Versionen).
+local VERSION_CHECKS = {
+    {
+        skipDispatch = true,
+        predicate    = function(senderMinor, localMinor) return senderMinor < MIN_PROTO_MINOR end,
+        message      = function(sender, senderVersion)
+            return "|cffff4444[ReqRT] " .. (sender or "?")
+                .. " hat v" .. senderVersion
+                .. " — inkompatibel (min Minor: " .. MIN_PROTO_MINOR
+                .. "). Bitte Addon aktualisieren.|r"
+        end,
+    },
+    {
+        skipDispatch = false,
+        predicate    = function(senderMinor, localMinor) return senderMinor < localMinor end,
+        message      = function(sender, senderVersion)
+            return "|cffff8800[ReqRT] " .. (sender or "?")
+                .. " hat eine ältere Version (v" .. senderVersion
+                .. ") — bitte Addon aktualisieren.|r"
+        end,
+    },
+    {
+        skipDispatch = false,
+        predicate    = function(senderMinor, localMinor) return senderMinor > localMinor end,
+        message      = function(sender, senderVersion)
+            return "|cffff8800[ReqRT] Deine Version (v" .. ADDON_VERSION
+                .. ") ist älter als die von " .. (sender or "?")
+                .. " (v" .. senderVersion .. ") — bitte Addon aktualisieren.|r"
+        end,
+    },
+}
+
 function Comm.OnMessage(msg, sender)
     -- Eigene Nachrichten ignorieren (ML hat bereits lokal verarbeitet)
     -- Ausnahme: commLoopback-Flag für Tests
@@ -337,31 +375,17 @@ function Comm.OnMessage(msg, sender)
 
     local senderMinor = MinorVersion(senderVersion)
     local localMinor  = MinorVersion(ADDON_VERSION)
-    local now = GetTime()
-    local lastWarn = versionWarnedAt[sender] or 0
-    local canWarn = (now - lastWarn) >= VERSION_WARN_COOLDOWN
-    if senderMinor < MIN_PROTO_MINOR then
-        if canWarn then
-            GL.Print("|cffff4444[ReqRT] " .. (sender or "?")
-                     .. " hat v" .. senderVersion
-                     .. " — inkompatibel (min Minor: " .. MIN_PROTO_MINOR
-                     .. "). Bitte Addon aktualisieren.|r")
-            versionWarnedAt[sender] = now
-        end
-        return
-    elseif senderMinor < localMinor then
-        if canWarn then
-            GL.Print("|cffff8800[ReqRT] " .. (sender or "?")
-                     .. " hat eine ältere Version (v" .. senderVersion
-                     .. ") — bitte Addon aktualisieren.|r")
-            versionWarnedAt[sender] = now
-        end
-    elseif senderMinor > localMinor then
-        if canWarn then
-            GL.Print("|cffff8800[ReqRT] Deine Version (v" .. ADDON_VERSION
-                     .. ") ist älter als die von " .. (sender or "?")
-                     .. " (v" .. senderVersion .. ") — bitte Addon aktualisieren.|r")
-            versionWarnedAt[sender] = now
+    local now         = GetTime()
+    local lastWarn    = versionWarnedAt[sender] or 0
+    local canWarn     = (now - lastWarn) >= VERSION_WARN_COOLDOWN
+    for _, check in ipairs(VERSION_CHECKS) do
+        if check.predicate(senderMinor, localMinor) then
+            if canWarn then
+                GL.Print(check.message(sender, senderVersion))
+                versionWarnedAt[sender] = now
+            end
+            if check.skipDispatch then return end
+            break
         end
     end
 
