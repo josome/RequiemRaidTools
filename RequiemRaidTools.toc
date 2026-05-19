@@ -35,3 +35,4 @@ src/tests/Session_Test.lua
 src/tests/Filter_Test.lua
 src/tests/Util_Test.lua
 src/tests/Roll_Test.lua
+src/tests/Migration_Test.lua

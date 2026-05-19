@@ -15,6 +15,7 @@ dofile("src/tests/Trade_Test.lua")
 dofile("src/tests/Filter_Test.lua")
 dofile("src/tests/Util_Test.lua")
 dofile("src/tests/Roll_Test.lua")
+dofile("src/tests/Migration_Test.lua")
 
 -- ADDON_LOADED feuern → alle _loader-Frames registrieren ihre Suites bei WoWUnit
 FireEvent("ADDON_LOADED", "RequiemRaidTools")
