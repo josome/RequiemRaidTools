@@ -326,6 +326,23 @@ function GL.ShortName(fullName)
 end
 
 -- ============================================================
+-- Session-Lookup
+-- ============================================================
+
+--- Sucht eine Session per ID in GuildLootDB.raidContainers.
+--- @param id string|nil  Session-ID (nil oder "" → nil)
+--- @return table|nil     Session-Tabelle oder nil
+function GL.FindSessionByID(id)
+    if not id or id == "" then return nil end
+    local db = GuildLootDB
+    if not db or not db.raidContainers then return nil end
+    for _, s in ipairs(db.raidContainers) do
+        if s.id == id then return s end
+    end
+    return nil
+end
+
+-- ============================================================
 -- Raid-ID
 -- ============================================================
 

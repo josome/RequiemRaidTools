@@ -274,12 +274,7 @@ end
 local function HandleLootTrash(parts, sender)
     local link, sessionID, raidID = parts[2], parts[3], parts[4]
     local db = GuildLootDB
-    local targetSession = nil
-    if sessionID and sessionID ~= "" then
-        for _, s in ipairs(db.raidContainers or {}) do
-            if s.id == sessionID then targetSession = s; break end
-        end
-    end
+    local targetSession = GL.FindSessionByID(sessionID)
     if not targetSession and db.activeContainerIdx then
         targetSession = db.raidContainers[db.activeContainerIdx]
     end
