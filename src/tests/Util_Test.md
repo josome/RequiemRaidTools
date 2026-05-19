@@ -108,6 +108,43 @@ Pending bis A1 (UI-Helper-Modul `src/ui/UI_Common.lua`) angelegt ist.
 
 Pending bis B4 (Tab-Registry-Tabelle statt nummerierter Konstanten).
 
+### GetItemCategory (T2.5)
+
+| Test | Was geprüft |
+|------|-------------|
+| `testGetItemCategory_Weapon` | `INVTYPE_WEAPON`/`MAINHAND`/`2HWEAPON`/`SHIELD`/`HOLDABLE` → `"weapons"` |
+| `testGetItemCategory_Trinket` | `INVTYPE_TRINKET` → `"trinket"` |
+| `testGetItemCategory_Other` | `INVTYPE_CHEST`/`LEGS`/`FINGER` → `"other"` |
+| `testGetItemCategory_SetItemBySetID` | `C_Item.GetItemSetID()` != 0 → `"setItems"` (egal welcher equipLoc) |
+| `testGetItemCategory_CurioToken` | Name enthält `"curio"`, equipLoc leer, Epic+ → `"setItems"` |
+
+`HasClassRestriction` (Tooltip-Scan für Klassen-Token) wird nicht direkt getestet — der Code-Pfad ist über `equipLoc != ""` umgangen, was die Mehrheit der Items abdeckt.
+
+### DiffIDToString (T2.5)
+
+| Test | Was geprüft |
+|------|-------------|
+| `testDiffIDToString_Normal` | IDs 14, 1, 17 → `"N"` |
+| `testDiffIDToString_Heroic` | IDs 15, 2 → `"H"` |
+| `testDiffIDToString_Mythic` | IDs 16, 8 → `"M"` |
+| `testDiffIDToString_Unknown_ReturnsNil` | Unbekannte ID, String, nil → `nil` |
+
+### DetectDifficulty (T2.5)
+
+| Test | Was geprüft |
+|------|-------------|
+| `testDetectDifficulty_InRaid` | `instanceType="raid"`, diff=14 → `"N"` |
+| `testDetectDifficulty_InParty` | `instanceType="party"`, diff=16 → `"M"` |
+| `testDetectDifficulty_NotInInstance_ReturnsNil` | `instanceType="none"` → `nil` |
+
+### NormalizeName (T2.5)
+
+| Test | Was geprüft |
+|------|-------------|
+| `testNormalizeName_AppendsRealmWhenMissing` | `"Alice"` → `"Alice-Malfurion"` (Realm angehängt) |
+| `testNormalizeName_PreservesExistingRealm` | `"Alice-Antonidas"` (cross-realm) → unverändert |
+| `testNormalizeName_NilSafe` | `nil` → `nil` |
+
 ---
 
 ## Tests erweitern

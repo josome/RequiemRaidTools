@@ -344,4 +344,125 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
             Exists(UI.TABS[name])
         end
     end
+
+    -- ========================================================
+    -- T2.5: GetItemCategory — Klassifizierung von Loot-Items
+    -- ========================================================
+
+    function Tests:testGetItemCategory_Weapon()
+        Mock(_G, "C_Item", { GetItemSetID = function() return 0 end })
+        AreEqual("weapons", GL.GetItemCategory(1, "INVTYPE_WEAPON",      4))
+        AreEqual("weapons", GL.GetItemCategory(2, "INVTYPE_MAINHAND",    4))
+        AreEqual("weapons", GL.GetItemCategory(3, "INVTYPE_2HWEAPON",    4))
+        AreEqual("weapons", GL.GetItemCategory(4, "INVTYPE_SHIELD",      4))
+        AreEqual("weapons", GL.GetItemCategory(5, "INVTYPE_HOLDABLE",    4))
+        MockRestore()
+    end
+
+    function Tests:testGetItemCategory_Trinket()
+        Mock(_G, "C_Item", { GetItemSetID = function() return 0 end })
+        AreEqual("trinket", GL.GetItemCategory(1, "INVTYPE_TRINKET", 4))
+        MockRestore()
+    end
+
+    function Tests:testGetItemCategory_Other()
+        Mock(_G, "C_Item", { GetItemSetID = function() return 0 end })
+        AreEqual("other", GL.GetItemCategory(1, "INVTYPE_CHEST",  4))
+        AreEqual("other", GL.GetItemCategory(2, "INVTYPE_LEGS",   4))
+        AreEqual("other", GL.GetItemCategory(3, "INVTYPE_FINGER", 4))
+        MockRestore()
+    end
+
+    function Tests:testGetItemCategory_SetItemBySetID()
+        -- SetID != 0 → direkt "setItems", egal welches equipLoc
+        Mock(_G, "C_Item", { GetItemSetID = function() return 12345 end })
+        AreEqual("setItems", GL.GetItemCategory(1, "INVTYPE_CHEST",  4))
+        AreEqual("setItems", GL.GetItemCategory(2, "INVTYPE_WEAPON", 4))
+        MockRestore()
+    end
+
+    function Tests:testGetItemCategory_CurioToken()
+        -- Curio = nicht-ausrüstbar, Epic+, Name enthält "curio"
+        Mock(_G, "C_Item", { GetItemSetID = function() return 0 end })
+        Mock(_G, "GetItemInfo", function() return "Ancient Curio of Power" end)
+        AreEqual("setItems", GL.GetItemCategory(1, "", 4))
+        MockRestore()
+    end
+
+    -- ========================================================
+    -- T2.5: DiffIDToString — WoW DifficultyID → "N"/"H"/"M"
+    -- ========================================================
+
+    function Tests:testDiffIDToString_Normal()
+        AreEqual("N", GL.DiffIDToString(14))  -- Heroic-Raid replaced as Normal
+        AreEqual("N", GL.DiffIDToString(1))   -- 5er Normal
+        AreEqual("N", GL.DiffIDToString(17))  -- LFR
+    end
+
+    function Tests:testDiffIDToString_Heroic()
+        AreEqual("H", GL.DiffIDToString(15))
+        AreEqual("H", GL.DiffIDToString(2))
+    end
+
+    function Tests:testDiffIDToString_Mythic()
+        AreEqual("M", GL.DiffIDToString(16))
+        AreEqual("M", GL.DiffIDToString(8))
+    end
+
+    function Tests:testDiffIDToString_Unknown_ReturnsNil()
+        AreEqual(nil, GL.DiffIDToString(999))
+        AreEqual(nil, GL.DiffIDToString("foo"))
+        AreEqual(nil, GL.DiffIDToString(nil))
+    end
+
+    -- ========================================================
+    -- T2.5: DetectDifficulty — basiert auf GetInstanceInfo
+    -- ========================================================
+
+    function Tests:testDetectDifficulty_InRaid()
+        Mock(_G, "GetInstanceInfo", function()
+            return "Test Raid", "raid", 14
+        end)
+        AreEqual("N", GL.DetectDifficulty())
+        MockRestore()
+    end
+
+    function Tests:testDetectDifficulty_InParty()
+        Mock(_G, "GetInstanceInfo", function()
+            return "Test Dungeon", "party", 16
+        end)
+        AreEqual("M", GL.DetectDifficulty())
+        MockRestore()
+    end
+
+    function Tests:testDetectDifficulty_NotInInstance_ReturnsNil()
+        Mock(_G, "GetInstanceInfo", function()
+            return "", "none", 0
+        end)
+        AreEqual(nil, GL.DetectDifficulty())
+        MockRestore()
+    end
+
+    -- ========================================================
+    -- T2.5: NormalizeName — Realm-Suffix anhängen falls fehlend
+    -- ========================================================
+
+    function Tests:testNormalizeName_AppendsRealmWhenMissing()
+        Mock(_G, "GetRealmName", function() return "Malfurion" end)
+        AreEqual("Alice-Malfurion", GL.NormalizeName("Alice"))
+        MockRestore()
+    end
+
+    function Tests:testNormalizeName_PreservesExistingRealm()
+        Mock(_G, "GetRealmName", function() return "Malfurion" end)
+        -- Cross-realm-Name → unverändert
+        AreEqual("Alice-Antonidas", GL.NormalizeName("Alice-Antonidas"))
+        MockRestore()
+    end
+
+    function Tests:testNormalizeName_NilSafe()
+        Mock(_G, "GetRealmName", function() return "Malfurion" end)
+        AreEqual(nil, GL.NormalizeName(nil))
+        MockRestore()
+    end
 end)
