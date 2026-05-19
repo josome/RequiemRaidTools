@@ -348,20 +348,22 @@ local VERSION_CHECKS = {
     },
 }
 
-function Comm.OnMessage(msg, sender)
-    -- Eigene Nachrichten ignorieren (ML hat bereits lokal verarbeitet)
-    -- Ausnahme: commLoopback-Flag für Tests
-    -- Sender ist realm-qualifiziert ("Name-Realm"), UnitName nicht → NormalizeName verwenden
+-- Self-Filter: eigene Nachrichten droppen (ML hat lokal schon verarbeitet).
+-- commLoopback-Flag in settings hebt den Filter für Tests auf.
+-- Sender ist realm-qualifiziert ("Name-Realm"), UnitName nicht → NormalizeName verwenden.
+local function shouldDropSelfMessage(sender)
     local myName      = (GL.NormalizeName and GL.NormalizeName(UnitName("player") or "")) or UnitName("player") or ""
     local myShortName = (GL.ShortName and GL.ShortName(myName)) or myName
     local senderShort = (GL.ShortName and GL.ShortName(sender or "")) or (sender or "")
     -- Exakter Vergleich ODER Kurzname-Vergleich als Fallback für Realm-Formatierungs-Unterschiede
     -- (GetRealmName() kann Leerzeichen enthalten, WoW-Sender-Format nicht immer identisch)
-    if sender == myName or senderShort == myShortName then
-        if not (GuildLootDB and GuildLootDB.settings and GuildLootDB.settings.commLoopback) then
-            return
-        end
-    end
+    if sender ~= myName and senderShort ~= myShortName then return false end
+    local loopback = GuildLootDB and GuildLootDB.settings and GuildLootDB.settings.commLoopback
+    return not loopback
+end
+
+function Comm.OnMessage(msg, sender)
+    if shouldDropSelfMessage(sender) then return end
 
     -- Addon-Version aus erstem Feld extrahieren
     local sep1 = msg:find(SEP, 1, true)
