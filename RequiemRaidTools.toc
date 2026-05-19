@@ -37,3 +37,4 @@ src/tests/Util_Test.lua
 src/tests/Roll_Test.lua
 src/tests/Migration_Test.lua
 src/tests/Loot_Test.lua
+src/tests/Export_Test.lua
