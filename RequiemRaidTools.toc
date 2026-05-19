@@ -36,3 +36,4 @@ src/tests/Filter_Test.lua
 src/tests/Util_Test.lua
 src/tests/Roll_Test.lua
 src/tests/Migration_Test.lua
+src/tests/Loot_Test.lua
