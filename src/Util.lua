@@ -322,7 +322,8 @@ function GL.ShortName(fullName)
     if not fullName then return "" end
     -- pcall guard: sender-Strings aus Chat-Events können WoW-tainted sein
     local ok, name = pcall(string.match, fullName, "^([^%-]+)")
-    return (ok and name) or fullName
+    if ok and name then return name end
+    return fullName
 end
 
 -- ============================================================
