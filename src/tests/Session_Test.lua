@@ -813,8 +813,7 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
     end
 
     local function MarkPending(reason)
-        local p = rawget(_G, "pending")
-        if type(p) == "function" then p(reason) end
+        WoWUnit.Pending(reason)
     end
 
     function Tests:testDeleteSession_RemovesFromContainers()

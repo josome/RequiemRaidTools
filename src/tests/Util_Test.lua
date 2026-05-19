@@ -22,12 +22,10 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
     local IsTrue   = WoWUnit.IsTrue
     local IsFalse  = WoWUnit.IsFalse
     local Exists   = WoWUnit.Exists
-    -- Pending: busted (CI) hat globales pending() im it-Env; WoWUnit in-game nicht.
-    -- Wir rufen es direkt im Test-Body via _G-Indirektion, damit der Test
-    -- in busted als "pending" markiert wird, in WoWUnit aber als grün durchläuft.
+    -- Pending: busted (CI) zeigt den Test als "pending" an; WoWUnit in-game
+    -- behandelt es als No-Op. Das Shim biegt WoWUnit.Pending pro it-Body um.
     local function MarkPending(reason)
-        local p = rawget(_G, "pending")
-        if type(p) == "function" then p(reason) end
+        WoWUnit.Pending(reason)
     end
 
     -- --------------------------------------------------------
