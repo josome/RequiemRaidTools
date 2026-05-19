@@ -1,8 +1,32 @@
 # Refactoring-Plan & Risikobewertung
 
-**Stand:** 2026-05-18
-**Branch:** `feature/util-tests` (Test-Vorbereitung umgesetzt; Refactorings stehen aus)
-**Test-Status:** 118 busted-Tests grün (lokal + CI)
+**Stand:** 2026-05-19
+**Branch:** `feature/util-tests` (Test-Vorbereitung + Paket-A Quick Wins A5/A2/A3 umgesetzt)
+**Test-Status:** 119 busted-Tests grün (lokal + CI), 10 pending marks gelistet
+**TOC:** 1.0.1.1
+**Anwender-Tests (in-game):** noch offen — siehe Abschnitt 7
+
+## Fortschritt
+
+| Paket | Status | Commit |
+|-------|--------|--------|
+| **Tests-Vorbereitung** | ✅ umgesetzt | `b617fa7` |
+| **Pending-Marker-Sichtbarkeit** | ✅ umgesetzt | `1e938c3` |
+| **A5** GL.ShortName Bug-Fix | ✅ umgesetzt | `56ccb2d` (Merge `3b805f5`) |
+| **A2** GL.ShowItemTooltip | ✅ umgesetzt (10 Call-Sites zusammengeführt) | `b280e9a` (Merge `7ef5ea1`) |
+| **A3** GL.FindSessionByID | ✅ umgesetzt (2 Lookups zusammengeführt) | `2ab4bf7` (Merge `ef24806`) |
+| **A4** getSessionPriorityConfig | ⏳ offen | — |
+| **A1** UI-Helpers (Backdrop, FontString, COLORS) | ⏳ offen | — |
+| **B1** FILTER_RULES-Tabelle | ⏳ offen | — |
+| **B2** setMiniTabState | ⏳ offen | — |
+| **B3** Version-Check-Tabelle | ⏳ offen | — |
+| **B4** Tab-Registry | ⏳ offen | — |
+| **C1** GL.DeleteSession | ⏳ offen | — |
+| **C2** GL.MigratePendingLoot | ⏳ offen | — |
+| **C3** BuildRaidPanel zerlegen | ⏳ offen | — |
+| **C4** commLoopback-Filter verschieben | ⏳ offen | — |
+| **D1** Core.lua aufspalten | ⏳ offen | — |
+| **D2** UI.lua entlasten | ⏳ offen | — |
 
 ---
 
@@ -89,11 +113,11 @@ Ziel des Plans: Schrittweise Verbesserungen in kleinen, getesteten Paketen — k
 ## 3. Refactoring-Pakete
 
 ### Paket A — Quick Wins (geringes Risiko, hoher Lesegewinn)
-- **A1:** `src/ui/UI_Common.lua` neu: `UI.CreateBackdropFrame()`, `UI.CreateGameFontString()`, `UI.COLORS`, `UI.BACKDROPS`. Ersetzt 6× Backdrop, >20× FontString, Color-Magic.
-- **A2:** `GL.ShowItemTooltip(link, frame)` in `Util.lua` — 7 Call-Sites umstellen.
-- **A3:** `GL.FindSessionByID(id)` in `Util.lua` — zwei Call-Sites zusammenführen.
-- **A4:** `getSessionPriorityConfig()` (lokal in `Util.lua`) — beide Lookups aufräumen.
-- **A5:** `GL.ShortName`-Fallback-Bug fixen (`Util.lua:325`).
+- **A1:** ⏳ `src/ui/UI_Common.lua` neu: `UI.CreateBackdropFrame()`, `UI.CreateGameFontString()`, `UI.COLORS`, `UI.BACKDROPS`. Ersetzt 6× Backdrop, >20× FontString, Color-Magic.
+- **A2:** ✅ `GL.ShowItemTooltip(link, frame, anchor)` in `Util.lua` — 10 Call-Sites umgestellt (`b280e9a`).
+- **A3:** ✅ `GL.FindSessionByID(id)` in `Util.lua` — Lookups in `Comm.HandleLootTrash` und `Loot.OnCommAssign` zusammengeführt (`2ab4bf7`).
+- **A4:** ⏳ `getSessionPriorityConfig()` (lokal in `Util.lua`) — beide Lookups aufräumen.
+- **A5:** ✅ `GL.ShortName`-Fallback-Bug gefixt (`Util.lua:325`, jetzt explizites if-else statt `(ok and name) or fullName`) (`56ccb2d`).
 
 ### Paket B — Open/Closed-Aufräumarbeiten
 - **B1:** `FILTER_RULES`-Tabelle für `PopupFilterMatches`.
@@ -116,7 +140,7 @@ Ziel des Plans: Schrittweise Verbesserungen in kleinen, getesteten Paketen — k
 ## 4. Test-Status
 
 **Externer Runner:** `busted spec/reqrt_spec.lua` (GitHub Actions, lokal via scoop-luarocks).
-**Stand:** 118 Tests grün, 0 failures, 0 errors, 0 pending.
+**Stand:** 119 Tests grün, 0 failures, 0 errors, 10 Pending-Marks gelistet (A1×2, B4×1, C1×4, C2×3).
 
 ### 4.1 Bestehende Coverage
 
@@ -135,9 +159,9 @@ Ziel des Plans: Schrittweise Verbesserungen in kleinen, getesteten Paketen — k
 
 | Paket | Tests (busted) | Status |
 |-------|---------------:|--------|
-| A1 UI-Helper | 2 (Smoke) | pending bis `UI.COLORS` / `UI.BACKDROPS` existieren |
-| A2 ShowItemTooltip | 1 | pending bis `GL.ShowItemTooltip` existiert |
-| A3 FindSessionByID | 4 | pending bis `GL.FindSessionByID` existiert |
+| A1 UI-Helper | 2 (Smoke) | ⏳ pending bis `UI.COLORS` / `UI.BACKDROPS` existieren |
+| **A2 ShowItemTooltip** | 1 | ✅ **aktiv, grün** |
+| **A3 FindSessionByID** | 4 | ✅ **aktiv, grün** |
 | A4 PriorityConfig | 8 | **aktiv** (gegen `GetActivePrios`/`GetPrioLabel`) |
 | A5 ShortName-Bug | 6 | **aktiv** (fixiert Bestand inkl. Edge-Case `-Realm`) |
 | B1 FILTER_RULES | 2 | **aktiv** (Unknown-Category + Parametrisiert) |
@@ -199,9 +223,9 @@ Skala: 🟢 niedrig · 🟡 mittel · 🟠 mittel-hoch · 🔴 hoch
 
 ## 6. Empfohlene Reihenfolge
 
-1. **A5 zuerst** — echter Bug-Fix, isoliert, 1 Zeile, Tests vorhanden.
-2. **A2 + A3** — klare Wrapper, wenige Call-Sites, Tests aktivieren sich automatisch.
-3. **A1 + A4** — mehr Call-Sites; A1 braucht visuelle Sichtprüfung.
+1. ~~**A5 zuerst** — echter Bug-Fix, isoliert, 1 Zeile, Tests vorhanden.~~ ✅
+2. ~~**A2 + A3** — klare Wrapper, wenige Call-Sites, Tests aktivieren sich automatisch.~~ ✅
+3. **A1 + A4** — mehr Call-Sites; A1 braucht visuelle Sichtprüfung. ← **nächstes**
 4. **Paket B komplett** — von Tests gestützt, klarer Erweiterbarkeits-Gewinn.
 5. **C1 + C2** mit DB-Backup-Snapshot und auf eigenem Branch.
 6. **C3** als reines UI-Refactoring auf Branch.
@@ -210,6 +234,23 @@ Skala: 🟢 niedrig · 🟡 mittel · 🟠 mittel-hoch · 🔴 hoch
 ---
 
 ## 7. Manuelle Verifikations-Checkliste (UI-Pakete)
+
+### 7.1 Offene Anwender-Tests für aktuell umgesetzte Pakete (A5, A2, A3)
+
+**Status: noch nicht durchgeführt.** Vor weiteren Refactorings sollten diese Punkte in-game (`/reload` auf aktuellem `feature/util-tests`) verifiziert werden:
+
+- [ ] **A5 ShortName** — Namen mit Realm-Suffix (z.B. `Aedalena-Malfurion`) erscheinen weiter korrekt als Kurzname in Chat-Output, Roll-Tab, Loot-Log und Player-Popup.
+- [ ] **A2 ShowItemTooltip** — Tooltips erscheinen beim Hover über:
+  - Pending-Loot-Icons + Link-Buttons (Loot-Tab)
+  - Aktiv-Item-Icon + Hover-Bereich (Loot-Tab)
+  - Loot-Log-Icons + Item-Hover (Loot-Tab History-Section)
+  - Item-Links im Log-Tab
+  - LootAnnounce-Widget (Icon + Name)
+  - Window-Header-Item-Buttons
+- [ ] **A3 FindSessionByID** — ML weist Item zu → Observer schreibt in **die per sessionID gestempelte Session**, nicht in die aktuell aktive (Test: zwei Sessions parallel anlegen, ML in Session 1 zuweisen, dann Session 2 aktivieren, Observer-Schreiben prüfen).
+- [ ] **Generell** — kein Lua-Error beim Login (BugSack / BugGrabber falls verfügbar).
+
+### 7.2 Zukünftige Pakete
 
 Pflicht für A1, B2, B4, C3, D2 — keine Auto-Tests möglich:
 
