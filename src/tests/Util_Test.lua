@@ -23,9 +23,9 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
     local IsFalse  = WoWUnit.IsFalse
     local Exists   = WoWUnit.Exists
     -- Pending: busted (CI) zeigt den Test als "pending" an; WoWUnit in-game
-    -- behandelt es als No-Op. Das Shim biegt WoWUnit.Pending pro it-Body um.
+    -- ist ein No-Op (WoWUnit.Pending existiert im echten Addon nicht).
     local function MarkPending(reason)
-        WoWUnit.Pending(reason)
+        if WoWUnit.Pending then WoWUnit.Pending(reason) end
     end
 
     -- --------------------------------------------------------
