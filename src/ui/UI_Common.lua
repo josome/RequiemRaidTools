@@ -8,6 +8,14 @@ GL.UI = GL.UI or {}
 local UI = GL.UI
 
 -- ============================================================
+-- Tab-Registry
+-- ============================================================
+
+--- Benannte Tab-IDs. Split-Dateien lesen über UI.TAB_LOOT etc.
+--- (Backward-compat-Aliases werden in UI.lua gesetzt.)
+UI.TABS = { LOOT=1, LOG=2, RAID=3, ROLL=4, PLAYER=5 }
+
+-- ============================================================
 -- Backdrop-Definitionen (BackdropTemplate)
 -- ============================================================
 

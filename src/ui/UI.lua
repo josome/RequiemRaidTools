@@ -11,16 +11,21 @@ local UI = GL.UI
 -- ============================================================
 
 local FRAME_W, FRAME_H = 720, 560
-local TAB_LOOT, TAB_LOG, TAB_RAID, TAB_ROLL, TAB_PLAYER = 1, 2, 3, 4, 5
-UI.TAB_LOOT = TAB_LOOT
+-- Tab-Registry aus UI_Common.lua — hier nur Backward-compat-Aliases
+-- und interne Kurzformen für UI.lua setzen.
+-- Backward-compat-Aliases für Split-Dateien (UI_RaidTab, UI_LootTab, …)
+UI.TAB_LOOT   = UI.TABS.LOOT
+UI.TAB_PLAYER = UI.TABS.PLAYER
+UI.TAB_LOG    = UI.TABS.LOG
+UI.TAB_RAID   = UI.TABS.RAID
+UI.TAB_ROLL   = UI.TABS.ROLL
+-- Interne Kurzformen für UI.lua
+local TAB_LOOT   = UI.TABS.LOOT
+local TAB_LOG    = UI.TABS.LOG
+local TAB_RAID   = UI.TABS.RAID
+local TAB_ROLL   = UI.TABS.ROLL
+local TAB_PLAYER = UI.TABS.PLAYER
 local DIFF_COLORS = { N = "|cff1eff00", H = "|cff0070dd", M = "|cffff8000" }
-
--- Tab-Konstanten für Split-Dateien
-UI.TAB_LOOT   = TAB_LOOT
-UI.TAB_PLAYER = TAB_PLAYER
-UI.TAB_LOG    = TAB_LOG
-UI.TAB_RAID   = TAB_RAID
-UI.TAB_ROLL   = TAB_ROLL
 
 -- ============================================================
 -- Hilfsfunktionen
