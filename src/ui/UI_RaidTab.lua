@@ -201,13 +201,7 @@ function UI.BuildRaidPanel(parent)
     panel.mergeBtn = mergeBtn
 
     -- ---- Liste (links) ----
-    local listFrame = CreateFrame("Frame", nil, panel, "BackdropTemplate")
-    listFrame:SetBackdrop({
-        bgFile   = "Interface\\DialogFrame\\UI-DialogBox-Background",
-        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-        edgeSize = 6,
-        insets   = { left = 2, right = 2, top = 2, bottom = 2 },
-    })
+    local listFrame = UI.CreateBackdropFrame("TOOLTIP", nil, panel)
     listFrame:SetPoint("TOPLEFT",    cs,    "BOTTOMLEFT",  0, -2)
     listFrame:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT",  2,  2)
     listFrame:SetWidth(LIST_W)
@@ -222,13 +216,7 @@ function UI.BuildRaidPanel(parent)
     panel.listScroll  = listScroll
 
     -- ---- Detail (rechts) ----
-    local detailFrame = CreateFrame("Frame", nil, panel, "BackdropTemplate")
-    detailFrame:SetBackdrop({
-        bgFile   = "Interface\\DialogFrame\\UI-DialogBox-Background",
-        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-        edgeSize = 6,
-        insets   = { left = 2, right = 2, top = 2, bottom = 2 },
-    })
+    local detailFrame = UI.CreateBackdropFrame("TOOLTIP", nil, panel)
     detailFrame:SetPoint("TOPLEFT",     listFrame, "TOPRIGHT",     4,  0)
     detailFrame:SetPoint("BOTTOMRIGHT", panel,     "BOTTOMRIGHT", -2,  2)
 

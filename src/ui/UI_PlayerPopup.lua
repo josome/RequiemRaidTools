@@ -109,12 +109,7 @@ local function BuildPopup()
     popup:RegisterForDrag("LeftButton")
     popup:SetScript("OnDragStart", popup.StartMoving)
     popup:SetScript("OnDragStop",  popup.StopMovingOrSizing)
-    popup:SetBackdrop({
-        bgFile   = "Interface\\DialogFrame\\UI-DialogBox-Background",
-        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-        tile = true, tileSize = 32, edgeSize = 32,
-        insets = { left=11, right=12, top=12, bottom=11 },
-    })
+    popup:SetBackdrop(UI.BACKDROPS.DIALOG)
     popup:SetBackdropColor(0, 0, 0, 0.9)
     popup:Hide()
 

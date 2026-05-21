@@ -82,13 +82,7 @@ UI._H = {
 --- @param title      string|nil  Titelzeile mit Trennlinie (nil = kein Header)
 --- @return outerFrame, content   Äußeres Frame und scrollbares Content-Frame
 function UI.CreateSidePanel(frameName, parent, title)
-    local outer = CreateFrame("Frame", frameName, parent, "BackdropTemplate")
-    outer:SetBackdrop({
-        bgFile   = "Interface\\DialogFrame\\UI-DialogBox-Background",
-        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-        tile = true, tileSize = 32, edgeSize = 32,
-        insets = { left=11, right=12, top=12, bottom=11 },
-    })
+    local outer = UI.CreateBackdropFrame("DIALOG", frameName, parent)
     outer:SetBackdropColor(0, 0, 0, 1.0)
 
     local closeBtn = CreateFrame("Button", nil, outer, "UIPanelCloseButton")
@@ -325,13 +319,7 @@ function UI.BuildMainFrame()
     UI.minBtn = minBtn
 
     -- Session-Leiste
-    local sessionBar = CreateFrame("Frame", nil, mainFrame, "BackdropTemplate")
-    sessionBar:SetBackdrop({
-        bgFile   = "Interface\\DialogFrame\\UI-DialogBox-Background",
-        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-        edgeSize = 6,
-        insets   = { left = 2, right = 2, top = 2, bottom = 2 },
-    })
+    local sessionBar = UI.CreateBackdropFrame("TOOLTIP", nil, mainFrame)
     sessionBar:SetPoint("BOTTOMLEFT",  mainFrame, "BOTTOMLEFT",  4,  4)
     sessionBar:SetPoint("BOTTOMRIGHT", mainFrame, "BOTTOMRIGHT", -4, 4)
     sessionBar:SetHeight(34)
