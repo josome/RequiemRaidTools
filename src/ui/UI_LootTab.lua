@@ -19,31 +19,30 @@ local pendingActiveTab     = "pending"   -- "pending" | "trash"
 
 -- Minitab helpers (nach OPie/TenSettings-Vorbild, Options_Tab_* Atlas)
 local minitabData = {}
-local function minitab_deselect(b)
+local function setMiniTabState(b, selected)
     local r = minitabData[b]
     if not r then return end
-    r.Text:SetPoint("BOTTOM", 0, 6)
-    r.Text:SetFontObject("GameFontNormalSmall")
-    r.Left:SetAtlas("Options_Tab_Left", true)
-    r.Middle:SetAtlas("Options_Tab_Middle", true)
-    r.Right:SetAtlas("Options_Tab_Right", true)
-    r.NormalBG:SetPoint("TOPRIGHT", -2, -15)
-    r.HighlightBG:SetColorTexture(1,1,1,1)
-    r.SelectedBG:SetColorTexture(0,0,0,0)
-    b:SetNormalFontObject(GameFontNormalSmall)
-end
-local function minitab_select(b)
-    local r = minitabData[b]
-    if not r then return end
-    r.Text:SetPoint("BOTTOM", 0, 8)
-    r.Text:SetFontObject("GameFontHighlightSmall")
-    r.Left:SetAtlas("Options_Tab_Active_Left", true)
-    r.Middle:SetAtlas("Options_Tab_Active_Middle", true)
-    r.Right:SetAtlas("Options_Tab_Active_Right", true)
-    r.NormalBG:SetPoint("TOPRIGHT", -2, -12)
-    r.HighlightBG:SetColorTexture(0,0,0,0)
-    r.SelectedBG:SetColorTexture(1,1,1,1)
-    b:SetNormalFontObject(GameFontHighlightSmall)
+    if selected then
+        r.Text:SetPoint("BOTTOM", 0, 8)
+        r.Text:SetFontObject("GameFontHighlightSmall")
+        r.Left:SetAtlas("Options_Tab_Active_Left", true)
+        r.Middle:SetAtlas("Options_Tab_Active_Middle", true)
+        r.Right:SetAtlas("Options_Tab_Active_Right", true)
+        r.NormalBG:SetPoint("TOPRIGHT", -2, -12)
+        r.HighlightBG:SetColorTexture(0,0,0,0)
+        r.SelectedBG:SetColorTexture(1,1,1,1)
+        b:SetNormalFontObject(GameFontHighlightSmall)
+    else
+        r.Text:SetPoint("BOTTOM", 0, 6)
+        r.Text:SetFontObject("GameFontNormalSmall")
+        r.Left:SetAtlas("Options_Tab_Left", true)
+        r.Middle:SetAtlas("Options_Tab_Middle", true)
+        r.Right:SetAtlas("Options_Tab_Right", true)
+        r.NormalBG:SetPoint("TOPRIGHT", -2, -15)
+        r.HighlightBG:SetColorTexture(1,1,1,1)
+        r.SelectedBG:SetColorTexture(0,0,0,0)
+        b:SetNormalFontObject(GameFontNormalSmall)
+    end
 end
 local function minitab_new(parent, text, onClick)
     local b, r = CreateFrame("Button", nil, parent), {}
@@ -86,7 +85,7 @@ local function minitab_new(parent, text, onClick)
         {r=0, g=0, b=0, a=0})
     b:SetSize(fs:GetStringWidth() + 40, 37)
     b:SetScript("OnClick", onClick)
-    minitab_deselect(b)
+    setMiniTabState(b, false)
     return b
 end
 local activeItemLabel
@@ -367,11 +366,11 @@ function UI.RefreshLootTab()
     -- Tab-Highlighting
     if UI.lootPanel.tabPending then
         if isTrashed then
-            minitab_deselect(UI.lootPanel.tabPending)
-            minitab_select(UI.lootPanel.tabTrash)
+            setMiniTabState(UI.lootPanel.tabPending, false)
+            setMiniTabState(UI.lootPanel.tabTrash,   true)
         else
-            minitab_select(UI.lootPanel.tabPending)
-            minitab_deselect(UI.lootPanel.tabTrash)
+            setMiniTabState(UI.lootPanel.tabPending, true)
+            setMiniTabState(UI.lootPanel.tabTrash,   false)
         end
     end
 
