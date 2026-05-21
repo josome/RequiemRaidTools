@@ -809,8 +809,13 @@ StaticPopupDialogs["RLT_RENAME_SESSION"] = {
     OnAccept     = function(self)
         local name = self.EditBox:GetText()
         if name ~= "" and selectedRaid and selectedRaid.ci then
-            local session = GuildLootDB.raidContainers[selectedRaid.ci]
+            local ci      = selectedRaid.ci
+            local session = GuildLootDB.raidContainers[ci]
             if session then
+                if GL.IsSessionLabelTaken(name, ci) then
+                    GL.Print("Name bereits vergeben: " .. name)
+                    return
+                end
                 session.label = name
                 GL.UI.RefreshRaidTab()
                 GL.UI.RefreshSessionBar()
@@ -820,8 +825,16 @@ StaticPopupDialogs["RLT_RENAME_SESSION"] = {
     EditBoxOnEnterPressed = function(self)
         local name = self:GetText()
         if name ~= "" and selectedRaid and selectedRaid.ci then
-            local session = GuildLootDB.raidContainers[selectedRaid.ci]
-            if session then session.label = name end
+            local ci      = selectedRaid.ci
+            local session = GuildLootDB.raidContainers[ci]
+            if session then
+                if GL.IsSessionLabelTaken(name, ci) then
+                    GL.Print("Name bereits vergeben: " .. name)
+                    StaticPopup_Hide("RLT_RENAME_SESSION")
+                    return
+                end
+                session.label = name
+            end
         end
         StaticPopup_Hide("RLT_RENAME_SESSION")
         GL.UI.RefreshRaidTab()

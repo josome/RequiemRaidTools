@@ -286,6 +286,27 @@ function GL.GetLastWeeklyReset()
     return resetTs
 end
 
+--- Gibt true zurück wenn ein Session-Label bereits vergeben ist.
+--- @param label    string   Zu prüfender Name
+--- @param exceptCI number|nil  Container-Index der ausgeschlossen wird (beim Umbenennen)
+function GL.IsSessionLabelTaken(label, exceptCI)
+    for i, s in ipairs(GuildLootDB.raidContainers or {}) do
+        if i ~= exceptCI and s.label == label then return true end
+    end
+    return false
+end
+
+--- Gibt einen eindeutigen Session-Label zurück.
+--- Falls label bereits vergeben ist, wird " (2)", " (3)" etc. angehängt.
+local function uniqueSessionLabel(label)
+    local result, n = label, 2
+    while GL.IsSessionLabelTaken(result) do
+        result = string.format("%s (%d)", label, n)
+        n = n + 1
+    end
+    return result
+end
+
 --- Erstellt eine neue Raid-Session und setzt sie als aktiv.
 --- Reads:  db.activeContainerIdx, db.settings.priorities, db.currentRaid.tier
 --- Writes: db.raidContainers, db.activeContainerIdx, db.settings.isMasterLooter,
@@ -302,8 +323,9 @@ function GL.StartContainer(label)
     local ts  = time()
     local kw  = GL.ISOWeek(ts)
     local yr  = tonumber(date("%Y", ts))
-    local finalLabel = (label and label ~= "") and label
-                       or string.format("KW %02d %d", kw, yr)
+    local finalLabel = uniqueSessionLabel(
+        (label and label ~= "") and label or string.format("KW %02d %d", kw, yr)
+    )
     local session = {
         id             = string.format("%04d-W%02d-%08x", yr, kw, ts),
         label          = finalLabel,
