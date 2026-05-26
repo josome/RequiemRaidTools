@@ -431,4 +431,134 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
         AreEqual("Myriella-Malfurion", args[1])
         MockRestore()
     end
+
+    -- ============================================================
+    -- B3: Version-Check-Verhalten in Comm.OnMessage (Comm.lua:340-371)
+    -- Fixiert das Bestandsverhalten, bevor die if/elseif-Kette auf
+    -- eine Predicate-Tabelle umgestellt wird.
+    --
+    -- Format einer Nachricht: "VERSION\tCMD\tARG1\t..."
+    -- ============================================================
+
+    local SEP_TAB = "\t"
+
+    local function CapturePrints()
+        local prints = {}
+        Mock(GuildLoot, "Print", function(msg) table.insert(prints, msg) end)
+        return prints
+    end
+
+    local function MakeMsg(version, cmd, ...)
+        local parts = { version, cmd, ... }
+        return table.concat(parts, SEP_TAB)
+    end
+
+    function Tests:testVersionWarn_IncompatibleOld()
+        -- senderMinor < MIN_PROTO_MINOR (5) → "inkompatibel" + return (Handler NICHT aufgerufen)
+        local handlerCalled = false
+        Mock(GuildLoot.Loot, "OnCommItemActivate", function() handlerCalled = true end)
+        local prints = CapturePrints()
+        Mock(_G, "GetTime", function() return 100000 end)
+
+        local msg = MakeMsg("0.4", "ITEM_ON", "|Hitem:1|h|r", "trinket")
+        Comm.OnMessage(msg, "Older-Realm")
+
+        IsFalse(handlerCalled)
+        IsTrue(#prints >= 1)
+        IsTrue(prints[1]:find("inkompatibel", 1, true) ~= nil)
+        MockRestore()
+    end
+
+    function Tests:testVersionWarn_OlderButCompatible_HandlerStillCalled()
+        -- senderMinor < localMinor aber >= MIN_PROTO_MINOR → Warnung + Dispatch
+        local handlerCalled = false
+        Mock(GuildLoot.Loot, "OnCommItemActivate", function() handlerCalled = true end)
+        local prints = CapturePrints()
+        Mock(_G, "GetTime", function() return 200000 end)
+
+        -- ADDON_VERSION ist die installierte; wenn lokal z.B. "1.0.x" (Minor=10) → Sender "0.5" (Minor=5) ist älter aber kompatibel
+        local msg = MakeMsg("0.5", "ITEM_ON", "|Hitem:1|h|r", "trinket")
+        Comm.OnMessage(msg, "Compat-Realm")
+
+        -- Bei aktueller installierter Version 1.0.x oder höher ist 0.5 älter → Warnung
+        -- Bei installierter 0.5 ist es gleich → keine Warnung
+        -- Handler muss in jedem Fall aufgerufen werden (kein early-return außer bei incompat)
+        IsTrue(handlerCalled)
+        MockRestore()
+    end
+
+    function Tests:testVersionWarn_NewerSender_HandlerStillCalled()
+        -- senderMinor > localMinor → Warnung + Dispatch
+        local handlerCalled = false
+        Mock(GuildLoot.Loot, "OnCommItemActivate", function() handlerCalled = true end)
+        local prints = CapturePrints()
+        Mock(_G, "GetTime", function() return 300000 end)
+
+        -- Major 9 → unrealistisch hoch, garantiert > local
+        local msg = MakeMsg("9.99", "ITEM_ON", "|Hitem:1|h|r", "trinket")
+        Comm.OnMessage(msg, "Newer-Realm")
+
+        IsTrue(handlerCalled)
+        IsTrue(#prints >= 1)
+        -- "Deine Version ... ist älter" Warnung
+        IsTrue(prints[1]:find("älter", 1, true) ~= nil)
+        MockRestore()
+    end
+
+    function Tests:testVersionWarn_Cooldown()
+        -- Zwei Nachrichten innerhalb von VERSION_WARN_COOLDOWN (300s) vom selben Sender:
+        -- nur eine Warnung soll geprintet werden.
+        local prints = CapturePrints()
+        local sender = "CooldownTester-Realm"
+        local t = 500000
+        Mock(_G, "GetTime", function() return t end)
+
+        local msg = MakeMsg("9.99", "ITEM_ON", "|Hitem:1|h|r", "trinket")
+        Comm.OnMessage(msg, sender)
+        local afterFirst = #prints
+        t = t + 60  -- 60s später, noch innerhalb Cooldown
+        Mock(_G, "GetTime", function() return t end)
+        Comm.OnMessage(msg, sender)
+
+        AreEqual(afterFirst, #prints)  -- keine zweite Warnung
+        MockRestore()
+    end
+
+    function Tests:testVersionWarn_NoVersionPrefix()
+        -- Nachricht ohne Version-Trennzeichen → spezielle Warnung + early-return
+        local handlerCalled = false
+        Mock(GuildLoot.Loot, "OnCommItemActivate", function() handlerCalled = true end)
+        local prints = CapturePrints()
+
+        Comm.OnMessage("MALFORMED_NO_TAB", "WeirdSender-Realm")
+
+        IsFalse(handlerCalled)
+        IsTrue(#prints >= 1)
+        IsTrue(prints[1]:find("ohne Version", 1, true) ~= nil)
+        MockRestore()
+    end
+
+    -- ============================================================
+    -- C4: Self-Filter unterbricht den Dispatch komplett.
+    -- testSelfFilter prüft bereits, dass ein einzelner Handler nicht
+    -- aufgerufen wird. Dieser Test verifiziert dass der Dispatch
+    -- generell stoppt — durch Mock auf einen anderen Handler-Pfad.
+    -- ============================================================
+    function Tests:testSelfFilter_DispatchStopsCompletely()
+        local origLoopback = GuildLootDB.settings.commLoopback
+        GuildLootDB.settings.commLoopback = false
+        local activateCalled, clearCalled = false, false
+        Mock(GuildLoot.Loot, "OnCommItemActivate", function() activateCalled = true end)
+        Mock(GuildLoot.Loot, "OnCommItemClear",    function() clearCalled    = true end)
+
+        local msg = Roundtrip(function()
+            Comm.SendItemActivate("|Hitem:212426|h|r", "trinket")
+        end)
+        Comm.OnMessage(msg, UnitName("player"))
+
+        IsFalse(activateCalled)
+        IsFalse(clearCalled)
+        GuildLootDB.settings.commLoopback = origLoopback
+        MockRestore()
+    end
 end)

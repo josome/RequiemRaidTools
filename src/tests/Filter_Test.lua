@@ -195,4 +195,56 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
         IsFalse(p); IsFalse(rt)
         Teardown()
     end
+
+    -- B1: unbekannte Kategorie soll Default-Verhalten haben (keine Filterung blockiert).
+    -- Fixiert das Bestandsverhalten, bevor PopupFilterMatches auf Dispatch-Tabelle umgestellt wird.
+    function Tests:testUnknownCategory()
+        Setup({})
+        MockItem("Foo", "INVTYPE_UNKNOWN")
+        local p, rt = Run("doesnotexist")
+        IsTrue(p); IsTrue(rt)
+        Teardown()
+    end
+
+    -- B1: Parametrisierter Test — kompakter Regression-Snapshot über alle bekannten
+    -- Filter-Kategorien. Verhindert, dass die geplante Dispatch-Tabelle (FILTER_RULES)
+    -- das Mapping unbeabsichtigt ändert. Ruft GL.PopupFilterMatches direkt auf statt
+    -- über OnCommItemActivate, damit die Tabelle übersichtlich bleibt.
+    function Tests:testFilterRulesTable_AllMappings()
+        local origDB2 = GuildLootDB
+        -- (subType, equipLoc, category, filterKey, expectedWhenFilterOff)
+        local cases = {
+            { "Cloth",   "INVTYPE_CHEST",  "armor",   "cloth",           false },
+            { "Leather", "INVTYPE_CHEST",  "armor",   "leather",         false },
+            { "Mail",    "INVTYPE_CHEST",  "armor",   "mail",            false },
+            { "Plate",   "INVTYPE_CHEST",  "armor",   "plate",           false },
+            { "Plate",   "INVTYPE_NECK",   "armor",   "neck",            false },
+            { "Plate",   "INVTYPE_FINGER", "armor",   "ring",            false },
+            { "Gem",     nil,              "trinket", "trinket",         false },
+            { "Token",   nil,              "armor",   "other",           false },
+        }
+        for _, c in ipairs(cases) do
+            local subType, equipLoc, category, filterKey, expected = c[1], c[2], c[3], c[4], c[5]
+            GuildLootDB = {
+                settings = { announceFilter = { [filterKey] = false } },
+            }
+            Mock(_G, "GetItemInfo", function()
+                return nil,nil,nil,nil,nil,nil, subType, nil, equipLoc
+            end)
+            local match = GL.PopupFilterMatches(FAKE, category, true)
+            MockRestore()
+            if expected then IsTrue(match) else IsFalse(match) end
+        end
+        -- Weapons: nicht-benutzbar mit nonUsableWeapon=false → false
+        GuildLootDB = {
+            settings = { announceFilter = { nonUsableWeapon = false } },
+        }
+        Mock(_G, "GetItemInfo", function() return nil,nil,nil,nil,nil,nil, "Sword", nil, nil end)
+        Mock(_G, "IsUsableItem", function() return false end)
+        local weaponMatch = GL.PopupFilterMatches(FAKE, "weapons", false)
+        MockRestore()
+        IsFalse(weaponMatch)
+
+        GuildLootDB = origDB2
+    end
 end)

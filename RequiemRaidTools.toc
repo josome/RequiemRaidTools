@@ -2,7 +2,7 @@
 ## Title: RequiemRaidTools
 ## Notes: Structured raid loot distribution for guild officers and raid leaders. Priority system, automatic roll evaluation and real-time sync between all raid members.
 ## Category: Raid
-## Version: 1.0.1.0
+## Version: 1.0.1.14
 ## SavedVariables: GuildLootDB GuildLootDBBackup RequiemRaidToolsMinimapIconDB
 ## OptionalDeps: WoWUnit
 ## X-Curse-Project-ID: 1502142
@@ -17,6 +17,7 @@ src/loot/Loot_Roll.lua
 src/loot/Loot_Assign.lua
 src/loot/Loot_Trade.lua
 src/MinimapButton.lua
+src/ui/UI_Common.lua
 src/ui/UI.lua
 src/ui/UI_Settings.lua
 src/ui/UI_LootAnnounceWidget.lua
@@ -33,3 +34,8 @@ src/tests/Assign_Test.lua
 src/tests/Trade_Test.lua
 src/tests/Session_Test.lua
 src/tests/Filter_Test.lua
+src/tests/Util_Test.lua
+src/tests/Roll_Test.lua
+src/tests/Migration_Test.lua
+src/tests/Loot_Test.lua
+src/tests/Export_Test.lua

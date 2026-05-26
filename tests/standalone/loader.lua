@@ -10,7 +10,10 @@ dofile("src/loot/Loot_Roll.lua")
 dofile("src/loot/Loot_Assign.lua")
 dofile("src/loot/Loot_Trade.lua")
 
--- UI-Stubs: UI-Dateien werden nicht geladen, Tests mocken darüber hinaus selbst
+-- UI_Common: Konstanten und Helpers (kein WoW-UI nötig, nur Tabellen)
+dofile("src/ui/UI_Common.lua")
+
+-- UI-Stubs: restliche UI-Dateien werden nicht geladen, Tests mocken darüber hinaus selbst
 GuildLoot.UI = GuildLoot.UI or {}
 GuildLoot.UI.Refresh        = GuildLoot.UI.Refresh        or function() end
 GuildLoot.UI.RefreshLootTab = GuildLoot.UI.RefreshLootTab or function() end

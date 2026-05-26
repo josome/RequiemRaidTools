@@ -274,12 +274,7 @@ end
 local function HandleLootTrash(parts, sender)
     local link, sessionID, raidID = parts[2], parts[3], parts[4]
     local db = GuildLootDB
-    local targetSession = nil
-    if sessionID and sessionID ~= "" then
-        for _, s in ipairs(db.raidContainers or {}) do
-            if s.id == sessionID then targetSession = s; break end
-        end
-    end
+    local targetSession = GL.FindSessionByID(sessionID)
     if not targetSession and db.activeContainerIdx then
         targetSession = db.raidContainers[db.activeContainerIdx]
     end
@@ -315,20 +310,60 @@ local msgHandlers = {
     ML_DENY       = HandleMLDeny,
 }
 
-function Comm.OnMessage(msg, sender)
-    -- Eigene Nachrichten ignorieren (ML hat bereits lokal verarbeitet)
-    -- Ausnahme: commLoopback-Flag für Tests
-    -- Sender ist realm-qualifiziert ("Name-Realm"), UnitName nicht → NormalizeName verwenden
+-- ============================================================
+-- Version-Checks für eingehende Nachrichten
+-- ============================================================
+
+-- Regel-Tabelle: jeder Eintrag prüft eine Versions-Konstellation und
+-- formatiert die Warnnachricht. skipDispatch=true bricht die OnMessage-
+-- Verarbeitung nach der Warnung ab (für strikt inkompatible Versionen).
+local VERSION_CHECKS = {
+    {
+        skipDispatch = true,
+        predicate    = function(senderMinor, localMinor) return senderMinor < MIN_PROTO_MINOR end,
+        message      = function(sender, senderVersion)
+            return "|cffff4444[ReqRT] " .. (sender or "?")
+                .. " hat v" .. senderVersion
+                .. " — inkompatibel (min Minor: " .. MIN_PROTO_MINOR
+                .. "). Bitte Addon aktualisieren.|r"
+        end,
+    },
+    {
+        skipDispatch = false,
+        predicate    = function(senderMinor, localMinor) return senderMinor < localMinor end,
+        message      = function(sender, senderVersion)
+            return "|cffff8800[ReqRT] " .. (sender or "?")
+                .. " hat eine ältere Version (v" .. senderVersion
+                .. ") — bitte Addon aktualisieren.|r"
+        end,
+    },
+    {
+        skipDispatch = false,
+        predicate    = function(senderMinor, localMinor) return senderMinor > localMinor end,
+        message      = function(sender, senderVersion)
+            return "|cffff8800[ReqRT] Deine Version (v" .. ADDON_VERSION
+                .. ") ist älter als die von " .. (sender or "?")
+                .. " (v" .. senderVersion .. ") — bitte Addon aktualisieren.|r"
+        end,
+    },
+}
+
+-- Self-Filter: eigene Nachrichten droppen (ML hat lokal schon verarbeitet).
+-- commLoopback-Flag in settings hebt den Filter für Tests auf.
+-- Sender ist realm-qualifiziert ("Name-Realm"), UnitName nicht → NormalizeName verwenden.
+local function shouldDropSelfMessage(sender)
     local myName      = (GL.NormalizeName and GL.NormalizeName(UnitName("player") or "")) or UnitName("player") or ""
     local myShortName = (GL.ShortName and GL.ShortName(myName)) or myName
     local senderShort = (GL.ShortName and GL.ShortName(sender or "")) or (sender or "")
     -- Exakter Vergleich ODER Kurzname-Vergleich als Fallback für Realm-Formatierungs-Unterschiede
     -- (GetRealmName() kann Leerzeichen enthalten, WoW-Sender-Format nicht immer identisch)
-    if sender == myName or senderShort == myShortName then
-        if not (GuildLootDB and GuildLootDB.settings and GuildLootDB.settings.commLoopback) then
-            return
-        end
-    end
+    if sender ~= myName and senderShort ~= myShortName then return false end
+    local loopback = GuildLootDB and GuildLootDB.settings and GuildLootDB.settings.commLoopback
+    return not loopback
+end
+
+function Comm.OnMessage(msg, sender)
+    if shouldDropSelfMessage(sender) then return end
 
     -- Addon-Version aus erstem Feld extrahieren
     local sep1 = msg:find(SEP, 1, true)
@@ -342,31 +377,17 @@ function Comm.OnMessage(msg, sender)
 
     local senderMinor = MinorVersion(senderVersion)
     local localMinor  = MinorVersion(ADDON_VERSION)
-    local now = GetTime()
-    local lastWarn = versionWarnedAt[sender] or 0
-    local canWarn = (now - lastWarn) >= VERSION_WARN_COOLDOWN
-    if senderMinor < MIN_PROTO_MINOR then
-        if canWarn then
-            GL.Print("|cffff4444[ReqRT] " .. (sender or "?")
-                     .. " hat v" .. senderVersion
-                     .. " — inkompatibel (min Minor: " .. MIN_PROTO_MINOR
-                     .. "). Bitte Addon aktualisieren.|r")
-            versionWarnedAt[sender] = now
-        end
-        return
-    elseif senderMinor < localMinor then
-        if canWarn then
-            GL.Print("|cffff8800[ReqRT] " .. (sender or "?")
-                     .. " hat eine ältere Version (v" .. senderVersion
-                     .. ") — bitte Addon aktualisieren.|r")
-            versionWarnedAt[sender] = now
-        end
-    elseif senderMinor > localMinor then
-        if canWarn then
-            GL.Print("|cffff8800[ReqRT] Deine Version (v" .. ADDON_VERSION
-                     .. ") ist älter als die von " .. (sender or "?")
-                     .. " (v" .. senderVersion .. ") — bitte Addon aktualisieren.|r")
-            versionWarnedAt[sender] = now
+    local now         = GetTime()
+    local lastWarn    = versionWarnedAt[sender] or 0
+    local canWarn     = (now - lastWarn) >= VERSION_WARN_COOLDOWN
+    for _, check in ipairs(VERSION_CHECKS) do
+        if check.predicate(senderMinor, localMinor) then
+            if canWarn then
+                GL.Print(check.message(sender, senderVersion))
+                versionWarnedAt[sender] = now
+            end
+            if check.skipDispatch then return end
+            break
         end
     end
 

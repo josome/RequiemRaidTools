@@ -26,6 +26,7 @@ local checkedUnassigned = {}
 local SESSION_HDR_H = 26
 local RAID_LINE_H   = 18   -- Höhe einer einzelnen Textzeile in der Raid-Row
 local RAID_ROW_H    = RAID_LINE_H + 4  -- Standardhöhe für einfache Rows (Platzhalter, Unassigned)
+local LIST_W        = 294  -- Breite der Session-/Raid-Liste links
 
 -- ============================================================
 -- Shims
@@ -35,23 +36,13 @@ function UI.UpdateEndResumeBtn() end
 function UI.UpdateStartRaidBtn() end
 
 -- ============================================================
--- Panel bauen
+-- Panel-Komponenten (C3: extrahiert aus BuildRaidPanel)
 -- ============================================================
 
-function UI.BuildRaidPanel(parent)
-    local panel = CreateFrame("Frame", nil, parent)
-    panel:SetPoint("TOPLEFT",     parent, "TOPLEFT",     0, 0)
-    panel:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", 0, 0)
-    panel:Hide()
-
-    local LIST_W = 294
-
-    -- ---- Control Strip ----
-    local cs = CreateFrame("Frame", nil, panel)
-    cs:SetPoint("TOPLEFT",  panel, "TOPLEFT",  2, -2)
-    cs:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -2, -2)
-    cs:SetHeight(28)
-
+--- Erstellt die 7 Buttons im Control Strip (Session-Toggle, Resume, Export,
+--- Rename, Delete, Assign, Merge). Buttons werden als panel.xxxBtn angehängt.
+--- Closures nutzen file-locals selectedRaid und checkedUnassigned.
+local function BuildRaidActions(panel, cs)
     -- New Raid Session / Close Raid Session
     local sessionBtn = CreateFrame("Button", nil, cs, "UIPanelButtonTemplate")
     sessionBtn:SetSize(150, 22)
@@ -151,17 +142,10 @@ function UI.BuildRaidPanel(parent)
         if delPending then
             if delTimer then delTimer:Cancel(); delTimer = nil end
             delPending = false; deleteBtn:SetText("Delete")
-            local db = GuildLootDB
             if selectedRaid.ci then
-                local ci = selectedRaid.ci
-                table.remove(db.raidContainers, ci)
-                if db.activeContainerIdx == ci then
-                    db.activeContainerIdx = nil; GL.ResetCurrentRaid()
-                elseif db.activeContainerIdx and db.activeContainerIdx > ci then
-                    db.activeContainerIdx = db.activeContainerIdx - 1
-                end
+                GL.DeleteSession(selectedRaid.ci)
             elseif selectedRaid.unassignedIdx then
-                table.remove(db.unassignedRaids or {}, selectedRaid.unassignedIdx)
+                table.remove(GuildLootDB.unassignedRaids or {}, selectedRaid.unassignedIdx)
                 checkedUnassigned = {}
             end
             selectedRaid = nil
@@ -199,15 +183,12 @@ function UI.BuildRaidPanel(parent)
         end
     end)
     panel.mergeBtn = mergeBtn
+end
 
-    -- ---- Liste (links) ----
-    local listFrame = CreateFrame("Frame", nil, panel, "BackdropTemplate")
-    listFrame:SetBackdrop({
-        bgFile   = "Interface\\DialogFrame\\UI-DialogBox-Background",
-        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-        edgeSize = 6,
-        insets   = { left = 2, right = 2, top = 2, bottom = 2 },
-    })
+--- Erstellt das Listen-Panel links (Session/Raid-Liste) inklusive ScrollFrame.
+--- Gibt das listFrame zurück damit das Detail-Pane dagegen ankern kann.
+local function BuildRaidList(panel, cs)
+    local listFrame = UI.CreateBackdropFrame("TOOLTIP", nil, panel)
     listFrame:SetPoint("TOPLEFT",    cs,    "BOTTOMLEFT",  0, -2)
     listFrame:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT",  2,  2)
     listFrame:SetWidth(LIST_W)
@@ -221,14 +202,13 @@ function UI.BuildRaidPanel(parent)
     panel.listContent = listContent
     panel.listScroll  = listScroll
 
-    -- ---- Detail (rechts) ----
-    local detailFrame = CreateFrame("Frame", nil, panel, "BackdropTemplate")
-    detailFrame:SetBackdrop({
-        bgFile   = "Interface\\DialogFrame\\UI-DialogBox-Background",
-        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-        edgeSize = 6,
-        insets   = { left = 2, right = 2, top = 2, bottom = 2 },
-    })
+    return listFrame
+end
+
+--- Erstellt das Detail-Panel rechts (Header + scrollbarer Content). Ankert
+--- horizontal an listFrame (rechte Kante davon).
+local function BuildRaidDetail(panel, listFrame)
+    local detailFrame = UI.CreateBackdropFrame("TOOLTIP", nil, panel)
     detailFrame:SetPoint("TOPLEFT",     listFrame, "TOPRIGHT",     4,  0)
     detailFrame:SetPoint("BOTTOMRIGHT", panel,     "BOTTOMRIGHT", -2,  2)
 
@@ -247,6 +227,27 @@ function UI.BuildRaidPanel(parent)
     detailScroll:SetScrollChild(detailContent)
     panel.detailContent = detailContent
     panel.detailScroll  = detailScroll
+end
+
+-- ============================================================
+-- Panel bauen (Orchestrator)
+-- ============================================================
+
+function UI.BuildRaidPanel(parent)
+    local panel = CreateFrame("Frame", nil, parent)
+    panel:SetPoint("TOPLEFT",     parent, "TOPLEFT",     0, 0)
+    panel:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", 0, 0)
+    panel:Hide()
+
+    -- ---- Control Strip ----
+    local cs = CreateFrame("Frame", nil, panel)
+    cs:SetPoint("TOPLEFT",  panel, "TOPLEFT",  2, -2)
+    cs:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -2, -2)
+    cs:SetHeight(28)
+
+    BuildRaidActions(panel, cs)
+    local listFrame = BuildRaidList(panel, cs)
+    BuildRaidDetail(panel, listFrame)
 
     return panel
 end
@@ -821,8 +822,13 @@ StaticPopupDialogs["RLT_RENAME_SESSION"] = {
     OnAccept     = function(self)
         local name = self.EditBox:GetText()
         if name ~= "" and selectedRaid and selectedRaid.ci then
-            local session = GuildLootDB.raidContainers[selectedRaid.ci]
+            local ci      = selectedRaid.ci
+            local session = GuildLootDB.raidContainers[ci]
             if session then
+                if GL.IsSessionLabelTaken(name, ci) then
+                    GL.Print("Name bereits vergeben: " .. name)
+                    return
+                end
                 session.label = name
                 GL.UI.RefreshRaidTab()
                 GL.UI.RefreshSessionBar()
@@ -832,8 +838,16 @@ StaticPopupDialogs["RLT_RENAME_SESSION"] = {
     EditBoxOnEnterPressed = function(self)
         local name = self:GetText()
         if name ~= "" and selectedRaid and selectedRaid.ci then
-            local session = GuildLootDB.raidContainers[selectedRaid.ci]
-            if session then session.label = name end
+            local ci      = selectedRaid.ci
+            local session = GuildLootDB.raidContainers[ci]
+            if session then
+                if GL.IsSessionLabelTaken(name, ci) then
+                    GL.Print("Name bereits vergeben: " .. name)
+                    StaticPopup_Hide("RLT_RENAME_SESSION")
+                    return
+                end
+                session.label = name
+            end
         end
         StaticPopup_Hide("RLT_RENAME_SESSION")
         GL.UI.RefreshRaidTab()

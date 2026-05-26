@@ -145,14 +145,23 @@ end
 -- Prioritäten-Hilfsfunktionen
 -- ============================================================
 
+--- Liefert die priorityConfig aus der aktiven Raid Session, mit Fallback auf
+--- settings.priorities und leerer Tabelle als letztem Anker.
+local function getSessionPriorityConfig()
+    local db = GuildLootDB
+    if not db then return {} end
+    local idx = db.activeContainerIdx
+    if idx and db.raidContainers and db.raidContainers[idx]
+       and db.raidContainers[idx].priorityConfig then
+        return db.raidContainers[idx].priorityConfig
+    end
+    return (db.settings and db.settings.priorities) or {}
+end
+
 --- Gibt sortierte Liste aktiver Prio-Nummern (1-5) zurück.
 --- Liest aus priorityConfig der aktiven Raid Session, Fallback auf settings.
 function GL.GetActivePrios()
-    local db  = GuildLootDB
-    local cfg = (db.activeContainerIdx and db.raidContainers
-                 and db.raidContainers[db.activeContainerIdx]
-                 and db.raidContainers[db.activeContainerIdx].priorityConfig)
-                or (db.settings and db.settings.priorities) or {}
+    local cfg = getSessionPriorityConfig()
     local result = {}
     for i = 1, 5 do
         if cfg[i] and cfg[i].active then table.insert(result, i) end
@@ -165,12 +174,7 @@ end
 --- Liest aus priorityConfig der aktiven Raid Session, Fallback auf settings.
 function GL.GetPrioLabel(n)
     if not n then return "" end
-    local db  = GuildLootDB
-    local cfg = (db.activeContainerIdx and db.raidContainers
-                 and db.raidContainers[db.activeContainerIdx]
-                 and db.raidContainers[db.activeContainerIdx].priorityConfig)
-                or (db.settings and db.settings.priorities) or {}
-    local p = cfg[n]
+    local p = getSessionPriorityConfig()[n]
     if p and p.shortName and p.shortName ~= "" then return p.shortName end
     return "Prio " .. tostring(n)
 end
@@ -235,6 +239,20 @@ function GL.IsPlayerMode()
     return true
 end
 
+-- Slot-spezifische Filter (equipLoc → filterKey)
+local EQUIPLOC_FILTER = {
+    INVTYPE_NECK   = "neck",
+    INVTYPE_FINGER = "ring",
+}
+
+-- Rüstungstyp-Filter (itemSubType → filterKey)
+local ARMOR_FILTER = {
+    Cloth   = "cloth",
+    Leather = "leather",
+    Mail    = "mail",
+    Plate   = "plate",
+}
+
 --- Announce-Filter: soll dieses Item den Popup triggern?
 --- skipUsableCheck = true: IsUsableItem-Prüfung überspringen (z.B. forcePlayerMode)
 --- Gibt true zurück wenn Item-Daten noch nicht gecacht (false positive besser als verpasstes Item).
@@ -247,26 +265,24 @@ function GL.PopupFilterMatches(link, category, skipUsableCheck)
         if not skipUsableCheck then
             local isUsable = IsUsableItem(link)
             if isUsable ~= false then return true end   -- usable oder noch nicht gecacht → zeigen
-            return f.nonUsableWeapon ~= false            -- nicht-usable → Filter prüfen
         end
-        return f.nonUsableWeapon ~= false
+        return f.nonUsableWeapon ~= false               -- nicht-usable → Filter prüfen
     end
 
     -- Trinkets haben eigenen Filter-Key
     if category == "trinket" then return f.trinket ~= false end
 
-    -- Ring/Neck via equipLoc; Rüstungstyp via itemSubType.
+    -- Ring/Neck via equipLoc, Rüstungstyp via itemSubType.
     -- IsUsableItem wird hier bewusst NICHT verwendet:
     --   • Legacy-Items (z.B. Shadowlands in Midnight) sind auf fremden Clients oft nicht gecacht →
     --     GetItemInfo liefert nil, IsUsableItem liefert false → fälschlicherweise blockiert.
     --   • Die Checkbox-Filter (cloth/leather/mail/plate/other) sind die korrekte Steuerung.
     local _, _, _, _, _, _, itemSubType, _, itemEquipLoc = GetItemInfo(link)
-    if itemEquipLoc == "INVTYPE_NECK"   then return f.neck    ~= false end
-    if itemEquipLoc == "INVTYPE_FINGER" then return f.ring    ~= false end
-    if itemSubType  == "Cloth"          then return f.cloth   ~= false end
-    if itemSubType  == "Leather"        then return f.leather ~= false end
-    if itemSubType  == "Mail"           then return f.mail    ~= false end
-    if itemSubType  == "Plate"          then return f.plate   ~= false end
+    local slotKey = EQUIPLOC_FILTER[itemEquipLoc]
+    if slotKey then return f[slotKey] ~= false end
+
+    local matKey = ARMOR_FILTER[itemSubType]
+    if matKey then return f[matKey] ~= false end
 
     -- Nicht klassifizierbar (Item noch nicht gecacht, Token, sonstiges) → other-Filter.
     -- Absichtlich kein IsUsableItem-Check: false-positive (Item wird gezeigt obwohl nicht nutzbar)
@@ -322,7 +338,40 @@ function GL.ShortName(fullName)
     if not fullName then return "" end
     -- pcall guard: sender-Strings aus Chat-Events können WoW-tainted sein
     local ok, name = pcall(string.match, fullName, "^([^%-]+)")
-    return (ok and name) or fullName
+    if ok and name then return name end
+    return fullName
+end
+
+-- ============================================================
+-- Tooltip
+-- ============================================================
+
+--- Zeigt einen Item-Tooltip am angegebenen Frame an.
+--- @param link string         Item-Link (Pflicht; nil → no-op)
+--- @param ownerFrame Frame?   Owner-Frame (Default: UIParent)
+--- @param anchor string?      WoW-Anchor (Default: "ANCHOR_CURSOR")
+function GL.ShowItemTooltip(link, ownerFrame, anchor)
+    if not link then return end
+    GameTooltip:SetOwner(ownerFrame or UIParent, anchor or "ANCHOR_CURSOR")
+    GameTooltip:SetHyperlink(link)
+    GameTooltip:Show()
+end
+
+-- ============================================================
+-- Session-Lookup
+-- ============================================================
+
+--- Sucht eine Session per ID in GuildLootDB.raidContainers.
+--- @param id string|nil  Session-ID (nil oder "" → nil)
+--- @return table|nil     Session-Tabelle oder nil
+function GL.FindSessionByID(id)
+    if not id or id == "" then return nil end
+    local db = GuildLootDB
+    if not db or not db.raidContainers then return nil end
+    for _, s in ipairs(db.raidContainers) do
+        if s.id == id then return s end
+    end
+    return nil
 end
 
 -- ============================================================

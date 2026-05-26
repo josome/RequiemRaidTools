@@ -11,16 +11,21 @@ local UI = GL.UI
 -- ============================================================
 
 local FRAME_W, FRAME_H = 720, 560
-local TAB_LOOT, TAB_LOG, TAB_RAID, TAB_ROLL, TAB_PLAYER = 1, 2, 3, 4, 5
-UI.TAB_LOOT = TAB_LOOT
+-- Tab-Registry aus UI_Common.lua — hier nur Backward-compat-Aliases
+-- und interne Kurzformen für UI.lua setzen.
+-- Backward-compat-Aliases für Split-Dateien (UI_RaidTab, UI_LootTab, …)
+UI.TAB_LOOT   = UI.TABS.LOOT
+UI.TAB_PLAYER = UI.TABS.PLAYER
+UI.TAB_LOG    = UI.TABS.LOG
+UI.TAB_RAID   = UI.TABS.RAID
+UI.TAB_ROLL   = UI.TABS.ROLL
+-- Interne Kurzformen für UI.lua
+local TAB_LOOT   = UI.TABS.LOOT
+local TAB_LOG    = UI.TABS.LOG
+local TAB_RAID   = UI.TABS.RAID
+local TAB_ROLL   = UI.TABS.ROLL
+local TAB_PLAYER = UI.TABS.PLAYER
 local DIFF_COLORS = { N = "|cff1eff00", H = "|cff0070dd", M = "|cffff8000" }
-
--- Tab-Konstanten für Split-Dateien
-UI.TAB_LOOT   = TAB_LOOT
-UI.TAB_PLAYER = TAB_PLAYER
-UI.TAB_LOG    = TAB_LOG
-UI.TAB_RAID   = TAB_RAID
-UI.TAB_ROLL   = TAB_ROLL
 
 -- ============================================================
 -- Hilfsfunktionen
@@ -60,9 +65,7 @@ local function MakeItemLinkBtn(parent, leftAnchorFrame, xOff, link, displayText)
     if link and link ~= "" then
         btn:EnableMouse(true)
         btn:SetScript("OnEnter", function(self)
-            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:SetHyperlink(link)
-            GameTooltip:Show()
+            GL.ShowItemTooltip(link, self, "ANCHOR_RIGHT")
         end)
         btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     end
@@ -84,13 +87,7 @@ UI._H = {
 --- @param title      string|nil  Titelzeile mit Trennlinie (nil = kein Header)
 --- @return outerFrame, content   Äußeres Frame und scrollbares Content-Frame
 function UI.CreateSidePanel(frameName, parent, title)
-    local outer = CreateFrame("Frame", frameName, parent, "BackdropTemplate")
-    outer:SetBackdrop({
-        bgFile   = "Interface\\DialogFrame\\UI-DialogBox-Background",
-        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-        tile = true, tileSize = 32, edgeSize = 32,
-        insets = { left=11, right=12, top=12, bottom=11 },
-    })
+    local outer = UI.CreateBackdropFrame("DIALOG", frameName, parent)
     outer:SetBackdropColor(0, 0, 0, 1.0)
 
     local closeBtn = CreateFrame("Button", nil, outer, "UIPanelCloseButton")
@@ -327,13 +324,7 @@ function UI.BuildMainFrame()
     UI.minBtn = minBtn
 
     -- Session-Leiste
-    local sessionBar = CreateFrame("Frame", nil, mainFrame, "BackdropTemplate")
-    sessionBar:SetBackdrop({
-        bgFile   = "Interface\\DialogFrame\\UI-DialogBox-Background",
-        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-        edgeSize = 6,
-        insets   = { left = 2, right = 2, top = 2, bottom = 2 },
-    })
+    local sessionBar = UI.CreateBackdropFrame("TOOLTIP", nil, mainFrame)
     sessionBar:SetPoint("BOTTOMLEFT",  mainFrame, "BOTTOMLEFT",  4,  4)
     sessionBar:SetPoint("BOTTOMRIGHT", mainFrame, "BOTTOMRIGHT", -4, 4)
     sessionBar:SetHeight(34)
