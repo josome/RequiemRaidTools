@@ -11,7 +11,7 @@ dofile("src/loot/Loot_Roll.lua")
 dofile("src/loot/Loot_Assign.lua")
 dofile("src/loot/Loot_Trade.lua")
 dofile("src/core/Core_Events.lua")
-dofile("src/Core.lua")
+dofile("src/core/Core_Slash.lua")
 
 -- UI_Common: Konstanten und Helpers (kein WoW-UI nötig, nur Tabellen)
 dofile("src/ui/UI_Common.lua")

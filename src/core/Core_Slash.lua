@@ -1,5 +1,7 @@
--- GuildLoot – Core.lua
--- Slash-Commands. Rest des God-Module ist in src/core/* aufgeteilt.
+-- GuildLoot – Core_Slash.lua
+-- Slash-Commands /reqrt und /requiemraidtools mit Sub-Command-Dispatcher.
+-- Lädt zuletzt im Core-Bundle (nach Core_Events.lua), greift auf alle
+-- GL.*-Funktionen der vorher geladenen Module zu.
 
 GuildLoot = GuildLoot or {}
 local GL = GuildLoot
