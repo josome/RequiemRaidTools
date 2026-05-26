@@ -778,46 +778,7 @@ function UI.AutoExpand()
     UI.ShowTab(TAB_LOOT)
 end
 
--- ============================================================
--- Difficulty-Popup (bei unbekanntem Itemlevel)
--- ============================================================
-
-local difficultyPopup
-
--- callback (optional): function(diff) — wird statt AssignLootConfirm aufgerufen (z.B. für AssignAllWinners)
-function UI.ShowDifficultyPopup(recipientShortName, callback)
-    if difficultyPopup then difficultyPopup:Hide() end
-
-    local popup = CreateFrame("Frame", "GuildLootDiffPopup", UIParent, "BackdropTemplate")
-    popup:SetBackdrop({ bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border", edgeSize = 16, insets = {left=4,right=4,top=4,bottom=4} })
-    popup:SetFrameStrata("DIALOG")
-    popup:SetSize(240, 100)
-    popup:SetPoint("CENTER", mainFrame, "CENTER")
-    difficultyPopup = popup
-
-    local lbl = popup:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    lbl:SetPoint("TOP", popup, "TOP", 0, -12)
-    lbl:SetText("Schwierigkeitsgrad auswählen:")
-
-    local function MakeDiffBtn(text, diff, xPos)
-        local btn = MakeButton(popup, text, 60, 24, function()
-            popup:Hide()
-            if callback then
-                callback(diff)
-            else
-                GL.Loot.AssignLootConfirm(recipientShortName, diff)
-            end
-        end)
-        btn:SetPoint("BOTTOM", popup, "BOTTOM", xPos, 12)
-        return btn
-    end
-
-    MakeDiffBtn("Normal", "N", -80)
-    MakeDiffBtn("Heroic", "H",  -10)
-    MakeDiffBtn("Mythic", "M",   60)
-
-    popup:Show()
-end
+-- (Difficulty-Popup: ausgegliedert in src/ui/UI_DifficultyPopup.lua seit D2.1)
 
 -- ============================================================
 -- Position speichern / wiederherstellen
