@@ -151,17 +151,10 @@ function UI.BuildRaidPanel(parent)
         if delPending then
             if delTimer then delTimer:Cancel(); delTimer = nil end
             delPending = false; deleteBtn:SetText("Delete")
-            local db = GuildLootDB
             if selectedRaid.ci then
-                local ci = selectedRaid.ci
-                table.remove(db.raidContainers, ci)
-                if db.activeContainerIdx == ci then
-                    db.activeContainerIdx = nil; GL.ResetCurrentRaid()
-                elseif db.activeContainerIdx and db.activeContainerIdx > ci then
-                    db.activeContainerIdx = db.activeContainerIdx - 1
-                end
+                GL.DeleteSession(selectedRaid.ci)
             elseif selectedRaid.unassignedIdx then
-                table.remove(db.unassignedRaids or {}, selectedRaid.unassignedIdx)
+                table.remove(GuildLootDB.unassignedRaids or {}, selectedRaid.unassignedIdx)
                 checkedUnassigned = {}
             end
             selectedRaid = nil

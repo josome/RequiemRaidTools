@@ -307,6 +307,28 @@ local function uniqueSessionLabel(label)
     return result
 end
 
+--- Löscht eine Session aus raidContainers und passt activeContainerIdx an.
+--- - Aktive Session gelöscht → activeContainerIdx = nil + ResetCurrentRaid.
+--- - Index vor aktiver Session gelöscht → activeContainerIdx dekrementieren.
+--- - Out-of-Bounds oder ungültiger Index → No-Op.
+--- Reads:  db.raidContainers, db.activeContainerIdx
+--- Writes: db.raidContainers, db.activeContainerIdx, db.currentRaid (via ResetCurrentRaid)
+--- @param ci number  1-basierter Index in raidContainers
+function GL.DeleteSession(ci)
+    local db = GuildLootDB
+    if type(ci) ~= "number" or not db.raidContainers
+       or ci < 1 or ci > #db.raidContainers then
+        return
+    end
+    table.remove(db.raidContainers, ci)
+    if db.activeContainerIdx == ci then
+        db.activeContainerIdx = nil
+        GL.ResetCurrentRaid()
+    elseif db.activeContainerIdx and db.activeContainerIdx > ci then
+        db.activeContainerIdx = db.activeContainerIdx - 1
+    end
+end
+
 --- Erstellt eine neue Raid-Session und setzt sie als aktiv.
 --- Reads:  db.activeContainerIdx, db.settings.priorities, db.currentRaid.tier
 --- Writes: db.raidContainers, db.activeContainerIdx, db.settings.isMasterLooter,
