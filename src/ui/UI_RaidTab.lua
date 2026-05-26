@@ -26,6 +26,7 @@ local checkedUnassigned = {}
 local SESSION_HDR_H = 26
 local RAID_LINE_H   = 18   -- Höhe einer einzelnen Textzeile in der Raid-Row
 local RAID_ROW_H    = RAID_LINE_H + 4  -- Standardhöhe für einfache Rows (Platzhalter, Unassigned)
+local LIST_W        = 294  -- Breite der Session-/Raid-Liste links
 
 -- ============================================================
 -- Shims
@@ -35,23 +36,13 @@ function UI.UpdateEndResumeBtn() end
 function UI.UpdateStartRaidBtn() end
 
 -- ============================================================
--- Panel bauen
+-- Panel-Komponenten (C3: extrahiert aus BuildRaidPanel)
 -- ============================================================
 
-function UI.BuildRaidPanel(parent)
-    local panel = CreateFrame("Frame", nil, parent)
-    panel:SetPoint("TOPLEFT",     parent, "TOPLEFT",     0, 0)
-    panel:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", 0, 0)
-    panel:Hide()
-
-    local LIST_W = 294
-
-    -- ---- Control Strip ----
-    local cs = CreateFrame("Frame", nil, panel)
-    cs:SetPoint("TOPLEFT",  panel, "TOPLEFT",  2, -2)
-    cs:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -2, -2)
-    cs:SetHeight(28)
-
+--- Erstellt die 7 Buttons im Control Strip (Session-Toggle, Resume, Export,
+--- Rename, Delete, Assign, Merge). Buttons werden als panel.xxxBtn angehängt.
+--- Closures nutzen file-locals selectedRaid und checkedUnassigned.
+local function BuildRaidActions(panel, cs)
     -- New Raid Session / Close Raid Session
     local sessionBtn = CreateFrame("Button", nil, cs, "UIPanelButtonTemplate")
     sessionBtn:SetSize(150, 22)
@@ -192,8 +183,11 @@ function UI.BuildRaidPanel(parent)
         end
     end)
     panel.mergeBtn = mergeBtn
+end
 
-    -- ---- Liste (links) ----
+--- Erstellt das Listen-Panel links (Session/Raid-Liste) inklusive ScrollFrame.
+--- Gibt das listFrame zurück damit das Detail-Pane dagegen ankern kann.
+local function BuildRaidList(panel, cs)
     local listFrame = UI.CreateBackdropFrame("TOOLTIP", nil, panel)
     listFrame:SetPoint("TOPLEFT",    cs,    "BOTTOMLEFT",  0, -2)
     listFrame:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT",  2,  2)
@@ -208,7 +202,12 @@ function UI.BuildRaidPanel(parent)
     panel.listContent = listContent
     panel.listScroll  = listScroll
 
-    -- ---- Detail (rechts) ----
+    return listFrame
+end
+
+--- Erstellt das Detail-Panel rechts (Header + scrollbarer Content). Ankert
+--- horizontal an listFrame (rechte Kante davon).
+local function BuildRaidDetail(panel, listFrame)
     local detailFrame = UI.CreateBackdropFrame("TOOLTIP", nil, panel)
     detailFrame:SetPoint("TOPLEFT",     listFrame, "TOPRIGHT",     4,  0)
     detailFrame:SetPoint("BOTTOMRIGHT", panel,     "BOTTOMRIGHT", -2,  2)
@@ -228,6 +227,27 @@ function UI.BuildRaidPanel(parent)
     detailScroll:SetScrollChild(detailContent)
     panel.detailContent = detailContent
     panel.detailScroll  = detailScroll
+end
+
+-- ============================================================
+-- Panel bauen (Orchestrator)
+-- ============================================================
+
+function UI.BuildRaidPanel(parent)
+    local panel = CreateFrame("Frame", nil, parent)
+    panel:SetPoint("TOPLEFT",     parent, "TOPLEFT",     0, 0)
+    panel:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", 0, 0)
+    panel:Hide()
+
+    -- ---- Control Strip ----
+    local cs = CreateFrame("Frame", nil, panel)
+    cs:SetPoint("TOPLEFT",  panel, "TOPLEFT",  2, -2)
+    cs:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -2, -2)
+    cs:SetHeight(28)
+
+    BuildRaidActions(panel, cs)
+    local listFrame = BuildRaidList(panel, cs)
+    BuildRaidDetail(panel, listFrame)
 
     return panel
 end
