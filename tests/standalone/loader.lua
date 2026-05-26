@@ -4,6 +4,7 @@
 
 dofile("src/Util.lua")
 dofile("src/core/Core_DB.lua")
+dofile("src/core/Core_Session.lua")
 dofile("src/Core.lua")
 dofile("src/Comm.lua")
 dofile("src/loot/Loot.lua")
