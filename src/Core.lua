@@ -307,6 +307,32 @@ local function uniqueSessionLabel(label)
     return result
 end
 
+--- Migriert orphaned pendingLoot-Items in einen separaten Legacy-Container.
+--- Idempotent: zweiter Aufruf ohne neue Items ist No-Op.
+--- Reads:  db.currentRaid.pendingLoot, db.settings.priorities
+--- Writes: db.raidContainers (neuer Legacy-Eintrag), db.currentRaid.pendingLoot (geleert)
+function GL.MigratePendingLoot()
+    local db = GuildLootDB
+    local orphaned = db.currentRaid and db.currentRaid.pendingLoot
+    if not orphaned or #orphaned == 0 then return end
+    local count = #orphaned
+    local legacyTs = time()
+    local legacy = {
+        id             = string.format("legacy-%08x", legacyTs),
+        label          = "Legacy Loot",
+        startedAt      = legacyTs,
+        closedAt       = legacyTs,
+        pendingLoot    = orphaned,
+        lootLog        = {},
+        trashedLoot    = {},
+        raidMeta       = {},
+        priorityConfig = CopyTable(db.settings.priorities or {}),
+    }
+    table.insert(db.raidContainers, legacy)
+    db.currentRaid.pendingLoot = {}
+    GL.Print(string.format("%d Item(s) in Legacy-Session gesichert.", count))
+end
+
 --- Löscht eine Session aus raidContainers und passt activeContainerIdx an.
 --- - Aktive Session gelöscht → activeContainerIdx = nil + ResetCurrentRaid.
 --- - Index vor aktiver Session gelöscht → activeContainerIdx dekrementieren.
@@ -359,24 +385,7 @@ function GL.StartContainer(label)
         raidMeta       = {},
         priorityConfig = CopyTable(db.settings.priorities or {}),
     }
-    local orphaned = db.currentRaid and db.currentRaid.pendingLoot
-    if orphaned and #orphaned > 0 then
-        local legacyTs = time()
-        local legacy = {
-            id             = string.format("legacy-%08x", legacyTs),
-            label          = "Legacy Loot",
-            startedAt      = legacyTs,
-            closedAt       = legacyTs,
-            pendingLoot    = orphaned,
-            lootLog        = {},
-            trashedLoot    = {},
-            raidMeta       = {},
-            priorityConfig = CopyTable(db.settings.priorities or {}),
-        }
-        table.insert(db.raidContainers, legacy)
-        db.currentRaid.pendingLoot = {}
-        GL.Print(string.format("%d Item(s) in Legacy-Session gesichert.", #legacy.pendingLoot))
-    end
+    GL.MigratePendingLoot()
 
     table.insert(db.raidContainers, session)
     db.activeContainerIdx = #db.raidContainers
