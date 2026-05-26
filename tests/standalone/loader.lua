@@ -3,6 +3,7 @@
 -- Pfade relativ zum Repo-Root (busted von dort starten).
 
 dofile("src/Util.lua")
+dofile("src/core/Core_DB.lua")
 dofile("src/Core.lua")
 dofile("src/Comm.lua")
 dofile("src/loot/Loot.lua")
