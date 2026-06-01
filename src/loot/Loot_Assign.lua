@@ -506,6 +506,7 @@ function Loot.OnCommAssign(playerName, diff, link, category, quality, winnerPrio
         targetSession = db.raidContainers[db.activeContainerIdx]
     end
     if targetSession then
+        local effectiveRaidID = raidID or db.currentRaid.id or ""
         table.insert(targetSession.lootLog, {
             player     = fullName,
             item       = link or "",
@@ -517,8 +518,30 @@ function Loot.OnCommAssign(playerName, diff, link, category, quality, winnerPrio
             boss       = boss,
             timestamp  = time(),
             sessionID  = sessionID or "",
-            raidID     = raidID or db.currentRaid.id or "",
+            raidID     = effectiveRaidID,
         })
+        -- Selbstheilung: ASSIGN für unbekannte raidID → Stub anlegen + RAID_QUERY
+        -- triggern, damit der UI-Raid-Tab sofort etwas zeigt und der ML
+        -- vollständige raidMeta nachschickt (siehe Comm.SendSessionSync).
+        if effectiveRaidID ~= "" then
+            targetSession.raidMeta = targetSession.raidMeta or {}
+            if not targetSession.raidMeta[effectiveRaidID] then
+                targetSession.raidMeta[effectiveRaidID] = {
+                    tier         = "",
+                    difficulty   = diff or "",
+                    startedAt    = time(),
+                    closedAt     = nil,
+                    participants = {},
+                    isStub       = true,
+                }
+                -- Rate-limitierter RAID_QUERY (geteilter Throttle mit Core_Events)
+                local now = time()
+                if not GL._lastRaidQuery or (now - GL._lastRaidQuery) > 5 then
+                    GL._lastRaidQuery = now
+                    if GL.Comm and GL.Comm.SendRaidQuery then GL.Comm.SendRaidQuery() end
+                end
+            end
+        end
     end
     -- Gewinner-Anzeige für den lokalen Spieler
     local isWinner = false

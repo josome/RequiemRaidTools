@@ -655,7 +655,9 @@ function GL.OnCommRaidMeta(sessionID, raidID, meta, prioCfg)
     local db = GuildLootDB
     for _, s in ipairs(db.raidContainers or {}) do
         if s.id == sessionID then
-            if not s.raidMeta[raidID] then
+            -- Stub aus OnCommAssign (isStub=true) wird vom echten RAID_META überschrieben
+            local existing = s.raidMeta[raidID]
+            if not existing or existing.isStub then
                 s.raidMeta[raidID] = meta
             end
             if prioCfg then

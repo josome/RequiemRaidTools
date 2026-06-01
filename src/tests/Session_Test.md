@@ -117,6 +117,25 @@ SESSION_START gefolgt von SESSION_END.
 - `SendSessionSync` wird nicht aufgerufen
 - Request landet in `GL._pendingSyncRequests`
 
+### `testAssignWithoutRaidMetaCreatesStub`
+Observer empfängt `ASSIGN` für eine `raidID`, die noch nicht in `session.raidMeta` existiert (z.B. verpasstes `RAID_META`-Broadcast wegen `/reload` oder Disconnect).
+- `lootLog`-Eintrag wird wie gewohnt geschrieben (mit `raidID`)
+- `session.raidMeta[raidID]` wird mit `isStub=true`, `difficulty=<diff>`, `tier=""`, leerem `participants` als Selbstheilungs-Stub angelegt — damit der UI-Raid-Tab den Raid sofort listen kann
+
+### `testAssignWithoutRaidMetaTriggersRaidQuery`
+Gleicher Aufruf wie oben.
+- `Comm.SendRaidQuery` wird einmal aufgerufen, damit der ML via `SendSessionSync` die vollständigen `raidMeta`-Daten nachschickt
+- Rate-limited über `GL._lastRaidQuery` (geteilter Throttle mit `Core_Events.OnEventRosterUpdate`)
+
+### `testRaidMetaOverwritesStub`
+Bestehender Stub-Eintrag (`isStub=true`) wird durch ein echtes `RAID_META` ersetzt.
+- `tier`, `participants` und alle anderen Felder kommen aus dem RAID_META
+- `isStub`-Flag ist im neuen Eintrag nicht mehr gesetzt
+
+### `testRaidMetaDoesNotOverwriteRealEntry`
+Bereits vollständiger `raidMeta`-Eintrag (ohne `isStub`) bleibt durch ein zweites `RAID_META` unverändert (bestehende Semantik — Late-Join-Sync soll nichts kaputtmachen).
+- Tier, Difficulty, startedAt, Participants behalten ihre Werte
+
 ### `testLegacySessionCreatedWhenPendingLootExists`
 `currentRaid.pendingLoot` hat 2 Items, dann `StartContainer` aufrufen.
 - 2 Sessions in `raidContainers` (Legacy + Neue)

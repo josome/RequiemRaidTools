@@ -986,4 +986,133 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
         end)
     end
 
+    -- --------------------------------------------------------
+    -- testAssignWithoutRaidMetaCreatesStub
+    -- Prüft: Observer empfängt ASSIGN für unbekannte raidID → Stub mit
+    -- isStub=true wird in session.raidMeta angelegt, damit die UI den Raid
+    -- sofort zeigt (auch wenn das eigentliche RAID_META verpasst wurde).
+    -- --------------------------------------------------------
+    function Tests:testAssignWithoutRaidMetaCreatesStub()
+        WithTestDB(function()
+            MockSideEffects()
+            Mock(GuildLoot, "IsMasterLooter", function() return false end)
+            Mock(GuildLoot.UI, "HidePlayerPopup", function() end)
+            Mock(GuildLoot.UI, "ClearRollTab",    function() end)
+
+            GuildLootDB.raidContainers = { { id="sess-1", label="X", startedAt=1,
+                                             lootLog={}, trashedLoot={}, raidMeta={} } }
+            GuildLootDB.activeContainerIdx = 1
+            GuildLoot._lastRaidQuery = nil
+
+            Loot.OnCommAssign("Myriella-Malfurion", "M",
+                              "|Hitem:212426|h[Egg]|h|r", "trinket",
+                              4, 1, "Ulgrax", "sess-1", "raid-new")
+
+            local session = GuildLootDB.raidContainers[1]
+            AreEqual(1, #session.lootLog)
+            AreEqual("raid-new", session.lootLog[1].raidID)
+            Exists(session.raidMeta["raid-new"])
+            IsTrue(session.raidMeta["raid-new"].isStub)
+            AreEqual("M", session.raidMeta["raid-new"].difficulty)
+            AreEqual("", session.raidMeta["raid-new"].tier)
+            AreEqual(0, #session.raidMeta["raid-new"].participants)
+            MockRestore()
+        end)
+    end
+
+    -- --------------------------------------------------------
+    -- testAssignWithoutRaidMetaTriggersRaidQuery
+    -- Prüft: gleicher Trigger ruft Comm.SendRaidQuery auf, damit der ML die
+    -- vollständigen raidMeta-Daten via SendSessionSync nachschickt.
+    -- --------------------------------------------------------
+    function Tests:testAssignWithoutRaidMetaTriggersRaidQuery()
+        WithTestDB(function()
+            MockSideEffects()
+            Mock(GuildLoot, "IsMasterLooter", function() return false end)
+            Mock(GuildLoot.UI, "HidePlayerPopup", function() end)
+            Mock(GuildLoot.UI, "ClearRollTab",    function() end)
+
+            local raidQueryCalled = 0
+            Mock(GuildLoot.Comm, "SendRaidQuery", function() raidQueryCalled = raidQueryCalled + 1 end)
+
+            GuildLootDB.raidContainers = { { id="sess-1", label="X", startedAt=1,
+                                             lootLog={}, trashedLoot={}, raidMeta={} } }
+            GuildLootDB.activeContainerIdx = 1
+            GuildLoot._lastRaidQuery = nil
+
+            Loot.OnCommAssign("Myriella-Malfurion", "M",
+                              "|Hitem:212426|h[Egg]|h|r", "trinket",
+                              4, 1, "Ulgrax", "sess-1", "raid-new")
+
+            AreEqual(1, raidQueryCalled)
+            MockRestore()
+        end)
+    end
+
+    -- --------------------------------------------------------
+    -- testRaidMetaOverwritesStub
+    -- Prüft: nachdem OnCommAssign einen Stub angelegt hat, ersetzt das
+    -- echte RAID_META (z.B. via SendSessionSync) den Stub vollständig.
+    -- --------------------------------------------------------
+    function Tests:testRaidMetaOverwritesStub()
+        WithTestDB(function()
+            GuildLootDB.raidContainers = { { id="sess-1", label="X", startedAt=1,
+                                             lootLog={}, trashedLoot={},
+                                             raidMeta = {
+                                                 ["raid-new"] = {
+                                                     tier="", difficulty="M",
+                                                     startedAt=1700000000,
+                                                     closedAt=nil, participants={},
+                                                     isStub=true,
+                                                 }
+                                             } } }
+            GuildLootDB.activeContainerIdx = 1
+
+            local fullMeta = { tier="Nerub-ar Palace", difficulty="M",
+                               startedAt=1699999000, closedAt=nil,
+                               participants={ "Myriella-Malfurion" } }
+            GuildLoot.OnCommRaidMeta("sess-1", "raid-new", fullMeta)
+
+            local entry = GuildLootDB.raidContainers[1].raidMeta["raid-new"]
+            Exists(entry)
+            AreEqual("Nerub-ar Palace", entry.tier)
+            AreEqual(1, #entry.participants)
+            AreEqual("Myriella-Malfurion", entry.participants[1])
+            IsFalse(entry.isStub)  -- isStub-Flag entfernt
+        end)
+    end
+
+    -- --------------------------------------------------------
+    -- testRaidMetaDoesNotOverwriteRealEntry
+    -- Prüft: ein bereits vollständiger raidMeta-Eintrag (ohne isStub) wird
+    -- nicht durch ein nachfolgendes RAID_META überschrieben — bestehende
+    -- Semantik (Late-Join-Sync soll nichts kaputtmachen).
+    -- --------------------------------------------------------
+    function Tests:testRaidMetaDoesNotOverwriteRealEntry()
+        WithTestDB(function()
+            GuildLootDB.raidContainers = { { id="sess-1", label="X", startedAt=1,
+                                             lootLog={}, trashedLoot={},
+                                             raidMeta = {
+                                                 ["raid-1"] = {
+                                                     tier="Nerub-ar Palace",
+                                                     difficulty="M",
+                                                     startedAt=1700000000,
+                                                     closedAt=nil,
+                                                     participants={ "Myriella-Malfurion" },
+                                                 }
+                                             } } }
+            GuildLootDB.activeContainerIdx = 1
+
+            local overwriteAttempt = { tier="ANDERER TIER", difficulty="H",
+                                       startedAt=9999, closedAt=nil, participants={} }
+            GuildLoot.OnCommRaidMeta("sess-1", "raid-1", overwriteAttempt)
+
+            local entry = GuildLootDB.raidContainers[1].raidMeta["raid-1"]
+            AreEqual("Nerub-ar Palace", entry.tier)
+            AreEqual("M", entry.difficulty)
+            AreEqual(1700000000, entry.startedAt)
+            AreEqual(1, #entry.participants)
+        end)
+    end
+
 end)
