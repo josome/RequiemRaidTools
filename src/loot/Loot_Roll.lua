@@ -302,6 +302,7 @@ function Loot.OnCommRollStart(seconds, players)
     currentItem.rollState.results  = {}
     currentItem.rollState.players  = {}
     currentItem.rollState.timeLeft = seconds
+    currentItem.rollState.iRolled  = false  -- neuer Roll (auch Tie-Re-Roll) → wieder rollbar
     currentItem.prioState.active   = false
     for _, p in ipairs(players or {}) do
         currentItem.rollState.players[p] = true
@@ -322,6 +323,12 @@ function Loot.OnCommRollStart(seconds, players)
     -- Roll-Button in Popup + Roll-Tab aktivieren wenn Spieler in der Liste ist
     local myShort = GL.ShortName(UnitName("player") or "")
     if currentItem.rollState.players[myShort] then
+        -- Auto-Reopen: Popup (wieder) öffnen falls der Spieler es geschlossen hatte.
+        -- ShowPlayerPopup enthält den popupEnabled-Guard; EnablePlayerPopupRoll
+        -- wirkt nur wenn das Popup sichtbar ist (daher zuerst öffnen).
+        if currentItem.link and GL.UI and GL.UI.ShowPlayerPopup then
+            GL.UI.ShowPlayerPopup(currentItem.link)
+        end
         if GL.UI and GL.UI.EnablePlayerPopupRoll then GL.UI.EnablePlayerPopupRoll() end
         if GL.UI and GL.UI.EnableRollTabRoll     then GL.UI.EnableRollTabRoll()     end
     end
