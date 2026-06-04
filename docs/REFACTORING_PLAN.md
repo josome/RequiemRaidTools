@@ -30,8 +30,8 @@
 | **C2** GL.MigratePendingLoot | ⏳ offen | — |
 | **C3** BuildRaidPanel zerlegen | ⏳ offen | — |
 | **C4** commLoopback-Filter verschieben | ⏳ offen | — |
-| **D1** Core.lua aufspalten | ⏳ offen | — |
-| **D2** UI.lua entlasten | ⏳ offen | — |
+| **D1** Core.lua aufspalten | ✅ umgesetzt (Core_DB/Session/Events/Slash) | Branch `feature/core-ui-split` |
+| **D2** UI.lua entlasten | ✅ umgesetzt (D2.1 DifficultyPopup, D2.2 DropPanel, D2.3 DockTab; Sound/Filter bereits in früheren Wellen ausgelagert) | Branch `feature/core-ui-split` |
 
 ---
 

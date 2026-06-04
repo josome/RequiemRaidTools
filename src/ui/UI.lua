@@ -128,7 +128,7 @@ end
 
 local mainFrame
 local contentFrame
-local dockTab
+-- dockTab lebt jetzt in UI.dockTab (BuildDockTab in src/ui/UI_DockTab.lua, D2.3)
 UI.activeTab = TAB_LOOT
 
 local tabButtons = {}
@@ -404,90 +404,9 @@ end
 -- ============================================================
 -- Dock-Tab (linker Bildschirmrand, angedockter Zustand)
 -- ============================================================
-
-function UI.BuildDockTab()
-    if dockTab then return end
-
-    dockTab = CreateFrame("Button", "GuildLootDockTab", UIParent, "BackdropTemplate")
-    dockTab:SetBackdrop({
-        bgFile   = "Interface\\DialogFrame\\UI-DialogBox-Background",
-        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-        edgeSize = 8,
-        insets   = { left = 2, right = 2, top = 2, bottom = 2 },
-    })
-    dockTab:SetSize(22, 110)
-    local savedY = (GuildLootDB.settings and GuildLootDB.settings.dockTabY) or 0
-    dockTab:SetPoint("LEFT", UIParent, "LEFT", 0, savedY)
-    dockTab:SetFrameStrata("HIGH")
-    dockTab:SetMovable(true)
-    dockTab:EnableMouse(true)
-    dockTab:RegisterForDrag("LeftButton")
-    dockTab:SetScript("OnDragStart", function(self) self:StartMoving() end)
-    dockTab:SetScript("OnDragStop", function(self)
-        self:StopMovingOrSizing()
-        local _, _, _, _, y = self:GetPoint()
-        self:ClearAllPoints()
-        self:SetPoint("LEFT", UIParent, "LEFT", 0, y)
-        GuildLootDB.settings.dockTabY = y
-    end)
-    dockTab:SetScript("OnClick", UI.Undock)
-    dockTab:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetText("RequiemRaidTools", 1, 0.8, 0)
-        local pending = GL.Loot and GL.Loot.GetPendingLoot and #GL.Loot.GetPendingLoot() or 0
-        if pending > 0 then
-            GameTooltip:AddLine(pending .. " Item(s) warten", 1, 1, 0)
-        end
-        GameTooltip:AddLine("Klicken zum Öffnen", 0.6, 0.6, 0.6)
-        GameTooltip:Show()
-    end)
-    dockTab:SetScript("OnLeave", function() GameTooltip:Hide() end)
-
-    local title = dockTab:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    title:SetPoint("TOP", dockTab, "TOP", 0, -8)
-    title:SetText("|cff00ccffR|r")
-
-    local title2 = dockTab:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    title2:SetPoint("TOP", title, "BOTTOM", 0, -2)
-    title2:SetText("|cff00ccffT|r")
-
-    UI.dockLootCount = dockTab:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    UI.dockLootCount:SetPoint("CENTER", dockTab, "CENTER", 0, 0)
-    UI.dockLootCount:SetText("")
-
-    UI.dockMLCheck = dockTab:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    UI.dockMLCheck:SetPoint("BOTTOM", dockTab, "BOTTOM", 0, 22)
-    UI.dockMLCheck:SetText("")
-
-    UI.dockRaidDot = dockTab:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    UI.dockRaidDot:SetPoint("BOTTOM", dockTab, "BOTTOM", 0, 8)
-    UI.dockRaidDot:SetText("")
-
-    dockTab:Hide()
-    UI.dockTab = dockTab
-end
-
-function UI.RefreshDockTab()
-    if not dockTab then return end
-    local pending = (GL.Loot and GL.Loot.GetPendingLoot) and #GL.Loot.GetPendingLoot() or 0
-    if pending > 0 then
-        UI.dockLootCount:SetText("|cffffcc00" .. pending .. "|r\n|cff888888Item(s)|r")
-    else
-        UI.dockLootCount:SetText("")
-    end
-    if UI.dockMLCheck then
-        if GL.IsMasterLooter() then
-            UI.dockMLCheck:SetText("|cff00ff00☑|r")
-        else
-            UI.dockMLCheck:SetText("|cff555555☐|r")
-        end
-    end
-    if GuildLootDB.activeContainerIdx then
-        UI.dockRaidDot:SetText("|cff00ff00☑|r")
-    else
-        UI.dockRaidDot:SetText("|cff555555☐|r")
-    end
-end
+-- BuildDockTab / RefreshDockTab: ausgegliedert in src/ui/UI_DockTab.lua (D2.3).
+-- Die folgenden Funktionen orchestrieren zusätzlich das Hauptfenster und
+-- bleiben daher hier; das Dock-Tab-Frame liegt in UI.dockTab.
 
 -- Andocken: Hauptfenster verstecken, Dock-Tab zeigen
 function UI.Dock()
@@ -497,13 +416,13 @@ function UI.Dock()
     mainFrame:Hide()
     UI.BuildDockTab()
     UI.RefreshDockTab()
-    dockTab:Show()
+    UI.dockTab:Show()
 end
 
 -- Abdocken: Dock-Tab verstecken, Hauptfenster wiederherstellen.
 -- Im Player-Mode: statt vollem Fenster den Player-Popup (Filter-Ansicht) zeigen.
 function UI.Undock()
-    if dockTab then dockTab:Hide() end
+    if UI.dockTab then UI.dockTab:Hide() end
     GuildLootDB.settings.minimized = false
     if GL.IsPlayerMode() then
         if UI.ShowPlayerPopupFilterOnly then UI.ShowPlayerPopupFilterOnly() end
@@ -649,7 +568,7 @@ end
 --- Wird vom Minimap-Button (Rechtsklick im Raider-Mode) verwendet.
 function UI.OpenMainWindow()
     if GuildLootDB.settings.minimized then
-        if dockTab then dockTab:Hide() end
+        if UI.dockTab then UI.dockTab:Hide() end
         GuildLootDB.settings.minimized = false
         if not mainFrame then UI.BuildMainFrame() end
         UI.LoadPosition()
@@ -694,13 +613,13 @@ end
 function UI.OnZoneChanged()
     if GL.IsValidZone() then
         -- Gültige Zone: Dock-Tab anzeigen falls minimiert
-        if dockTab and GuildLootDB.settings.minimized then
-            dockTab:Show()
+        if UI.dockTab and GuildLootDB.settings.minimized then
+            UI.dockTab:Show()
         end
     else
         -- Dungeon / Delve / Arena: UI komplett ausblenden
         if mainFrame then mainFrame:Hide() end
-        if dockTab then dockTab:Hide() end
+        if UI.dockTab then UI.dockTab:Hide() end
     end
 end
 
@@ -738,7 +657,7 @@ function UI.LoadPosition()
         mainFrame:Hide()
         UI.BuildDockTab()
         UI.RefreshDockTab()
-        if GL.IsValidZone() then dockTab:Show() end
+        if GL.IsValidZone() then UI.dockTab:Show() end
     else
         -- Position wiederherstellen
         local sz = GuildLootDB.settings.frameSize
