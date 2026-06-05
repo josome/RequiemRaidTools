@@ -113,6 +113,21 @@ local function BuildPopup()
     popup:SetBackdropColor(0, 0, 0, 0.9)
     popup:Hide()
 
+    -- Gewinner-Aufleuchten: goldener Vollflächen-Puls (analog Blizzard-Group-Loot).
+    -- Wird in ShowPlayerPopupWin per :Play() ausgelöst.
+    local winFlash = popup:CreateTexture(nil, "OVERLAY")
+    winFlash:SetAllPoints(popup)
+    winFlash:SetColorTexture(1, 0.82, 0, 1)  -- gold
+    winFlash:SetBlendMode("ADD")
+    winFlash:SetAlpha(0)
+    local ag = winFlash:CreateAnimationGroup()
+    local a1 = ag:CreateAnimation("Alpha"); a1:SetOrder(1); a1:SetDuration(0.18)
+    a1:SetFromAlpha(0);    a1:SetToAlpha(0.55)
+    local a2 = ag:CreateAnimation("Alpha"); a2:SetOrder(2); a2:SetDuration(0.55)
+    a2:SetFromAlpha(0.55); a2:SetToAlpha(0)
+    ag:SetScript("OnFinished", function() winFlash:SetAlpha(0) end)
+    popup.winFlash, popup.winFlashAnim = winFlash, ag
+
     -- Titelzeile
     local titleBar = popup:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     titleBar:SetPoint("TOPLEFT", popup, "TOPLEFT", 16, -10)
@@ -253,6 +268,10 @@ function UI.ShowPlayerPopupWin(link)
     CancelAutoClose()
     widget:ShowWin(link)
     popup:Show()
+
+    -- Gewinner sofort sichtbar machen: Aufleuchten (immer) + Sound (über Toggle)
+    if popup.winFlashAnim then popup.winFlashAnim:Stop(); popup.winFlashAnim:Play() end
+    if IsSoundEnabled() then PlaySound(SOUNDKIT.UI_EPICLOOT_TOAST) end
 
     autoCloseTimer = C_Timer.NewTimer(6, function()
         if helpPanel then helpPanel:Hide() end
