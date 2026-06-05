@@ -253,4 +253,108 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
         ResetTradeState()
     end
 
+    -- --------------------------------------------------------
+    -- Test 9: Gebundene Duplikat-Kopie wird übersprungen, handelbare bevorzugt
+    -- Slot 1: gleiche itemID, gebunden, kein Trade-Timer → nicht handelbar
+    -- Slot 2: gleiche itemID, gebunden, MIT Trade-Timer → handelbar → wird genommen
+    -- --------------------------------------------------------
+    function Tests:testPicksTradeableCopyOverBoundDuplicate()
+        ResetTradeState()
+        Loot._pendingTrades = { { itemID = 900, shortName = "Barbossbär" } }
+
+        MockBasics()
+        local pickedBag, pickedSlot
+        Mock(_G, "C_Container", {
+            GetContainerNumSlots = function(bag) return bag == 0 and 5 or 0 end,
+            GetContainerItemInfo = function(bag, slot)
+                if bag == 0 and (slot == 1 or slot == 2) then
+                    return { itemID = 900, isBound = true }
+                end
+                return nil
+            end,
+            PickupContainerItem = function(bag, slot) pickedBag, pickedSlot = bag, slot end,
+        })
+        -- Nur Slot 2 zeigt die 2h-Trade-Zeile
+        Mock(_G, "BIND_TRADE_TIME_REMAINING", "You may trade this item for the next %s.")
+        Mock(_G, "C_TooltipInfo", {
+            GetBagItem = function(bag, slot)
+                if bag == 0 and slot == 2 then
+                    return { lines = { { leftText = "You may trade this item for the next 1 hour." } } }
+                end
+                return { lines = { { leftText = "Soulbound" } } }
+            end,
+        })
+        Mock(_G, "TradeFrameRecipientNameText", { GetText = function() return "Barbossbär" end })
+        Mock(_G, "UnitName", function() return nil end)
+
+        Loot.OnTradeShow()
+
+        AreEqual(0, pickedBag)
+        AreEqual(2, pickedSlot)  -- handelbare Kopie, nicht die erste (gebundene)
+
+        MockRestore()
+        ResetTradeState()
+    end
+
+    -- --------------------------------------------------------
+    -- Test 10: Keine handelbare Kopie → Fallback nimmt erste Fundstelle
+    -- (altes Verhalten, kein Regress)
+    -- --------------------------------------------------------
+    function Tests:testFallbackToFirstMatchWhenNoneTradeable()
+        ResetTradeState()
+        Loot._pendingTrades = { { itemID = 950, shortName = "Barbossbär" } }
+
+        MockBasics()
+        local pickedSlot
+        Mock(_G, "C_Container", {
+            GetContainerNumSlots = function(bag) return bag == 0 and 3 or 0 end,
+            GetContainerItemInfo = function(bag, slot)
+                if bag == 0 and slot == 1 then return { itemID = 950, isBound = true } end
+                return nil
+            end,
+            PickupContainerItem = function(_, slot) pickedSlot = slot end,
+        })
+        Mock(_G, "BIND_TRADE_TIME_REMAINING", "You may trade this item for the next %s.")
+        Mock(_G, "C_TooltipInfo", {
+            GetBagItem = function() return { lines = { { leftText = "Soulbound" } } } end,
+        })
+        Mock(_G, "TradeFrameRecipientNameText", { GetText = function() return "Barbossbär" end })
+        Mock(_G, "UnitName", function() return nil end)
+
+        Loot.OnTradeShow()
+
+        AreEqual(1, pickedSlot)  -- einzige Kopie wird trotz „nicht handelbar" genommen
+
+        MockRestore()
+        ResetTradeState()
+    end
+
+    -- --------------------------------------------------------
+    -- Test 11: Nicht gebundenes Item ist handelbar (ohne Tooltip-Scan)
+    -- --------------------------------------------------------
+    function Tests:testUnboundItemIsTradeable()
+        ResetTradeState()
+        Loot._pendingTrades = { { itemID = 980, shortName = "Barbossbär" } }
+
+        MockBasics()
+        local pickedSlot
+        Mock(_G, "C_Container", {
+            GetContainerNumSlots = function(bag) return bag == 0 and 3 or 0 end,
+            GetContainerItemInfo = function(bag, slot)
+                if bag == 0 and slot == 1 then return { itemID = 980, isBound = false } end
+                return nil
+            end,
+            PickupContainerItem = function(_, slot) pickedSlot = slot end,
+        })
+        Mock(_G, "TradeFrameRecipientNameText", { GetText = function() return "Barbossbär" end })
+        Mock(_G, "UnitName", function() return nil end)
+
+        Loot.OnTradeShow()
+
+        AreEqual(1, pickedSlot)
+
+        MockRestore()
+        ResetTradeState()
+    end
+
 end)
