@@ -13,7 +13,8 @@ local UI = GL.UI
 
 --- Benannte Tab-IDs. Split-Dateien lesen über UI.TAB_LOOT etc.
 --- (Backward-compat-Aliases werden in UI.lua gesetzt.)
-UI.TABS = { LOOT=1, LOG=2, RAID=3, ROLL=4, PLAYER=5 }
+-- TRADE=5 ist das DEBUG Trade-Tab (siehe UI_TradeTab.lua); PLAYER dadurch auf 6.
+UI.TABS = { LOOT=1, LOG=2, RAID=3, ROLL=4, TRADE=5, PLAYER=6 }
 
 -- ============================================================
 -- Backdrop-Definitionen (BackdropTemplate)

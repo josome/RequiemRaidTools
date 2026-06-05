@@ -19,11 +19,13 @@ UI.TAB_PLAYER = UI.TABS.PLAYER
 UI.TAB_LOG    = UI.TABS.LOG
 UI.TAB_RAID   = UI.TABS.RAID
 UI.TAB_ROLL   = UI.TABS.ROLL
+UI.TAB_TRADE  = UI.TABS.TRADE  -- DEBUG Trade-Tab
 -- Interne Kurzformen für UI.lua
 local TAB_LOOT   = UI.TABS.LOOT
 local TAB_LOG    = UI.TABS.LOG
 local TAB_RAID   = UI.TABS.RAID
 local TAB_ROLL   = UI.TABS.ROLL
+local TAB_TRADE  = UI.TABS.TRADE
 local TAB_PLAYER = UI.TABS.PLAYER
 local DIFF_COLORS = { N = "|cff1eff00", H = "|cff0070dd", M = "|cffff8000" }
 
@@ -349,7 +351,7 @@ function UI.BuildMainFrame()
     contentFrame:SetPoint("BOTTOMRIGHT", mainFrame, "BOTTOMRIGHT", -4, 42)
 
     -- Tab-Buttons
-    local tabNames = { "Loot", "Log", "Raid", "Roll", "Players" }
+    local tabNames = { "Loot", "Log", "Raid", "Roll", "Trade", "Players" }  -- "Trade" = DEBUG Trade-Tab
     for i, name in ipairs(tabNames) do
         local tb = CreateFrame("Button", "GuildLootMainFrameTab" .. i, mainFrame, "CharacterFrameTabTemplate")
         tb:SetScript("OnLoad", nil)
@@ -367,6 +369,7 @@ function UI.BuildMainFrame()
             UI.ShowTab(self:GetID())
         end)
         if i == TAB_PLAYER then tb:Hide() end  -- Players tab: no function yet
+        if i == TAB_TRADE  then tb:Hide() end  -- DEBUG Trade-Tab: nur für ML (RefreshMLButton steuert)
         tabButtons[i] = tb
     end
 
@@ -376,6 +379,7 @@ function UI.BuildMainFrame()
     UI.logPanel    = UI.BuildLogPanel(contentFrame)
     UI.raidPanel   = UI.BuildRaidPanel(contentFrame)
     UI.rollPanel   = UI.BuildRollTab(contentFrame)
+    UI.tradePanel  = UI.BuildTradeTab(contentFrame)  -- DEBUG Trade-Tab
 
     -- Settings-Panel
     settingsPanel = UI.BuildSettingsPanel(UIParent)
@@ -468,6 +472,7 @@ function UI.ShowTab(tabID)
     UI.logPanel:Hide()
     if UI.raidPanel then UI.raidPanel:Hide() end
     if UI.rollPanel then UI.rollPanel:Hide() end
+    if UI.tradePanel then UI.tradePanel:Hide() end
 
     for i, tb in ipairs(tabButtons) do
         if i == tabID then
@@ -491,6 +496,9 @@ function UI.ShowTab(tabID)
         UI.RefreshRaidTab()
     elseif tabID == TAB_ROLL then
         if UI.rollPanel then UI.rollPanel:Show() end
+    elseif tabID == TAB_TRADE then  -- DEBUG Trade-Tab
+        if UI.tradePanel then UI.tradePanel:Show() end
+        UI.RefreshTradeTab()
     end
 end
 
@@ -528,6 +536,7 @@ function UI.Refresh()
     if UI.activeTab == TAB_PLAYER then UI.RefreshPlayerTab() end
     if UI.activeTab == TAB_LOG    then UI.RefreshLogTab()    end
     if UI.activeTab == TAB_RAID   then UI.RefreshRaidTab()   end
+    if UI.activeTab == TAB_TRADE  then UI.RefreshTradeTab()  end  -- DEBUG Trade-Tab
 end
 
 function UI.IsMainFrameShown()
@@ -536,6 +545,15 @@ end
 
 function UI.RefreshMLButton()
     if not UI.mlCheck then return end
+    -- DEBUG Trade-Tab: nur für den ML (er ist der einzige mit einer Auto-Trade-Queue)
+    if tabButtons[TAB_TRADE] then
+        if GL.IsMasterLooter() then
+            tabButtons[TAB_TRADE]:Show()
+        else
+            tabButtons[TAB_TRADE]:Hide()
+            if UI.activeTab == TAB_TRADE then UI.ShowTab(TAB_LOOT) end
+        end
+    end
     -- Nur Raid-Leader oder Assistent sehen den Checkbox
     local canBeML = not (IsInRaid() or IsInGroup())
                  or UnitIsGroupLeader("player")
