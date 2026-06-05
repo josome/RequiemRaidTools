@@ -235,12 +235,29 @@ function UI.EnablePlayerPopupRoll()
     widget:EnableRoll()
 end
 
---- Filter-Only-Ansicht: Popup ohne aktives Item zeigen (MMB-Klick im Raider-Mode).
+--- Popup (wieder) öffnen (MMB-Klick im Raider-Mode, /reqrt popup, Undock).
 --- Ignoriert popupEnabled — manuelles Öffnen funktioniert immer.
+--- Ist noch Loot aktiv (currentItem.link gesetzt) und der Spieler hat noch nicht
+--- gerollt, wird die Item-Ansicht wiederhergestellt (sonst Filter-Only).
 function UI.ShowPlayerPopupFilterOnly()
     BuildPopup()
     CancelAutoClose()
-    widget:ShowFilterOnly()
+    local cur    = GL.Loot and GL.Loot.GetCurrentItem and GL.Loot.GetCurrentItem()
+    local rolled = cur and cur.rollState and cur.rollState.iRolled
+    if cur and cur.link and not rolled then
+        -- Loot noch aktiv und noch nicht gerollt → Item-Ansicht wiederherstellen
+        widget:SetItem(cur.link)
+        popup:SetWidth(math.max(340, (widget.requiredWidth or 340)))
+        -- Roll-Enable wiederherstellen, falls ROLL_START bei geschlossenem Popup kam
+        local myShort = GL.ShortName(UnitName("player") or "")
+        if cur.rollState and cur.rollState.active
+           and cur.rollState.players and cur.rollState.players[myShort] then
+            widget:EnableRoll()
+        end
+    else
+        -- schon gerollt ODER verteilt (link nil) → leer
+        widget:ShowFilterOnly()
+    end
     RefreshEnableCheck()
     RefreshSoundCheck()
     popup:Show()
