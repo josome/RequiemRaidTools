@@ -333,3 +333,9 @@ function Loot.OnCommRollStart(seconds, players)
         if GL.UI and GL.UI.EnableRollTabRoll     then GL.UI.EnableRollTabRoll()     end
     end
 end
+
+--- Markiert, dass der lokale Spieler für das aktuelle Item gerollt hat
+--- (→ Reopen zeigt danach leer). Vorher direkt im UI-Widget gesetzt.
+function Loot.MarkPlayerRolled()
+    if currentItem.rollState then currentItem.rollState.iRolled = true end
+end

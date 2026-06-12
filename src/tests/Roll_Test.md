@@ -87,7 +87,7 @@ Tests für `src/loot/Loot_Roll.lua`. Deckt die kritische **Tie-Logik in `Finaliz
 
 | Test | Was wird geprüft |
 |------|------------------|
-| `testOnCommRollStart_ObserverPath` | Observer setzt `rollState.players` aus Comm-Payload, Timer-Setup, `prioState.active = false` |
+| `testOnCommRollStart_ObserverPath` | Observer setzt `rollState.players` aus Comm-Payload, Timer-Setup, `prioState.active = false`, `rollState.iRolled = false` (Reopen-Fix: neuer Roll → wieder rollbar) |
 | `testOnCommRollStart_MasterLooter_Ignored` | ML ignoriert die eigene Comm-Nachricht |
 
 ---

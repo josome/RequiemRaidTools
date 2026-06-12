@@ -427,4 +427,95 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
             MockRestore()
         end)
     end
+
+    -- ========================================================
+    -- Reopen-Restore (GetReopenItem / IsRollOpenFor / MarkPlayerRolled)
+    -- ========================================================
+
+    function Tests:testGetReopenItem_LiveNotRolled_ReturnsLink()
+        WithTestDB(function()
+            local ci = Loot.GetCurrentItem()
+            ci.link      = "|Hitem:1|h|r"
+            ci.rollState = { active = false, players = {}, results = {}, iRolled = false }
+            AreEqual("|Hitem:1|h|r", Loot.GetReopenItem())
+        end)
+    end
+
+    function Tests:testGetReopenItem_AfterMarkRolled_ReturnsNil()
+        WithTestDB(function()
+            local ci = Loot.GetCurrentItem()
+            ci.link      = "|Hitem:1|h|r"
+            ci.rollState = { active = true, players = {}, results = {} }
+            Loot.MarkPlayerRolled()
+            AreEqual(nil, Loot.GetReopenItem())
+        end)
+    end
+
+    function Tests:testGetReopenItem_AfterClear_ReturnsNil()
+        WithTestDB(function()
+            local ci = Loot.GetCurrentItem()
+            ci.link      = nil
+            ci.rollState = { active = false, players = {}, results = {}, iRolled = false }
+            AreEqual(nil, Loot.GetReopenItem())
+        end)
+    end
+
+    function Tests:testMarkPlayerRolled_SetsFlag()
+        WithTestDB(function()
+            local ci = Loot.GetCurrentItem()
+            ci.rollState = { active = true, players = {}, results = {} }
+            Loot.MarkPlayerRolled()
+            IsTrue(ci.rollState.iRolled)
+        end)
+    end
+
+    function Tests:testIsRollOpenFor_EligibleActive_True()
+        WithTestDB(function()
+            local ci = Loot.GetCurrentItem()
+            ci.rollState = { active = true, players = { Tester = true } }
+            IsTrue(Loot.IsRollOpenFor("Tester"))
+        end)
+    end
+
+    function Tests:testIsRollOpenFor_NotInPlayers_False()
+        WithTestDB(function()
+            local ci = Loot.GetCurrentItem()
+            ci.rollState = { active = true, players = { Other = true } }
+            IsFalse(Loot.IsRollOpenFor("Tester"))
+        end)
+    end
+
+    function Tests:testIsRollOpenFor_RollInactive_False()
+        WithTestDB(function()
+            local ci = Loot.GetCurrentItem()
+            ci.rollState = { active = false, players = { Tester = true } }
+            IsFalse(Loot.IsRollOpenFor("Tester"))
+        end)
+    end
+
+    -- Kern-Regressionstest: spiegelt den echten Raid-Flow eines Observers.
+    -- ITEM_ON → Reopen würde Item wiederherstellen; ROLL_START → weiterhin
+    -- restorebar + Roll offen + iRolled false; eigener Roll → Reopen leer.
+    function Tests:testReopenLifecycle_Observer_ItemOn_RollStart_Rolled()
+        WithTestDB(function()
+            MockBasics()
+            Mock(GL, "IsMasterLooter",   function() return false end)  -- Observer
+            Mock(GL, "PopupFilterMatches", function() return false end) -- UI-Pfad überspringen
+            Mock(_G, "UnitName",         function() return "Tester" end)
+            local FAKE = "|Hitem:42|h[Fake]|h|r"
+
+            Loot.OnCommItemActivate(FAKE, "cloth")
+            AreEqual(FAKE, Loot.GetCurrentItem().link)  -- ITEM_ON setzt link
+            AreEqual(FAKE, Loot.GetReopenItem())
+
+            Loot.OnCommRollStart(15, { "Tester" })
+            AreEqual(FAKE, Loot.GetReopenItem())         -- vor Roll weiter restorebar
+            IsTrue(Loot.IsRollOpenFor("Tester"))
+            IsFalse(Loot.GetCurrentItem().rollState.iRolled)
+
+            Loot.MarkPlayerRolled()
+            AreEqual(nil, Loot.GetReopenItem())          -- nach eigenem Roll → leer
+            MockRestore()
+        end)
+    end
 end)

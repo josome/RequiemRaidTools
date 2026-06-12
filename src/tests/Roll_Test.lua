@@ -355,6 +355,7 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
             IsTrue(ci.rollState.players["Bob"])
             AreEqual(15, ci.rollState.timeLeft)
             IsFalse(ci.prioState.active)
+            IsFalse(ci.rollState.iRolled)  -- neuer Roll → wieder rollbar (Reopen-Fix)
             MockRestore()
         end)
     end

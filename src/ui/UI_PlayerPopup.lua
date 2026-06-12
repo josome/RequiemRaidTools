@@ -257,16 +257,14 @@ end
 function UI.ShowPlayerPopupFilterOnly()
     BuildPopup()
     CancelAutoClose()
-    local cur    = GL.Loot and GL.Loot.GetCurrentItem and GL.Loot.GetCurrentItem()
-    local rolled = cur and cur.rollState and cur.rollState.iRolled
-    if cur and cur.link and not rolled then
+    local link = GL.Loot and GL.Loot.GetReopenItem and GL.Loot.GetReopenItem()
+    if link then
         -- Loot noch aktiv und noch nicht gerollt → Item-Ansicht wiederherstellen
-        widget:SetItem(cur.link)
+        widget:SetItem(link)
         popup:SetWidth(math.max(340, (widget.requiredWidth or 340)))
         -- Roll-Enable wiederherstellen, falls ROLL_START bei geschlossenem Popup kam
         local myShort = GL.ShortName(UnitName("player") or "")
-        if cur.rollState and cur.rollState.active
-           and cur.rollState.players and cur.rollState.players[myShort] then
+        if GL.Loot.IsRollOpenFor and GL.Loot.IsRollOpenFor(myShort) then
             widget:EnableRoll()
         end
     else

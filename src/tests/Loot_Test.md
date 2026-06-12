@@ -103,6 +103,21 @@ Tests für `src/loot/Loot.lua`. Deckt den **User-Hot-Path** ab: Boss tot → Ite
 | `testResetCurrentItem_ClearsLink` | `currentItem.link` wird auf `nil` gesetzt |
 | `testCancelPrio_OnlyWhenPrioActive` | `prioState.active=false` → no-op; `=true` → ClearCurrentItem |
 
+### Reopen-Restore (`GetReopenItem` / `IsRollOpenFor` / `MarkPlayerRolled`)
+
+Entscheidungslogik für das Wiederöffnen des Loot-Popups (aus der UI in die Loot-Schicht extrahiert, damit testbar).
+
+| Test | Was wird geprüft |
+|------|------------------|
+| `testGetReopenItem_LiveNotRolled_ReturnsLink` | Item live + nicht gerollt → liefert Link (Item wird wiederhergestellt) |
+| `testGetReopenItem_AfterMarkRolled_ReturnsNil` | nach `MarkPlayerRolled()` → `nil` (Reopen leer) |
+| `testGetReopenItem_AfterClear_ReturnsNil` | `link=nil` (verteilt) → `nil` |
+| `testMarkPlayerRolled_SetsFlag` | setzt `rollState.iRolled = true` |
+| `testIsRollOpenFor_EligibleActive_True` | aktiver Roll + Spieler in `players` → `true` |
+| `testIsRollOpenFor_NotInPlayers_False` | Spieler nicht in `players` → `false` |
+| `testIsRollOpenFor_RollInactive_False` | `rollState.active=false` → `false` |
+| `testReopenLifecycle_Observer_ItemOn_RollStart_Rolled` | Kern-Regressionstest: ITEM_ON setzt `link` (→ restorebar), ROLL_START hält `link` + `IsRollOpenFor` true + `iRolled` false, eigener Roll → Reopen leer |
+
 ---
 
 ## Was diese Tests nicht abdecken

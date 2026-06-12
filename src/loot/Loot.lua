@@ -97,6 +97,22 @@ function Loot.GetPendingLoot()  return pendingLoot()  end
 function Loot.GetTrashedLoot()  return trashedLoot()  end
 function Loot.GetCurrentItem()  return currentItem  end
 
+--- Item-Link, falls beim Reopen wiederherzustellen (live UND noch nicht gerollt),
+--- sonst nil. Kapselt die Reopen-Restore-Entscheidung (vorher in der UI inline).
+function Loot.GetReopenItem()
+    if currentItem.link and not (currentItem.rollState and currentItem.rollState.iRolled) then
+        return currentItem.link
+    end
+    return nil
+end
+
+--- Ist für shortName aktuell ein Roll offen (Roll-Button beim Reopen aktivierbar)?
+function Loot.IsRollOpenFor(shortName)
+    local rs = currentItem.rollState
+    if rs and rs.active and rs.players and rs.players[shortName] then return true end
+    return false
+end
+
 -- Fügt ein Item manuell zur pendingLoot hinzu (bypass filter)
 function Loot.AddItemManually(link)
     local itemID = tonumber(link:match("item:(%d+)"))

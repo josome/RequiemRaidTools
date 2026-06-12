@@ -140,8 +140,7 @@ function UI.BuildLootAnnounceWidget(parent, yStart)
         rollBtn:SetAlpha(0.4)
         rollBtn:SetText("Rolled")
         -- „schon gerollt" pro Item merken → Reopen zeigt dann leer (Aktion erledigt)
-        local cur = GL.Loot and GL.Loot.GetCurrentItem and GL.Loot.GetCurrentItem()
-        if cur and cur.rollState then cur.rollState.iRolled = true end
+        if GL.Loot and GL.Loot.MarkPlayerRolled then GL.Loot.MarkPlayerRolled() end
     end)
 
     -- ── Gewinner-Label ────────────────────────────────────────
