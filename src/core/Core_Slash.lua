@@ -75,6 +75,15 @@ SlashCmdList["REQUIEMRAIDTOOLS"] = function(input)
             GL.UI.ShowPlayerPopupFilterOnly()
         end
 
+    elseif cmd == "testwin" then
+        -- Gewinner-Anzeige (Glanz-Puls + Sound + 6s-Auto-Close) ohne echten ASSIGN auslösen.
+        -- Ungated (kein devMode nötig), damit der Effekt ohne Taint-Risiko testbar ist.
+        if GL.UI and GL.UI.ShowPlayerPopupWin then
+            GL.UI.ShowPlayerPopupWin("|cffa335ee|Hitem:18832::::::::70:::::|h[Brutality Blade]|h|r")
+        else
+            GL.Print("UI not loaded.")
+        end
+
     elseif cmd == "playermode" then
         local s = GuildLootDB.settings
         s.forcePlayerMode = not s.forcePlayerMode
