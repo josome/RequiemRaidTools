@@ -114,7 +114,6 @@ function Loot.OnTradeShow()
             GL.Print(("[ReqRT] AutoTrade: partner=%s, staged=%d, queue=%d")
                 :format(partnerName, #Loot._inTradeItems, #Loot._pendingTrades))
         end
-        if GL.UI and GL.UI.RefreshTradeTab then GL.UI.RefreshTradeTab() end  -- DEBUG Trade-Tab
         if #Loot._inTradeItems == 0 then return end
 
         -- Nächsten freien Handelsslot finden (Hilfsfunktion)
@@ -180,5 +179,4 @@ function Loot.OnTradeClosed()
         Loot._inTradeItems = {}
     end
     _tradeAccepted = false
-    if GL.UI and GL.UI.RefreshTradeTab then GL.UI.RefreshTradeTab() end  -- DEBUG Trade-Tab
 end

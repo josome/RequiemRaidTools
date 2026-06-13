@@ -326,7 +326,6 @@ function Loot.AssignLootConfirm(fullName, diff, clearAfter)
     -- Ausstehenden Handel vormerken (ML legt Item bei nächstem Handel automatisch rein)
     if GL.IsMasterLooter() then
         table.insert(Loot._pendingTrades, { itemID = itemID, shortName = GL.ShortName(fullName) })
-        if GL.UI and GL.UI.RefreshTradeTab then GL.UI.RefreshTradeTab() end  -- DEBUG Trade-Tab
     end
 
     -- Observer informieren (fullName ist bereits realm-qualifiziert)
