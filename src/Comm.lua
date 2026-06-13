@@ -163,22 +163,9 @@ function Comm.SendSessionSync(session, target)
                            .. SEP .. tostring(meta.closedAt or 0)
                            .. SEP .. participants)
     end
-    -- 3. Zugewiesener Loot
-    for _, item in ipairs(session.lootLog or {}) do
-        Whisper("ASSIGN" .. SEP .. (item.player or "") .. SEP .. (item.difficulty or "")
-                        .. SEP .. (item.link or "") .. SEP .. (item.category or "other")
-                        .. SEP .. tostring(item.quality or 0)
-                        .. SEP .. tostring(item.winnerPrio or 0)
-                        .. SEP .. (item.boss or "")
-                        .. SEP .. (item.sessionID or session.id)
-                        .. SEP .. (item.raidID or ""))
-    end
-    -- 4. Getrashter Loot
-    for _, item in ipairs(session.trashedLoot or {}) do
-        Whisper("LOOT_TRASH" .. SEP .. (item.link or "")
-                             .. SEP .. (item.sessionID or session.id)
-                             .. SEP .. (item.raidID or ""))
-    end
+    -- Slim-Sync: bewusst KEIN lootLog/trashedLoot-Replay mehr. Observer bekommen
+    -- nur die offene Session (SESSION_START + RAID_META). Die Loot-Historie bleibt
+    -- beim ML; ein ML-Wechsel überträgt sie bei Bedarf via JSON-Export/-Import.
 end
 
 --- Neuer ML steht fest (direkte Übernahme oder nach Bestätigung)
@@ -272,15 +259,9 @@ local function HandleRaidMeta(parts, sender)
 end
 
 local function HandleLootTrash(parts, sender)
-    local link, sessionID, raidID = parts[2], parts[3], parts[4]
-    local db = GuildLootDB
-    local targetSession = GL.FindSessionByID(sessionID)
-    if not targetSession and db.activeContainerIdx then
-        targetSession = db.raidContainers[db.activeContainerIdx]
-    end
-    if targetSession and link and link ~= "" then
-        table.insert(targetSession.trashedLoot, { link=link, sessionID=sessionID or "", raidID=raidID or "" })
-    end
+    -- Slim-Sync: Observer führen keine Trash-Historie mehr. Handler bleibt nur
+    -- registriert, damit live empfangene LOOT_TRASH-Telegramme keine
+    -- "unbekanntes Telegramm"-Warnung auslösen.
 end
 
 local function HandleMLAnnounce(parts, sender)

@@ -98,12 +98,13 @@ Der Spieler kommt über den echten Chat-Parser (`OnChatMessage`) in `candidates`
 
 ### `testCommAssignObserver`
 
-**Testet:** Observer-Pfad — `OnCommAssign` schreibt direkt in aktive Session
+**Testet:** Observer-Pfad (Slim-Sync) — `OnCommAssign` persistiert **keinen**
+`lootLog` mehr; nur das raidMeta-Self-Healing läuft weiter.
 
 **Schritte:**
 1. `IsMasterLooter` → false (Observer-Kontext)
 2. `OnCommAssign(...)` direkt aufrufen
-3. Prüfen: `lootLog[1]` in der aktiven Session vorhanden
+3. Prüfen: `#lootLog == 0` (keine Historie) und `raidMeta["raid-01"].isStub` wurde angelegt
 
 ---
 

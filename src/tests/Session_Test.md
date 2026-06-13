@@ -81,11 +81,12 @@ Session anlegen, 4 Raids durchlaufen (je `EnsureRaidMeta` + `AssignLootConfirm`)
 
 ### `testLateJoinerSyncNewSession`
 `CaptureWhispers` generiert SESSION_SYNC-Whisper, alle durch `Comm.OnMessage` jagen.
-- Neue Session korrekt angelegt (`id`, `label`, `raidMeta`, `lootLog`)
+- Neue Session + `raidMeta` korrekt angelegt (`id`, `label`, `raidMeta`)
+- Slim-Sync: `#lootLog == 0` (keine Loot-Historie beim Observer)
 
 ### `testLateJoinerSyncWithLootTrash`
-SESSION_SYNC mit `trashedLoot`-Eintrag.
-- `trashedLoot[1].link` und `.raidID` korrekt übertragen
+SESSION_SYNC einer Session mit `trashedLoot`-Eintrag.
+- Slim-Sync: kein Trash-Replay → Observer-`trashedLoot` bleibt leer (`#trashedLoot == 0`)
 
 ### `testLateJoinerSyncUpdatesExistingSession`
 Bestehende inaktive Session mit gleicher ID ist bereits in `raidContainers`.
@@ -119,7 +120,7 @@ SESSION_START gefolgt von SESSION_END.
 
 ### `testAssignWithoutRaidMetaCreatesStub`
 Observer empfängt `ASSIGN` für eine `raidID`, die noch nicht in `session.raidMeta` existiert (z.B. verpasstes `RAID_META`-Broadcast wegen `/reload` oder Disconnect).
-- `lootLog`-Eintrag wird wie gewohnt geschrieben (mit `raidID`)
+- Slim-Sync: **kein** `lootLog`-Eintrag (Observer führt keine Historie)
 - `session.raidMeta[raidID]` wird mit `isStub=true`, `difficulty=<diff>`, `tier=""`, leerem `participants` als Selbstheilungs-Stub angelegt — damit der UI-Raid-Tab den Raid sofort listen kann
 
 ### `testAssignWithoutRaidMetaTriggersRaidQuery`

@@ -181,8 +181,10 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
     end
 
     -- --------------------------------------------------------
-    -- testOnCommAssignSchreibtObserverLog
-    -- Prüft: Observer-Pfad via OnCommAssign schreibt in aktive Session
+    -- testCommAssignObserver
+    -- Prüft (Slim-Sync): Observer-Pfad via OnCommAssign persistiert KEINEN
+    -- lootLog-Eintrag mehr — Historie wird nicht mehr observer-seitig geführt.
+    -- Das raidMeta-Self-Healing (Stub für unbekannte raidID) läuft weiter.
     -- --------------------------------------------------------
     function Tests:testCommAssignObserver()
         WithTestDB(function(session)
@@ -194,11 +196,11 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
                 "test-sess", "raid-01"
             )
 
-            AreEqual(1,                    #session.lootLog)
-            AreEqual("Myriella-Malfurion", session.lootLog[1].player)
-            AreEqual(TEST_LINK,            session.lootLog[1].link)
-            AreEqual("H",                  session.lootLog[1].difficulty)
-            AreEqual(1,                    session.lootLog[1].winnerPrio)
+            -- Kein History-Append mehr
+            AreEqual(0, #session.lootLog)
+            -- Self-Healing bleibt: Stub für die unbekannte raidID wird angelegt
+            Exists(session.raidMeta["raid-01"])
+            IsTrue(session.raidMeta["raid-01"].isStub)
 
             MockRestore()
         end)

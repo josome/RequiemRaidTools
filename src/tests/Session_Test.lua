@@ -333,8 +333,9 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
 
     -- --------------------------------------------------------
     -- testLateJoinerSyncNewSession
-    -- Prüft: Observer empfängt SESSION_START + RAID_META + ASSIGN via Whisper
-    --        → neue Session wird korrekt in GuildLootDB angelegt
+    -- Prüft (Slim-Sync): Observer empfängt nur SESSION_START + RAID_META via
+    --        Whisper → neue Session + raidMeta werden angelegt, aber KEINE
+    --        Loot-Historie (lootLog bleibt leer).
     -- --------------------------------------------------------
     function Tests:testLateJoinerSyncNewSession()
         WithTestDB(function()
@@ -369,8 +370,8 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
             Exists(db.raidContainers[1].raidMeta["raid-01"])
             AreEqual("T1",        db.raidContainers[1].raidMeta["raid-01"].tier)
             AreEqual("Myri",      db.raidContainers[1].raidMeta["raid-01"].participants[1])
-            AreEqual(1,           #db.raidContainers[1].lootLog)
-            AreEqual("Myri",      db.raidContainers[1].lootLog[1].player)
+            -- Slim-Sync: keine Loot-Historie beim Observer
+            AreEqual(0,           #db.raidContainers[1].lootLog)
 
             MockRestore()
         end)
@@ -378,7 +379,8 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
 
     -- --------------------------------------------------------
     -- testLateJoinerSyncWithLootTrash
-    -- Prüft: LOOT_TRASH-Whisper wird korrekt in trashedLoot eingetragen
+    -- Prüft (Slim-Sync): SendSessionSync verschickt KEINEN trashedLoot-Replay
+    --        mehr → der Observer legt keinen Trash-Eintrag an.
     -- --------------------------------------------------------
     function Tests:testLateJoinerSyncWithLootTrash()
         WithTestDB(function()
@@ -402,9 +404,8 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
 
             local s = GuildLootDB.raidContainers[1]
             Exists(s)
-            AreEqual(1,                          #s.trashedLoot)
-            AreEqual("|Hitem:99|h[Schwert]|h|r", s.trashedLoot[1].link)
-            AreEqual("raid-01",                  s.trashedLoot[1].raidID)
+            -- Slim-Sync: kein Trash-Replay → Observer-Trashlog bleibt leer
+            AreEqual(0, #s.trashedLoot)
 
             MockRestore()
         end)
@@ -1009,8 +1010,9 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
                               4, 1, "Ulgrax", "sess-1", "raid-new")
 
             local session = GuildLootDB.raidContainers[1]
-            AreEqual(1, #session.lootLog)
-            AreEqual("raid-new", session.lootLog[1].raidID)
+            -- Slim-Sync: Observer persistiert keinen lootLog mehr ...
+            AreEqual(0, #session.lootLog)
+            -- ... aber das raidMeta-Self-Healing legt weiterhin einen Stub an
             Exists(session.raidMeta["raid-new"])
             IsTrue(session.raidMeta["raid-new"].isStub)
             AreEqual("M", session.raidMeta["raid-new"].difficulty)

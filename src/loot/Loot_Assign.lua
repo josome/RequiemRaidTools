@@ -507,19 +507,8 @@ function Loot.OnCommAssign(playerName, diff, link, category, quality, winnerPrio
     end
     if targetSession then
         local effectiveRaidID = raidID or db.currentRaid.id or ""
-        table.insert(targetSession.lootLog, {
-            player     = fullName,
-            item       = link or "",
-            link       = link or "",
-            category   = category or "other",
-            quality    = quality or 0,
-            difficulty = diff or "",
-            winnerPrio = winnerPrio,
-            boss       = boss,
-            timestamp  = time(),
-            sessionID  = sessionID or "",
-            raidID     = effectiveRaidID,
-        })
+        -- Slim-Sync: Observer persistieren KEINEN lootLog mehr — die Loot-Historie
+        -- bleibt beim ML. Hier nur noch das raidMeta-Self-Healing für den Raid-Tab.
         -- Selbstheilung: ASSIGN für unbekannte raidID → Stub anlegen + RAID_QUERY
         -- triggern, damit der UI-Raid-Tab sofort etwas zeigt und der ML
         -- vollständige raidMeta nachschickt (siehe Comm.SendSessionSync).
