@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.0.2.0-beta
+
+**New Features**
+- Winner loot popup now flashes gold and plays a sound when you win an item (glow extended to ~1s). Preview it with `/reqrt testwin`.
+- The loot popup restores the current item when reopened and auto-reopens when a roll starts — you no longer miss a roll if you closed the popup.
+
+**Bug Fixes**
+- Auto-trade now picks a tradeable copy from your bags when you hold several of the same item.
+- Observers that missed the raid metadata (e.g. after a /reload) self-heal: the raid appears immediately and the master looter resends the data.
+- No more duplicate loot rows on observers: the loot history is no longer re-synced on every reconnect (slim observer sync), which also reduces addon traffic.
+- Session labels can no longer be duplicated when creating or renaming a session.
+
+**Internal**
+- Large refactor: Core.lua split into focused modules (DB / session / events / slash), several UI panels extracted, numbered tabs replaced by a tab registry. No functional change intended.
+- Expanded automated test coverage (Roll, Migration, Loot, Export, Util suites) on busted + CI; 213 tests green.
+
 ## v1.0.0.0
 
 **New Features**

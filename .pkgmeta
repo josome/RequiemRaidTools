@@ -19,3 +19,5 @@ ignore:
   - CLAUDE.md
   - RequiemRaidTools.code-workspace
   - pics
+  - TEST_CHECKLIST_WELLE6.md
+  - TEST_CHECKLIST_POPUP_REOPEN.md
