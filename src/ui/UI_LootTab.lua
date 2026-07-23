@@ -303,8 +303,7 @@ function UI.BuildLootPanel(parent)
         local log = (idx and db.raidContainers and db.raidContainers[idx])
                     and db.raidContainers[idx].lootLog or {}
         for _, entry in ipairs(log) do
-            local k = tostring(entry.timestamp) .. (entry.player or "")
-            sessionHidden()[k] = true
+            sessionHidden()[GL.SessionLootKey(entry)] = true
         end
         UI.RefreshSessionLoot()
     end)
@@ -786,7 +785,7 @@ function UI.RefreshSessionLoot()
 
     for i = #log, 1, -1 do
         local entry = log[i]
-        local k = tostring(entry.timestamp) .. (entry.player or "")
+        local k = GL.SessionLootKey(entry)
         if not sessionHidden()[k] then
             local isChecked = sessionChecked()[k] or false
             local row = AcquireSessionRow(content)
