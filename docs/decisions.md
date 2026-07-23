@@ -50,11 +50,16 @@ So sieht er trotzdem was gerade verteilt wird.
 
 ## UI
 
-### Frame-Pool in `RefreshSessionLoot`
-Session-Loot-Rows werden nicht bei jedem Refresh neu erstellt, sondern aus einem Pool
-wiederverwendet (`sessionLootPool`).
+### Generischer Frame-Pool für Listen-Rows (`UI.CreateFramePool`)
+Listen-Rows werden nicht bei jedem Refresh neu erstellt, sondern aus Pools
+wiederverwendet. Die Factory lebt in `UI_Common.lua` (`UI.CreateFramePool(createFn, resetFn)`,
+Suite `ReqRT.Pool`); jede Tab-Datei hält einen Pool pro Row-Typ.
+Ursprung war der handgerollte Pool in `RefreshSessionLoot` — der ist auf die Factory
+migriert, die übrigen Listen folgen demselben Muster.
 **Grund:** WoW-Frames können nicht garbage-collected werden. Ohne Pool akkumulieren
 tausende versteckte Frames → "script ran too long" bei ENCOUNTER_END.
+Die Factory ist Frame-API-agnostisch (alles Frame-Berührende lebt in createFn/resetFn),
+damit sie standalone via busted testbar ist.
 
 ### Kein End-Raid-Button
 Es gibt keinen separaten "Raid beenden"-Button.

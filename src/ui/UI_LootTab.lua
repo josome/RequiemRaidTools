@@ -92,8 +92,7 @@ local activeItemLabel
 local activeItemCategoryLabel
 local candidateRows        = {}
 local rollResultRows       = {}
-local sessionLootRows      = {}
-local sessionLootPool      = {}
+local sessionRowPool  -- UI.CreateFramePool, initialisiert nach den Row-Funktionen (unten)
 local countdownLabel
 local resetItemBtn
 local trashItemBtn
@@ -709,13 +708,11 @@ function UI.RefreshRollResults()
     content:SetHeight(math.max(1, -yOff))
 end
 
-local function AcquireSessionRow(parent)
-    local row = table.remove(sessionLootPool)
-    if row then
-        row:SetParent(parent)
-        return row
-    end
-    row = CreateFrame("Frame", nil, parent)
+--- createFn für sessionRowPool. Parent ist immer sessionContent —
+--- existiert garantiert, weil der Pool nur aus RefreshSessionLoot
+--- gezogen wird (das auf lootPanel.sessionContent prüft).
+local function CreateSessionRow()
+    local row = CreateFrame("Frame", nil, UI.lootPanel.sessionContent)
     row:SetHeight(26)
 
     row.cb = CreateFrame("CheckButton", nil, row, "UICheckButtonTemplate")
@@ -756,7 +753,8 @@ local function AcquireSessionRow(parent)
     return row
 end
 
-local function ReleaseSessionRow(row)
+--- resetFn für sessionRowPool.
+local function ResetSessionRow(_, row)
     row:Hide()
     row:ClearAllPoints()
     row.cb:SetScript("OnClick", nil)
@@ -765,15 +763,15 @@ local function ReleaseSessionRow(row)
     row.iconFrame:SetScript("OnLeave", nil)
     row.itemHover:SetScript("OnEnter", nil)
     row.itemHover:SetScript("OnLeave", nil)
-    table.insert(sessionLootPool, row)
 end
+
+sessionRowPool = UI.CreateFramePool(CreateSessionRow, ResetSessionRow)
 
 function UI.RefreshSessionLoot()
     local content = UI.lootPanel and UI.lootPanel.sessionContent
     if not content then return end
 
-    for _, r in ipairs(sessionLootRows) do ReleaseSessionRow(r) end
-    sessionLootRows = {}
+    sessionRowPool:ReleaseAll()
 
     local db  = GuildLootDB
     local idx = db.activeContainerIdx
@@ -788,7 +786,7 @@ function UI.RefreshSessionLoot()
         local k = GL.SessionLootKey(entry)
         if not sessionHidden()[k] then
             local isChecked = sessionChecked()[k] or false
-            local row = AcquireSessionRow(content)
+            local row = sessionRowPool:Acquire()
             row:ClearAllPoints()
             row:SetPoint("TOPLEFT",  content, "TOPLEFT",  0, yOff)
             row:SetPoint("TOPRIGHT", content, "TOPRIGHT", 0, yOff)
@@ -833,7 +831,6 @@ function UI.RefreshSessionLoot()
             row.iconFrame:SetAlpha(alpha)
 
             row:Show()
-            table.insert(sessionLootRows, row)
             yOff  = yOff - ROW_H - 1
             shown = shown + 1
         end
