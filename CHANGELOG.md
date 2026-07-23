@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.0.2.4-beta
+
+**Bug Fixes**
+- The Raid tab now shows the green "active (no boss kill)" row for a running session before the first boss kill — previously it never appeared.
+- Hiding (×) or checking off a session loot row no longer affects other items the same player received in the same second: each drop now tracks its own state.
+
+**Internal**
+- New generic frame pool (`UI.CreateFramePool`): list rows are reused across UI refreshes instead of being recreated (WoW frames are never garbage-collected). The session loot list uses it already; the remaining lists will follow in upcoming betas.
+- 10 new unit tests; 223 tests green on busted + CI.
+
 ## v1.0.2.0-beta
 
 **New Features**
