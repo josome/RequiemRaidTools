@@ -78,3 +78,45 @@ function UI.CreateBackdropFrame(backdropKey, name, parent)
     f:SetBackdrop(UI.BACKDROPS[backdropKey])
     return f
 end
+
+-- ============================================================
+-- Frame-Pool
+-- ============================================================
+
+--- Erstellt einen Frame-Pool für Listen-Rows. WoW-Frames werden nie
+--- garbage-collected — Refreshes müssen Rows wiederverwenden statt
+--- neu zu erzeugen. Muster pro Refresh:
+---   pool:ReleaseAll()
+---   für jede Zeile: local row = pool:Acquire(); <populate>
+---
+--- Die Factory ist Frame-API-agnostisch: sie ruft selbst nie Hide/
+--- ClearAllPoints — alles Frame-Berührende gehört in createFn/resetFn.
+--- @param createFn fun(pool):Frame  Erzeugt eine neue Row (nur wenn Free-List leer)
+--- @param resetFn  fun(pool, frame) Setzt eine Row zurück (Hide, ClearAllPoints, Scripts nillen)
+function UI.CreateFramePool(createFn, resetFn)
+    local pool = { _free = {}, _active = {} }
+
+    function pool:Acquire()
+        local frame = table.remove(self._free)
+        if not frame then
+            frame = createFn(self)
+        end
+        table.insert(self._active, frame)
+        return frame
+    end
+
+    function pool:ReleaseAll()
+        for i = #self._active, 1, -1 do
+            local frame = self._active[i]
+            self._active[i] = nil
+            resetFn(self, frame)
+            table.insert(self._free, frame)
+        end
+    end
+
+    function pool:GetNumActive()
+        return #self._active
+    end
+
+    return pool
+end
