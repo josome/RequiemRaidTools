@@ -15,6 +15,8 @@ local DB_DEFAULTS = {
     raidContainers     = {},   -- Array von Session-Objekten
     activeContainerIdx = nil,  -- Index der offenen Session (nil = keine)
     unassignedRaids    = {},   -- Legacy Raid-Snapshots ohne Session
+    seasons            = {},   -- { [id] = { id, name, startedAt, endedAt, rankFilter={} } }
+    activeSeasonId     = nil,  -- ID der aktiven Season (nil = keine); via GL.CreateSeason gesetzt
     lastLogout         = 0,
     currentRaid = {
         id                      = "",
