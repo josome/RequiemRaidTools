@@ -159,6 +159,15 @@ function ClearCursor()          end
 function ClickTradeButton()     end
 function SendChatMessage()      end
 
+-- Gilden-API (Tests mocken darüber; Defaults = keine Gilde)
+function IsInGuild()               return false end
+function GetNumGuildMembers()      return 0 end
+function GetGuildRosterInfo()      return nil end
+function GuildControlGetNumRanks() return 0 end
+function GuildControlGetRankName(i) return "Rank" .. tostring(i) end
+C_GuildInfo = C_GuildInfo or {}
+function C_GuildInfo.GuildRoster() end
+
 function strtrim(s)
     return (s:match("^%s*(.-)%s*$"))
 end

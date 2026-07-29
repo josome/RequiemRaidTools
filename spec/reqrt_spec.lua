@@ -12,6 +12,7 @@ dofile("src/tests/Comm_Test.lua")
 dofile("src/tests/Assign_Test.lua")
 dofile("src/tests/Session_Test.lua")
 dofile("src/tests/Season_Test.lua")
+dofile("src/tests/Guild_Test.lua")
 dofile("src/tests/Trade_Test.lua")
 dofile("src/tests/Filter_Test.lua")
 dofile("src/tests/Util_Test.lua")
@@ -64,6 +65,13 @@ describe("ReqRT.API", function()
     expectFunction("GuildLoot.GetActiveSeason")
     expectFunction("GuildLoot.EndSeason")
     expectFunction("GuildLoot.SetSeasonRankFilter")
+
+    -- Guild
+    expectFunction("GuildLoot.RefreshGuildRoster")
+    expectFunction("GuildLoot.GetGuildMembers")
+    expectFunction("GuildLoot.GetGuildRankNames")
+    expectFunction("GuildLoot.GetSeasonAttendees")
+    expectFunction("GuildLoot.GetSeasonRoster")
 
     -- Util
     expectFunction("GuildLoot.ShortName")
