@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.0.2.7
+
+**Internal**
+- Updated for game version 12.0.7 (Interface 120007).
+
 ## v1.0.2.6
 
 **Bug Fixes**
