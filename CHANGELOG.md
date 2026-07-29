@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.0.2.6
+
+**Bug Fixes**
+- The loot window no longer auto-opens on a boss kill when no raid session is running. As master looter it still pops up on a kill while a session is active — otherwise it stays as you left it.
+
 ## v1.0.2.4-beta
 
 **Bug Fixes**
