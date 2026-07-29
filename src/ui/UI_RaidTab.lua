@@ -605,7 +605,7 @@ function UI.RefreshRaidTab()
             end
 
             -- Aktiver Raid vor erstem Boss-Kill (noch kein raidMeta)
-            if isActiveSess and cr.id and cr.id ~= ""
+            if isActive and cr.id and cr.id ~= ""
                and not (session.raidMeta and session.raidMeta[cr.id]) then
                 local r = CreateFrame("Frame", nil, content)
                 r:SetPoint("TOPLEFT",  content, "TOPLEFT",  20, yOff)

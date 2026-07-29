@@ -13,6 +13,7 @@
 - [Teststrategie](#teststrategie)
 - [Testfälle](#testfälle)
   - [ShortName](#shortname-a5)
+  - [SessionLootKey](#sessionlootkey)
   - [GetActivePrios / GetPrioLabel](#getactiveprios--getpriolabel-a4)
   - [FindSessionByID — PENDING](#findsessionbyid--pending-a3)
   - [ShowItemTooltip — PENDING](#showitemtooltip--pending-a2)
@@ -144,6 +145,17 @@ Pending bis B4 (Tab-Registry-Tabelle statt nummerierter Konstanten).
 | `testNormalizeName_AppendsRealmWhenMissing` | `"Alice"` → `"Alice-Malfurion"` (Realm angehängt) |
 | `testNormalizeName_PreservesExistingRealm` | `"Alice-Antonidas"` (cross-realm) → unverändert |
 | `testNormalizeName_NilSafe` | `nil` → `nil` |
+
+### SessionLootKey
+
+Eindeutiger Hidden/Checked-State-Key pro Session-Loot-Eintrag: `timestamp|player|item`. Ersetzt den kollisionsanfälligen alten Key `timestamp..player` (gleicher Spieler + gleiche Sekunde + zwei Items → ✕/Checkbox wirkten auf beide Rows).
+
+| Test | Was geprüft |
+|------|-------------|
+| `testSessionLootKey_DifferentItemsSamePlayerSameSecond` | Gleicher Spieler/Timestamp, verschiedene Items → verschiedene Keys (der Bug) |
+| `testSessionLootKey_SeparatorDisambiguation` | `{ts=123, player="4Foo"}` ≠ `{ts=1234, player="Foo"}` (Separator statt roher Konkatenation) |
+| `testSessionLootKey_NilFieldsTolerated` | Fehlende Felder → kein Error, stabiler Key (`"100||"`, `"||"`) |
+| `testSessionLootKey_Deterministic` | Gleicher Entry → gleicher Key |
 
 ---
 

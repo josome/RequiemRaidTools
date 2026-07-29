@@ -316,6 +316,15 @@ function GL.FormatTimestamp(ts)
     return date("%d.%m.%Y %H:%M", ts)
 end
 
+--- Eindeutiger Hidden/Checked-State-Key für einen Session-Loot-Eintrag.
+--- Pure — Separator "|" verhindert Kollisionen bei Konkatenation
+--- (z.B. gleicher Spieler, gleiche Sekunde, verschiedene Items).
+function GL.SessionLootKey(entry)
+    return tostring(entry.timestamp or "") .. "|"
+        .. (entry.player or "") .. "|"
+        .. (entry.item or "")
+end
+
 --- Gibt den Namen in Klassenfarbe zurück (nutzt RAID_CLASS_COLORS wie native WoW-Addons)
 function GL.ColoredName(name, classFileName)
     if not classFileName then return name end

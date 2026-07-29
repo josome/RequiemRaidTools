@@ -465,4 +465,33 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
         AreEqual(nil, GL.NormalizeName(nil))
         MockRestore()
     end
+
+    -- ========================================================
+    -- SessionLootKey — eindeutiger Hidden/Checked-Key pro
+    -- Session-Loot-Eintrag (timestamp|player|item)
+    -- ========================================================
+
+    function Tests:testSessionLootKey_DifferentItemsSamePlayerSameSecond()
+        -- Der Bug: gleicher Spieler, gleiche Sekunde, zwei Items → Keys müssen verschieden sein
+        local a = GL.SessionLootKey({ timestamp = 100, player = "Alice-Malfurion", item = "[Axt der Prüfung]" })
+        local b = GL.SessionLootKey({ timestamp = 100, player = "Alice-Malfurion", item = "[Schwert der Prüfung]" })
+        IsTrue(a ~= b)
+    end
+
+    function Tests:testSessionLootKey_SeparatorDisambiguation()
+        -- Ohne Separator wäre "123".."4Foo" == "1234".."Foo"
+        local a = GL.SessionLootKey({ timestamp = 123,  player = "4Foo", item = "X" })
+        local b = GL.SessionLootKey({ timestamp = 1234, player = "Foo",  item = "X" })
+        IsTrue(a ~= b)
+    end
+
+    function Tests:testSessionLootKey_NilFieldsTolerated()
+        AreEqual("100||", GL.SessionLootKey({ timestamp = 100 }))
+        AreEqual("||",    GL.SessionLootKey({}))
+    end
+
+    function Tests:testSessionLootKey_Deterministic()
+        local e = { timestamp = 100, player = "Alice-Malfurion", item = "[Axt]" }
+        AreEqual(GL.SessionLootKey(e), GL.SessionLootKey(e))
+    end
 end)
