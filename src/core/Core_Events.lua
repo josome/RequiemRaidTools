@@ -211,7 +211,10 @@ local function OnEventEncounterEnd(encounterID, encounterName, difficultyID, gro
             if GL.Comm and GL.Comm.SendMLAnnounce then
                 GL.Comm.SendMLAnnounce(UnitName("player") or "")
             end
-            if GL.UI and GL.UI.AutoExpand then C_Timer.After(0, GL.UI.AutoExpand) end
+            -- Fenster nur bei aktiver Session automatisch aufklappen
+            if db.activeContainerIdx and GL.UI and GL.UI.AutoExpand then
+                C_Timer.After(0, GL.UI.AutoExpand)
+            end
         end
     end
 end
