@@ -75,6 +75,23 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
         end)
     end
 
+    function Tests:testCreateSeason_IdCollisionResolvesToUniqueId()
+        WithTestDB(FreshDB(), function()
+            local orig, calls = GL.GenerateRaidID, 0
+            -- die ersten beiden Hashes kollidieren, danach eindeutig
+            GL.GenerateRaidID = function()
+                calls = calls + 1
+                return (calls <= 2) and "collide" or "unique"
+            end
+            local a = GL.CreateSeason("S")
+            local b = GL.CreateSeason("S")
+            GL.GenerateRaidID = orig   -- vor den Assertions restaurieren
+            IsTrue(a ~= b)
+            Exists(GuildLootDB.seasons[a])
+            Exists(GuildLootDB.seasons[b])
+        end)
+    end
+
     function Tests:testCreateSeason_NoDB_ReturnsNil()
         WithTestDB(nil, function()
             AreEqual(nil, GL.CreateSeason("S"))
@@ -84,14 +101,50 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
     -- ========================================================
     -- SetActiveSeason / GetActiveSeason
     -- ========================================================
-    function Tests:testSetActiveSeason_KnownAndUnknown()
+    function Tests:testSetActiveSeason_UnknownIdRejected()
         WithTestDB(FreshDB(), function()
             local a = GL.CreateSeason("A")
-            GL.CreateSeason("B")             -- B ist jetzt aktiv
-            IsTrue(GL.SetActiveSeason(a))
-            AreEqual(a, GuildLootDB.activeSeasonId)
             IsFalse(GL.SetActiveSeason("does-not-exist"))
             AreEqual(a, GuildLootDB.activeSeasonId)  -- unverändert
+        end)
+    end
+
+    function Tests:testSetActiveSeason_EndedSeasonRejected()
+        WithTestDB(FreshDB(), function()
+            local a = GL.CreateSeason("A")
+            local b = GL.CreateSeason("B")   -- beendet A, B ist aktiv
+            IsFalse(GL.SetActiveSeason(a))   -- A ist beendet → kein Aufzeichnungsziel
+            AreEqual(b, GuildLootDB.activeSeasonId)
+        end)
+    end
+
+    function Tests:testSetActiveSeason_OpenSeasonAccepted()
+        WithTestDB(FreshDB(), function()
+            local a = GL.CreateSeason("A")
+            GuildLootDB.activeSeasonId = nil     -- Zeiger verloren, Season noch offen
+            IsTrue(GL.SetActiveSeason(a))
+            AreEqual(a, GuildLootDB.activeSeasonId)
+        end)
+    end
+
+    -- ========================================================
+    -- ReopenSeason — Rückweg nach versehentlichem "Neue Season"
+    -- ========================================================
+    function Tests:testReopenSeason_ClearsEndedAtAndActivates()
+        WithTestDB(FreshDB(), function()
+            local a = GL.CreateSeason("A")
+            local b = GL.CreateSeason("B")       -- beendet A versehentlich
+            IsTrue(GL.ReopenSeason(a))
+            AreEqual(a, GuildLootDB.activeSeasonId)
+            AreEqual(nil, GuildLootDB.seasons[a].endedAt)
+            -- B wurde im Gegenzug beendet: immer höchstens eine offene Season
+            IsTrue(GuildLootDB.seasons[b].endedAt ~= nil)
+        end)
+    end
+
+    function Tests:testReopenSeason_UnknownReturnsFalse()
+        WithTestDB(FreshDB(), function()
+            IsFalse(GL.ReopenSeason("nope"))
         end)
     end
 
@@ -123,6 +176,18 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
         end)
     end
 
+    function Tests:testEndSeason_IsIdempotent()
+        WithTestDB(FreshDB(), function()
+            local id = GL.CreateSeason("S")
+            GL.EndSeason(id)
+            local first = GuildLootDB.seasons[id].endedAt
+            GuildLootDB.seasons[id].endedAt = first - 500   -- älteres Ende simulieren
+            IsTrue(GL.EndSeason(id))
+            -- zweiter Aufruf verschiebt den Season-Zeitraum nicht
+            AreEqual(first - 500, GuildLootDB.seasons[id].endedAt)
+        end)
+    end
+
     -- ========================================================
     -- SetSeasonRankFilter
     -- ========================================================
@@ -141,6 +206,129 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
             IsFalse(GL.SetSeasonRankFilter("nope", 1, true))
         end)
     end
+
+    function Tests:testSetSeasonRankFilter_NilIndexReturnsFalse()
+        WithTestDB(FreshDB(), function()
+            local id = GL.CreateSeason("S")
+            -- ohne Guard wäre das ein hartes "table index is nil"
+            IsFalse(GL.SetSeasonRankFilter(id, nil, true))
+            IsFalse(GL.SetSeasonRankFilter(id, nil, false))
+        end)
+    end
+
+    function Tests:testSetSeasonRankFilter_StringIndexNormalized()
+        WithTestDB(FreshDB(), function()
+            local id = GL.CreateSeason("S")
+            IsTrue(GL.SetSeasonRankFilter(id, "3", true))
+            IsTrue(GuildLootDB.seasons[id].rankFilter[3])   -- Zahl, nicht String
+        end)
+    end
+
+    function Tests:testCreateSeason_StringRankKeysNormalized()
+        WithTestDB(FreshDB(), function()
+            -- so kämen die Schlüssel nach einem JSON-Roundtrip zurück
+            local id = GL.CreateSeason("S", { ["2"] = true })
+            IsTrue(GuildLootDB.seasons[id].rankFilter[2])
+        end)
+    end
+
+    -- ========================================================
+    -- DeleteSeason
+    -- ========================================================
+    function Tests:testDeleteSeason_RemovesEntryAndClearsActive()
+        WithTestDB(FreshDB(), function()
+            local id = GL.CreateSeason("Verklickt")
+            IsTrue(GL.DeleteSeason(id))
+            AreEqual(nil, GuildLootDB.seasons[id])
+            AreEqual(nil, GuildLootDB.activeSeasonId)
+        end)
+    end
+
+    function Tests:testDeleteSeason_KeepsOtherSeasonsAndRaidData()
+        WithTestDB(FreshDB(), function()
+            GuildLootDB.raidContainers = { { id = "c1", startedAt = 100 } }
+            local a = GL.CreateSeason("A")
+            local b = GL.CreateSeason("B")   -- B ist aktiv
+            IsTrue(GL.DeleteSeason(a))
+            Exists(GuildLootDB.seasons[b])
+            AreEqual(b, GuildLootDB.activeSeasonId)     -- aktive Season unberührt
+            AreEqual(1, #GuildLootDB.raidContainers)    -- Raid-Daten bleiben
+        end)
+    end
+
+    function Tests:testDeleteSeason_UnknownReturnsFalse()
+        WithTestDB(FreshDB(), function()
+            IsFalse(GL.DeleteSeason("nope"))
+        end)
+    end
+
+    -- ========================================================
+    -- SetSeasonStart — Zeitfenster nachträglich verschieben
+    -- ========================================================
+    function Tests:testSetSeasonStart_MovesWindowBack()
+        WithTestDB(FreshDB(), function()
+            local id = GL.CreateSeason("S")
+            IsTrue(GL.SetSeasonStart(id, 12345))
+            AreEqual(12345, GuildLootDB.seasons[id].startedAt)
+            AreEqual(nil, GuildLootDB.seasons[id].endedAt)   -- Ende bleibt unangetastet
+        end)
+    end
+
+    function Tests:testSetSeasonStart_RejectsUnknownOrInvalid()
+        WithTestDB(FreshDB(), function()
+            local id = GL.CreateSeason("S")
+            IsFalse(GL.SetSeasonStart("nope", 12345))
+            IsFalse(GL.SetSeasonStart(id, nil))
+            IsFalse(GL.SetSeasonStart(id, 0))
+            IsFalse(GL.SetSeasonStart(id, "keine Zahl"))
+        end)
+    end
+
+    function Tests:testSetSeasonStart_RejectsStartAfterEnd()
+        WithTestDB(FreshDB(), function()
+            local id = GL.CreateSeason("S")
+            GuildLootDB.seasons[id].endedAt = 1000
+            IsFalse(GL.SetSeasonStart(id, 2000))
+            IsTrue(GL.SetSeasonStart(id, 500))
+        end)
+    end
+
+    -- ========================================================
+    -- SetSeasonRankThreshold — "Raider und höher" in einem Klick
+    -- ========================================================
+    function Tests:testSetSeasonRankThreshold_EnablesRankAndAllAbove()
+        WithTestDB(FreshDB(), function()
+            local id = GL.CreateSeason("S")
+            -- Schwelle "Raider" = Index 2 → 0 (GM), 1 (Offizier), 2 (Raider) aktiv
+            IsTrue(GL.SetSeasonRankThreshold(id, 2))
+            local rf = GuildLootDB.seasons[id].rankFilter
+            IsTrue(rf[0])
+            IsTrue(rf[1])
+            IsTrue(rf[2])
+            AreEqual(nil, rf[3])
+            AreEqual(nil, rf[4])
+        end)
+    end
+
+    function Tests:testSetSeasonRankThreshold_ReplacesPreviousSelection()
+        WithTestDB(FreshDB(), function()
+            local id = GL.CreateSeason("S", { [5] = true })
+            GL.SetSeasonRankThreshold(id, 1)
+            local rf = GuildLootDB.seasons[id].rankFilter
+            IsTrue(rf[0])
+            IsTrue(rf[1])
+            AreEqual(nil, rf[5])   -- alte Auswahl ist weg, nicht dazugemischt
+        end)
+    end
+
+    function Tests:testSetSeasonRankThreshold_UnknownSeasonOrBadIndex()
+        WithTestDB(FreshDB(), function()
+            local id = GL.CreateSeason("S")
+            IsFalse(GL.SetSeasonRankThreshold("nope", 2))
+            IsFalse(GL.SetSeasonRankThreshold(id, nil))
+        end)
+    end
+
 
     -- ========================================================
     -- InitDB-Defaults

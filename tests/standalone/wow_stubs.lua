@@ -147,6 +147,9 @@ function IsInGroup()            return false end
 function GetNumGroupMembers()   return 0 end
 function GetRaidRosterInfo()    return nil end
 function UnitName()             return "TestPlayer", nil end
+-- Rückgabe: lokalisierter Klassenname, classFileName
+function UnitClass()           return "Krieger", "WARRIOR" end
+function UnitIsConnected()     return true end
 function UnitAffectingCombat()  return false end
 function UnitIsRaidOfficer()    return false end
 function UnitIsGroupLeader()    return false end
@@ -165,6 +168,10 @@ function GetNumGuildMembers()      return 0 end
 function GetGuildRosterInfo()      return nil end
 function GuildControlGetNumRanks() return 0 end
 function GuildControlGetRankName(i) return "Rank" .. tostring(i) end
+-- Roster-Filter "Offline anzeigen": beeinflusst, welche Zeilen GetGuildRosterInfo liefert.
+local _showOffline = true
+function GetGuildRosterShowOffline()  return _showOffline end
+function SetGuildRosterShowOffline(v) _showOffline = v and true or false end
 C_GuildInfo = C_GuildInfo or {}
 function C_GuildInfo.GuildRoster() end
 

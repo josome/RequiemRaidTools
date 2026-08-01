@@ -1,7 +1,7 @@
 -- GuildLoot – Core_Season.lua
 -- Season-Verwaltung: Anlegen, aktive Season, Beenden, Rang-Filter.
 -- Reine DB-Mutation (keine WoW-API) → busted-testbar.
--- Muss NACH Core_DB.lua geladen werden (nutzt GL.GenerateRaidID aus Util.lua).
+-- Muss NACH Util.lua geladen werden (nutzt GL.GenerateRaidID).
 
 GuildLoot = GuildLoot or {}
 local GL = GuildLoot
@@ -30,11 +30,13 @@ function GL.CreateSeason(name, rankFilter)
         n = n + 1
         id = GenerateSeasonID((name or "") .. "#" .. n, ts)
     end
-    -- nur aktivierte Ränge in den Filter übernehmen
+    -- nur aktivierte Ränge in den Filter übernehmen; Schlüssel als Zahl normalisieren,
+    -- damit der Lookup filter[rankIndex] auch nach einem JSON-Roundtrip greift
     local filter = {}
     if type(rankFilter) == "table" then
         for k, v in pairs(rankFilter) do
-            if v then filter[k] = true end
+            local idx = tonumber(k)
+            if v and idx then filter[idx] = true end
         end
     end
     db.seasons[id] = {
@@ -48,11 +50,32 @@ function GL.CreateSeason(name, rankFilter)
     return id
 end
 
---- Setzt die aktive Season. Returns true bei Erfolg, false wenn ID unbekannt.
+--- Setzt die aktive Season — also das Ziel, in das aufgezeichnet wird.
+--- Beendete Seasons werden abgewiesen: sonst liefen ab Phase 1b Bosskills in eine
+--- abgeschlossene Season. Zum Betrachten vergangener Seasons dient ein eigener Selektor
+--- (Phase 1c), zum Wiederaufnehmen GL.ReopenSeason.
+--- Returns true bei Erfolg, false wenn ID unbekannt oder die Season beendet ist.
 --- Writes: db.activeSeasonId
 function GL.SetActiveSeason(id)
     local db = GuildLootDB
-    if not (db and db.seasons and db.seasons[id]) then return false end
+    local season = db and db.seasons and db.seasons[id]
+    if not season or season.endedAt then return false end
+    db.activeSeasonId = id
+    return true
+end
+
+--- Nimmt eine beendete Season wieder auf (endedAt zurücksetzen) und macht sie aktiv.
+--- Rückweg, wenn "Neue Season" versehentlich geklickt wurde. Beendet dabei die bisher
+--- aktive Season, damit immer höchstens eine Season offen ist.
+--- Returns true bei Erfolg, false wenn ID unbekannt.
+--- Writes: db.seasons[id].endedAt, db.seasons[prev].endedAt, db.activeSeasonId
+function GL.ReopenSeason(id)
+    local db = GuildLootDB
+    local season = db and db.seasons and db.seasons[id]
+    if not season then return false end
+    local prev = db.activeSeasonId and db.seasons[db.activeSeasonId]
+    if prev and prev ~= season and not prev.endedAt then prev.endedAt = time() end
+    season.endedAt = nil
     db.activeSeasonId = id
     return true
 end
@@ -66,25 +89,78 @@ function GL.GetActiveSeason()
 end
 
 --- Beendet eine Season (endedAt-Stempel). Leert activeSeasonId, falls es die aktive war.
+--- Idempotent: ein bereits gesetztes endedAt bleibt stehen, ein zweiter Aufruf verschiebt
+--- also nicht den Season-Zeitraum (an dem GL.GetSeasonAttendees hängt).
 --- Returns true bei Erfolg, false wenn ID unbekannt.
 --- Writes: db.seasons[id].endedAt, ggf. db.activeSeasonId
 function GL.EndSeason(id)
     local db = GuildLootDB
     local season = db and db.seasons and db.seasons[id]
     if not season then return false end
-    season.endedAt = time()
+    if not season.endedAt then season.endedAt = time() end
     if db.activeSeasonId == id then db.activeSeasonId = nil end
     return true
 end
 
---- Setzt/entfernt einen Rang im Rang-Filter einer Season.
+--- Löscht eine Season. Betrifft NUR den Season-Eintrag (Name, Zeitfenster, Rang-Filter) —
+--- Raid-Sessions und Loot bleiben unangetastet, Attendance wird ohnehin daraus abgeleitet.
+--- War es die aktive Season, bleibt danach keine aktiv.
 --- Returns true bei Erfolg, false wenn ID unbekannt.
+--- Writes: db.seasons[id] = nil, ggf. db.activeSeasonId
+function GL.DeleteSeason(id)
+    local db = GuildLootDB
+    if not (db and db.seasons and db.seasons[id]) then return false end
+    db.seasons[id] = nil
+    if db.activeSeasonId == id then db.activeSeasonId = nil end
+    return true
+end
+
+--- Setzt das Startdatum einer Season. Nötig, weil eine heute angelegte Season sonst alle
+--- bereits vorhandenen Raid-Sessions aus ihrem Zeitfenster ausschließt — die Matrix bliebe
+--- leer, obwohl Daten da sind. Zugleich die Grundlage für das Nachtragen alter Raids.
+--- endedAt bleibt unangetastet; ein Start nach dem Ende wird abgewiesen.
+--- Returns true bei Erfolg, false wenn ID oder Zeitstempel unbrauchbar.
+--- Writes: db.seasons[id].startedAt
+function GL.SetSeasonStart(id, timestamp)
+    local db = GuildLootDB
+    local season = db and db.seasons and db.seasons[id]
+    if not season then return false end
+    timestamp = tonumber(timestamp)
+    if not timestamp or timestamp <= 0 then return false end
+    if season.endedAt and timestamp > season.endedAt then return false end
+    season.startedAt = timestamp
+    return true
+end
+
+--- Setzt/entfernt einen Rang im Rang-Filter einer Season.
+--- Returns true bei Erfolg, false wenn ID oder rankIndex unbrauchbar.
 --- Writes: db.seasons[id].rankFilter[rankIndex]
 function GL.SetSeasonRankFilter(id, rankIndex, enabled)
     local db = GuildLootDB
     local season = db and db.seasons and db.seasons[id]
     if not season then return false end
+    rankIndex = tonumber(rankIndex)
+    if not rankIndex then return false end
     season.rankFilter = season.rankFilter or {}
     season.rankFilter[rankIndex] = enabled and true or nil
+    return true
+end
+
+--- Setzt den Rang-Filter auf "dieser Rang und alle höheren" (rankIndex 0 = Gildenmeister,
+--- aufsteigend = niedriger). Bedienhilfe über GL.SetSeasonRankFilter — der Kader besteht in
+--- der Praxis aus Raider plus allem darüber (Offiziere, GM), und das soll ein Klick sein.
+--- Ersetzt die bisherige Auswahl vollständig; einzelne Ränge lassen sich danach wieder
+--- abwählen (Gilden mit einem Nicht-Raider-Rang oberhalb von Raider).
+--- Returns true bei Erfolg, false wenn ID oder rankIndex unbrauchbar.
+--- Writes: db.seasons[id].rankFilter
+function GL.SetSeasonRankThreshold(id, rankIndex)
+    local db = GuildLootDB
+    local season = db and db.seasons and db.seasons[id]
+    if not season then return false end
+    rankIndex = tonumber(rankIndex)
+    if not rankIndex then return false end
+    local filter = {}
+    for i = 0, rankIndex do filter[i] = true end
+    season.rankFilter = filter
     return true
 end

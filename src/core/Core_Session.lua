@@ -456,6 +456,21 @@ function GL.LoadRaidRoster()
     end
 end
 
+--- Stellt sicher, dass currentRaid.participants befüllt ist, bevor ein Bosskill aufgezeichnet
+--- wird. Nötig, weil GROUP_ROSTER_UPDATE nicht feuert, solange man allein ist: solo wird
+--- GL.LoadRaidRoster nirgends angestoßen (StartContainer überspringt es mangels Gruppe), die
+--- Liste bliebe leer und der Kill damit ohne Teilnehmer.
+--- Eine bereits befüllte Liste bleibt unangetastet — sie ist kumulativ und darf nicht auf den
+--- aktuellen Gruppenstand zurückfallen.
+--- Writes: db.currentRaid.participants (via GL.LoadRaidRoster)
+function GL.EnsureRaidParticipants()
+    local raid = GuildLootDB and GuildLootDB.currentRaid
+    if not raid then return end
+    if #(raid.participants or {}) == 0 then
+        GL.LoadRaidRoster()
+    end
+end
+
 --- Bereinigt currentRaid.participants gegen aktuelle Gruppe (neue Mitglieder hinzufügen, DCs markieren).
 --- Reads:  db.activeContainerIdx, db.currentRaid.participants
 --- Writes: db.currentRaid.participants, db.currentRaid.absent

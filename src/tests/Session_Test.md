@@ -185,6 +185,18 @@ Diese Tests gaten sich selbst über `type(GuildLoot.X) == "function"`. Solange d
 | `testMigratePendingLoot_Idempotent` | Zweiter Aufruf erzeugt keinen zweiten Legacy-Container |
 | `testMigratePendingLoot_EmptyPending_NoOp` | Leeres `currentRaid.pendingLoot` → kein Legacy-Container |
 
+### EnsureRaidParticipants
+
+Solo feuert WoW kein `GROUP_ROSTER_UPDATE`, und `StartContainer` überspringt `LoadRaidRoster`
+mangels Gruppe — `currentRaid.participants` bliebe leer und der Bosskill damit ohne Teilnehmer
+(keine Zeile, keine grüne Zelle in der Attendance-Matrix). `GL.EnsureRaidParticipants` schließt
+diese Lücke vor `GL.EnsureRaidMeta` in `OnEventEncounterEnd`.
+
+| Test | Prüft |
+|------|-------|
+| `testEnsureRaidParticipants_SoloFillsEmptyList` | Leere Liste + solo → eigener Char wird eingetragen |
+| `testEnsureRaidParticipants_KeepsExistingList` | Befüllte Liste bleibt unangetastet (kumulativ, darf nicht auf den Gruppenstand zurückfallen) |
+
 ---
 
 ## Was diese Tests nicht abdecken

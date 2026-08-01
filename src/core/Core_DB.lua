@@ -15,8 +15,12 @@ local DB_DEFAULTS = {
     raidContainers     = {},   -- Array von Session-Objekten
     activeContainerIdx = nil,  -- Index der offenen Session (nil = keine)
     unassignedRaids    = {},   -- Legacy Raid-Snapshots ohne Session
-    seasons            = {},   -- { [id] = { id, name, startedAt, endedAt, rankFilter={} } }
+    -- { [id] = { id, name, startedAt, endedAt, rankFilter={},
+    --            roster={{name,class}}, rosterReadAt, rosterFilterKey } }
+    -- roster = Kader-Schnappschuss, nur via GL.SnapshotSeasonRoster ("Roster lesen")
+    seasons            = {},
     activeSeasonId     = nil,  -- ID der aktiven Season (nil = keine); via GL.CreateSeason gesetzt
+    guildRankNames     = {},   -- [rankIndex] = Anzeigename; Fallback wenn Guild-Control schweigt
     lastLogout         = 0,
     currentRaid = {
         id                      = "",
@@ -86,6 +90,7 @@ local function DefaultPlayerRecord()
         lootEligible   = true,
         setPieces      = 0,
         class          = nil,  -- classFileName, z.B. "WARRIOR"
+        trial          = false, -- dauerhafter Flag, von der Raidleitung manuell entfernt
     }
 end
 

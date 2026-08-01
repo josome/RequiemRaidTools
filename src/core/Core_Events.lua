@@ -16,6 +16,7 @@ eventFrame:RegisterEvent("PLAYER_LOGIN")
 eventFrame:RegisterEvent("PLAYER_LOGOUT")
 eventFrame:RegisterEvent("RAID_ROSTER_UPDATE")
 eventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
+eventFrame:RegisterEvent("GUILD_ROSTER_UPDATE")
 eventFrame:RegisterEvent("ENCOUNTER_END")
 eventFrame:RegisterEvent("LOOT_OPENED")
 eventFrame:RegisterEvent("LOOT_SLOT_CHANGED")
@@ -83,6 +84,8 @@ local function OnEventPlayerLogin()
         end
     end
     if GL.UI and GL.UI.Init then GL.UI.Init() end
+    -- Gildenroster anfordern; die Daten laufen über GUILD_ROSTER_UPDATE nach.
+    GL.RefreshGuildRoster()
     -- Delayed RAID_QUERY: Gruppe/Raid-API ist bei Login noch nicht sofort bereit.
     C_Timer.After(3, function()
         if not GL.IsMasterLooter() and not GuildLootDB.activeContainerIdx then
@@ -207,6 +210,8 @@ local function OnEventEncounterEnd(encounterID, encounterName, difficultyID, gro
                 cr.difficulty = eventDiff or cr.difficulty or ""
                 cr.startedAt  = cr.startedAt ~= 0 and cr.startedAt or time()
             end
+            -- Solo feuert kein GROUP_ROSTER_UPDATE → participants wäre noch leer
+            GL.EnsureRaidParticipants()
             GL.EnsureRaidMeta()
             if GL.Comm and GL.Comm.SendMLAnnounce then
                 GL.Comm.SendMLAnnounce(UnitName("player") or "")
@@ -306,6 +311,7 @@ local eventDispatch = {
     TRADE_ACCEPT_UPDATE           = OnEventTradeAcceptUpdate,
     RAID_ROSTER_UPDATE            = OnEventGroupRosterUpdate,
     GROUP_ROSTER_UPDATE           = OnEventGroupRosterUpdate,
+    GUILD_ROSTER_UPDATE           = function() GL.OnGuildRosterUpdate() end,
     ENCOUNTER_END                 = OnEventEncounterEnd,
     PLAYER_REGEN_ENABLED          = OnEventPlayerRegenEnabled,
     START_LOOT_ROLL               = OnEventStartLootRoll,

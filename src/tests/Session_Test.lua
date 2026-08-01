@@ -1117,4 +1117,37 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
         end)
     end
 
+    -- ========================================================
+    -- EnsureRaidParticipants — solo feuert kein GROUP_ROSTER_UPDATE
+    -- ========================================================
+    function Tests:testEnsureRaidParticipants_SoloFillsEmptyList()
+        WithTestDB(function()
+            MockSideEffects()
+            Mock(_G, "IsInRaid",  function() return false end)
+            Mock(_G, "IsInGroup", function() return false end)
+            GuildLootDB.currentRaid.participants = {}
+
+            GuildLoot.EnsureRaidParticipants()
+
+            -- ohne den Guard bliebe die Liste leer und der Bosskill ohne Teilnehmer
+            AreEqual(1, #GuildLootDB.currentRaid.participants)
+            Exists(GuildLootDB.currentRaid.participants[1])
+        end)
+    end
+
+    function Tests:testEnsureRaidParticipants_KeepsExistingList()
+        WithTestDB(function()
+            MockSideEffects()
+            Mock(_G, "IsInRaid",  function() return false end)
+            Mock(_G, "IsInGroup", function() return false end)
+            GuildLootDB.currentRaid.participants = { "Alice-Realm", "Bob-Realm" }
+
+            GuildLoot.EnsureRaidParticipants()
+
+            -- kumulative Liste darf nicht auf den aktuellen Gruppenstand zurückfallen
+            AreEqual(2, #GuildLootDB.currentRaid.participants)
+            AreEqual("Alice-Realm", GuildLootDB.currentRaid.participants[1])
+        end)
+    end
+
 end)

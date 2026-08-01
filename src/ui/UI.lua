@@ -349,7 +349,7 @@ function UI.BuildMainFrame()
     contentFrame:SetPoint("BOTTOMRIGHT", mainFrame, "BOTTOMRIGHT", -4, 42)
 
     -- Tab-Buttons
-    local tabNames = { "Loot", "Log", "Raid", "Roll", "Players" }
+    local tabNames = { "Loot", "Log", "Raid", "Roll", "Attendance" }
     for i, name in ipairs(tabNames) do
         local tb = CreateFrame("Button", "GuildLootMainFrameTab" .. i, mainFrame, "CharacterFrameTabTemplate")
         tb:SetScript("OnLoad", nil)
@@ -366,13 +366,12 @@ function UI.BuildMainFrame()
         tb:SetScript("OnClick", function(self)
             UI.ShowTab(self:GetID())
         end)
-        if i == TAB_PLAYER then tb:Hide() end  -- Players tab: no function yet
         tabButtons[i] = tb
     end
 
     -- Panels (in je eigener Datei definiert)
-    UI.lootPanel   = UI.BuildLootPanel(contentFrame)
-    UI.playerPanel = UI.BuildPlayerPanel(contentFrame)
+    UI.lootPanel       = UI.BuildLootPanel(contentFrame)
+    UI.attendancePanel = UI.BuildAttendancePanel(contentFrame)
     UI.logPanel    = UI.BuildLogPanel(contentFrame)
     UI.raidPanel   = UI.BuildRaidPanel(contentFrame)
     UI.rollPanel   = UI.BuildRollTab(contentFrame)
@@ -464,7 +463,7 @@ function UI.ShowTab(tabID)
     GuildLootDB.settings.lastTab = tabID
     UI.activeTab = tabID
     UI.lootPanel:Hide()
-    UI.playerPanel:Hide()
+    UI.attendancePanel:Hide()
     UI.logPanel:Hide()
     if UI.raidPanel then UI.raidPanel:Hide() end
     if UI.rollPanel then UI.rollPanel:Hide() end
@@ -481,8 +480,8 @@ function UI.ShowTab(tabID)
         UI.lootPanel:Show()
         UI.RefreshLootTab()
     elseif tabID == TAB_PLAYER then
-        UI.playerPanel:Show()
-        UI.RefreshPlayerTab()
+        UI.attendancePanel:Show()
+        UI.RefreshAttendanceTab()
     elseif tabID == TAB_LOG then
         UI.logPanel:Show()
         UI.RefreshLogTab()
@@ -525,7 +524,7 @@ function UI.Refresh()
     UI.RefreshSessionBar()
     UI.RefreshMLButton()
     if UI.activeTab == TAB_LOOT   then UI.RefreshLootTab()   end
-    if UI.activeTab == TAB_PLAYER then UI.RefreshPlayerTab() end
+    if UI.activeTab == TAB_PLAYER then UI.RefreshAttendanceTab() end
     if UI.activeTab == TAB_LOG    then UI.RefreshLogTab()    end
     if UI.activeTab == TAB_RAID   then UI.RefreshRaidTab()   end
 end
