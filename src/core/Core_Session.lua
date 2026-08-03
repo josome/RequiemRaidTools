@@ -324,6 +324,64 @@ function GL.EnsureRaidMeta()
     end
 end
 
+--- Schreibt einen Bosskill in die raidMeta des laufenden Raids: der Gruppenstand zum
+--- Kill wird als eigener kills-Eintrag angehängt UND in die kumulative Teilnehmerliste
+--- des Abends vereinigt.
+---
+--- Bewusst getrennt von GL.EnsureRaidMeta: das legt den raidMeta-Eintrag nur EINMAL an
+--- (eine raidMeta-ID ist eine Tier+Difficulty-Kombination, kein Boss). Die participants
+--- blieben dadurch auf dem ersten Kill des Abends eingefroren und Nachrücker fehlten für
+--- den gesamten Abend. Die Kill-Ebene muss dagegen bei jedem Kill wachsen.
+---
+--- Die Einzelliste wird zusätzlich zur Vereinigung gespeichert, weil sie nicht
+--- rekonstruierbar ist: aus den Einzellisten lässt sich die Vereinigung jederzeit wieder
+--- bilden, umgekehrt nie.
+---
+--- Reads:  db.activeContainerIdx, db.raidContainers, db.currentRaid.id,
+---         db.currentRaid.currentKillParticipants, db.currentRaid.participants
+--- Writes: db.raidContainers[i].raidMeta[id].kills,
+---         db.raidContainers[i].raidMeta[id].participants
+function GL.RecordKillAttendance(bossName, encounterID)
+    local db = GuildLootDB
+    if not db or not db.activeContainerIdx then return end
+    local session = db.raidContainers[db.activeContainerIdx]
+    if not session or not session.raidMeta then return end
+    local raid = db.currentRaid
+    local id   = raid and raid.id
+    if not id or id == "" then return end
+    local meta = session.raidMeta[id]
+    if not meta then return end
+
+    -- Gruppenstand zum Kill; ENCOUNTER_END hat currentKillParticipants gerade gesetzt.
+    -- Fallback auf die kumulative Liste, damit ein Aufruf ohne frischen Snapshot keinen
+    -- leeren Kill (= Boss-Spalte ohne Teilnehmer) aufzeichnet.
+    local names = raid.currentKillParticipants or {}
+    if #names == 0 then names = raid.participants or {} end
+
+    local kill = {
+        boss         = bossName or "",
+        encounterID  = encounterID,
+        ts           = time(),
+        participants = {},
+    }
+    for _, name in ipairs(names) do
+        table.insert(kill.participants, name)
+    end
+    meta.kills = meta.kills or {}
+    table.insert(meta.kills, kill)
+
+    -- Vereinigung: Nachrücker kommen dazu, niemand fällt aus der Abend-Liste heraus
+    meta.participants = meta.participants or {}
+    local seen = {}
+    for _, name in ipairs(meta.participants) do seen[name] = true end
+    for _, name in ipairs(names) do
+        if not seen[name] then
+            seen[name] = true
+            table.insert(meta.participants, name)
+        end
+    end
+end
+
 --- Setzt db.currentRaid auf leeren Ausgangszustand.
 --- Writes: db.currentRaid (alle Felder)
 function GL.ResetCurrentRaid()

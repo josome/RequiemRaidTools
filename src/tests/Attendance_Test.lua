@@ -50,6 +50,9 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
 
     --- Baut eine DB mit Season "s1" und Raid-Sessions.
     --- sessions: Array von { startedAt, label, raids = { { id, participants = {…} }, … } }
+    --- Ein Raid darf zusätzlich kills = { { boss, ts, participants = {…} }, … } tragen —
+    --- das ist die Boss-Ebene aus GL.RecordKillAttendance (Phase 1b). Ohne kills greift
+    --- der Fallback für Altdaten.
     --- Das Gilden-Roster wird über GL.GetSeasonRoster gemockt (roster = Array von
     --- { name, class, group }), damit das Aggregat isoliert testbar bleibt.
     local function AttendanceDB(seasonFields, sessions, players)
@@ -66,6 +69,7 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
                 meta[raid.id] = {
                     startedAt    = raid.ts or s.startedAt,
                     participants = raid.participants or {},
+                    kills        = raid.kills,
                 }
             end
             containers[i] = {
@@ -171,6 +175,96 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
             local night = GL.ComputeAttendance("s1").nights[1]
             AreEqual(1, #night.kills)
             AreEqual("r1", night.kills[1].id)
+        end)
+    end
+
+    -- ========================================================
+    -- Boss-Ebene (raidMeta[*].kills, Phase 1b)
+    -- ========================================================
+    function Tests:testComputeAttendance_KillsPerBossWhenRecorded()
+        WithDB(AttendanceDB({}, {
+            { startedAt = 100, raids = {
+                { id = "r1", participants = { "Alice-R", "Bob-R" }, kills = {
+                    { boss = "Ulgrax", ts = 110, participants = { "Alice-R" } },
+                    { boss = "Sikran", ts = 120, participants = { "Alice-R", "Bob-R" } },
+                } },
+            } },
+        }), function()
+            MockRoster({})
+            local night = GL.ComputeAttendance("s1").nights[1]
+            -- eine Spalte je Bosskill statt einer je Abend
+            AreEqual(2,        #night.kills)
+            AreEqual("Ulgrax", night.kills[1].name)
+            AreEqual("Sikran", night.kills[2].name)
+            AreEqual("r1#1",   night.kills[1].id)
+            AreEqual("r1#2",   night.kills[2].id)
+        end)
+    end
+
+    function Tests:testComputeAttendance_LateJoinerPresentOnlyFromHisKill()
+        WithDB(AttendanceDB({}, {
+            { startedAt = 100, raids = {
+                { id = "r1", participants = { "Alice-R", "Bob-R" }, kills = {
+                    { boss = "Ulgrax", ts = 110, participants = { "Alice-R" } },
+                    { boss = "Sikran", ts = 120, participants = { "Alice-R", "Bob-R" } },
+                } },
+            } },
+        }), function()
+            MockRoster({ { name = "Bob-R", class = "ROGUE", group = "roster" } })
+            local result = GL.ComputeAttendance("s1")
+            local bob    = RowByName(result, "Bob-R")
+            AreEqual(nil, bob.present["r1#1"])          -- beim ersten Boss noch nicht da
+            IsTrue(bob.present["r1#2"])
+            IsTrue(bob.present[result.nights[1].id])    -- der Abend zählt trotzdem
+            AreEqual(1, bob.attended)                   -- und zwar genau einmal
+        end)
+    end
+
+    function Tests:testComputeAttendance_KillsSortedByTimestamp()
+        WithDB(AttendanceDB({}, {
+            { startedAt = 100, raids = {
+                { id = "r1", participants = {}, kills = {
+                    { boss = "Zweiter", ts = 200, participants = {} },
+                } },
+                { id = "r2", participants = {}, kills = {
+                    { boss = "Erster", ts = 150, participants = {} },
+                } },
+            } },
+        }), function()
+            MockRoster({})
+            local night = GL.ComputeAttendance("s1").nights[1]
+            AreEqual("Erster",  night.kills[1].name)
+            AreEqual("Zweiter", night.kills[2].name)
+        end)
+    end
+
+    function Tests:testComputeAttendance_FallsBackToNightLevelWithoutKills()
+        -- Altdaten von vor Phase 1b und Observer-Sessions: kills fehlt, die Abend-Ebene
+        -- muss unverändert funktionieren
+        WithDB(AttendanceDB({}, {
+            { startedAt = 100, raids = { { id = "r1", participants = { "Alice-R" } } } },
+        }), function()
+            MockRoster({ { name = "Alice-R", class = "MAGE", group = "roster" } })
+            local result = GL.ComputeAttendance("s1")
+            local alice  = RowByName(result, "Alice-R")
+            AreEqual(1,    #result.nights[1].kills)
+            AreEqual("r1", result.nights[1].kills[1].id)
+            IsTrue(alice.present["r1"])
+            AreEqual(1, alice.attended)
+        end)
+    end
+
+    function Tests:testComputeAttendance_EmptyKillsListUsesFallback()
+        WithDB(AttendanceDB({}, {
+            { startedAt = 100, raids = {
+                { id = "r1", participants = { "Alice-R" }, kills = {} },
+            } },
+        }), function()
+            MockRoster({ { name = "Alice-R", class = "MAGE", group = "roster" } })
+            local result = GL.ComputeAttendance("s1")
+            AreEqual(1,    #result.nights[1].kills)
+            AreEqual("r1", result.nights[1].kills[1].id)
+            IsTrue(RowByName(result, "Alice-R").present["r1"])
         end)
     end
 

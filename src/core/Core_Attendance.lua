@@ -22,14 +22,28 @@ local function CollectNights(db, season)
         if ts >= from and ts <= to then
             local kills = {}
             for raidID, meta in pairs(session.raidMeta or {}) do
-                table.insert(kills, {
-                    id   = raidID,
-                    name = meta.tier,
-                    ts   = meta.startedAt or ts,
-                    -- participants bleiben hier, damit die Präsenz in einem zweiten Durchlauf
-                    -- ohne erneuten DB-Zugriff aufgebaut werden kann
-                    participants = meta.participants or {},
-                })
+                -- participants bleiben in beiden Zweigen erhalten, damit die Präsenz in
+                -- einem zweiten Durchlauf ohne erneuten DB-Zugriff aufgebaut werden kann
+                if meta.kills and #meta.kills > 0 then
+                    -- Boss-Ebene, ab Phase 1b von GL.RecordKillAttendance aufgezeichnet
+                    for i, kill in ipairs(meta.kills) do
+                        table.insert(kills, {
+                            id           = raidID .. "#" .. i,
+                            name         = (kill.boss ~= "" and kill.boss) or meta.tier,
+                            ts           = kill.ts or meta.startedAt or ts,
+                            participants = kill.participants or {},
+                        })
+                    end
+                else
+                    -- Altdaten und Observer-Sessions: ein Eintrag je raidMeta, Teilnehmer
+                    -- nur auf Abend-Ebene bekannt
+                    table.insert(kills, {
+                        id           = raidID,
+                        name         = meta.tier,
+                        ts           = meta.startedAt or ts,
+                        participants = meta.participants or {},
+                    })
+                end
             end
             table.sort(kills, function(a, b) return (a.ts or 0) < (b.ts or 0) end)
             table.insert(nights, {
@@ -55,9 +69,10 @@ end
 ---   pct              — attended/total in ganzen Prozent, 0 wenn total == 0
 ---   trial            — db.players[name].trial (nur Flag; Loot-Effekt ist Phase 2)
 ---
---- HINWEIS: GL.EnsureRaidMeta legt raidMeta[id] nur einmal pro Raid an — die kills-Ebene
---- hat deshalb vorerst genau einen Eintrag je Abend, mit einem Teilnehmer-Schnappschuss vom
---- ersten Bosskill. Die Struktur steht bereits; Phase 1b füllt sie auf.
+--- Die kills-Ebene kommt aus raidMeta[*].kills (GL.RecordKillAttendance, ein Eintrag je
+--- Bosskill). Fehlt sie — Altdaten von vor Phase 1b oder eine über RAID_META empfangene
+--- Observer-Session — bleibt es bei einem Eintrag je raidMeta mit den Teilnehmern des
+--- Abends. Die Abend-Ebene stimmt in beiden Fällen.
 ---
 --- Reads:  db.seasons[seasonId], db.raidContainers, db.players, GL.GetSeasonRoster
 --- Returns: { season, nights, rows } — bei unbekannter Season/fehlender DB leere Listen.

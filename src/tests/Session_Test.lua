@@ -1150,4 +1150,148 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
         end)
     end
 
+    -- ========================================================
+    -- RecordKillAttendance — Boss-Ebene + Nachrücker
+    -- ========================================================
+
+    --- Aktive Session mit raidMeta-Eintrag für currentRaid.id, wie ihn EnsureRaidMeta
+    --- beim ersten Bosskill des Abends anlegt.
+    local function SetupKillSession(initialParticipants)
+        GuildLoot.StartContainer("Kill-Test")
+        local session = GuildLootDB.raidContainers[1]
+        session.raidMeta = {
+            ["raid-01"] = {
+                tier         = "Nerub-ar Palace",
+                difficulty   = "H",
+                startedAt    = 1700000000,
+                participants = initialParticipants or {},
+            },
+        }
+        GuildLootDB.currentRaid.id = "raid-01"
+        return session
+    end
+
+    function Tests:testRecordKillAttendance_FirstKillCreatesKillsList()
+        WithTestDB(function()
+            MockSideEffects()
+            local session = SetupKillSession({ "Alice-Realm" })
+            GuildLootDB.currentRaid.currentKillParticipants = { "Alice-Realm" }
+
+            GuildLoot.RecordKillAttendance("Ulgrax", 2607)
+
+            local meta = session.raidMeta["raid-01"]
+            AreEqual(1,        #meta.kills)
+            AreEqual("Ulgrax", meta.kills[1].boss)
+            AreEqual(2607,     meta.kills[1].encounterID)
+            AreEqual(1,        #meta.kills[1].participants)
+            Exists(meta.kills[1].ts)
+        end)
+    end
+
+    function Tests:testRecordKillAttendance_SecondKillAppends()
+        WithTestDB(function()
+            MockSideEffects()
+            local session = SetupKillSession({ "Alice-Realm" })
+
+            GuildLootDB.currentRaid.currentKillParticipants = { "Alice-Realm" }
+            GuildLoot.RecordKillAttendance("Ulgrax", 2607)
+            GuildLootDB.currentRaid.currentKillParticipants = { "Alice-Realm" }
+            GuildLoot.RecordKillAttendance("Bloodbound Horror", 2611)
+
+            -- ohne das Anhängen gäbe es weiterhin nur eine Spalte pro Abend
+            local meta = session.raidMeta["raid-01"]
+            AreEqual(2, #meta.kills)
+            AreEqual("Ulgrax",            meta.kills[1].boss)
+            AreEqual("Bloodbound Horror", meta.kills[2].boss)
+        end)
+    end
+
+    function Tests:testRecordKillAttendance_LateJoinerAddedToNightList()
+        WithTestDB(function()
+            MockSideEffects()
+            local session = SetupKillSession({ "Alice-Realm" })
+            -- Bob rückt zum zweiten Boss nach
+            GuildLootDB.currentRaid.currentKillParticipants = { "Alice-Realm", "Bob-Realm" }
+
+            GuildLoot.RecordKillAttendance("Bloodbound Horror", 2611)
+
+            -- der eigentliche Bug: EnsureRaidMeta fror participants beim ersten Kill ein
+            local meta = session.raidMeta["raid-01"]
+            AreEqual(2,            #meta.participants)
+            AreEqual("Alice-Realm", meta.participants[1])
+            AreEqual("Bob-Realm",   meta.participants[2])
+        end)
+    end
+
+    function Tests:testRecordKillAttendance_NoDuplicatesInNightList()
+        WithTestDB(function()
+            MockSideEffects()
+            local session = SetupKillSession({ "Alice-Realm" })
+
+            GuildLootDB.currentRaid.currentKillParticipants = { "Alice-Realm" }
+            GuildLoot.RecordKillAttendance("Ulgrax", 2607)
+            GuildLoot.RecordKillAttendance("Sikran", 2599)
+
+            AreEqual(1, #session.raidMeta["raid-01"].participants)
+        end)
+    end
+
+    function Tests:testRecordKillAttendance_LeaverStaysInNightList()
+        WithTestDB(function()
+            MockSideEffects()
+            local session = SetupKillSession({ "Alice-Realm", "Bob-Realm" })
+            -- Bob ist zum nächsten Boss weg
+            GuildLootDB.currentRaid.currentKillParticipants = { "Alice-Realm" }
+
+            GuildLoot.RecordKillAttendance("Sikran", 2599)
+
+            -- die Abend-Liste ist kumulativ — wer dabei war, bleibt drin
+            local meta = session.raidMeta["raid-01"]
+            AreEqual(2, #meta.participants)
+            -- der Kill selbst kennt nur die, die wirklich dabei waren
+            AreEqual(1, #meta.kills[1].participants)
+        end)
+    end
+
+    function Tests:testRecordKillAttendance_EmptySnapshotFallsBackToNightList()
+        WithTestDB(function()
+            MockSideEffects()
+            local session = SetupKillSession({ "Alice-Realm" })
+            -- kein frischer Snapshot → lieber die kumulative Liste als eine leere Spalte
+            GuildLootDB.currentRaid.currentKillParticipants = {}
+            GuildLootDB.currentRaid.participants            = { "Alice-Realm" }
+
+            GuildLoot.RecordKillAttendance("Ulgrax", 2607)
+
+            AreEqual(1, #session.raidMeta["raid-01"].kills[1].participants)
+        end)
+    end
+
+    function Tests:testRecordKillAttendance_NoSessionIsNoOp()
+        WithTestDB(function()
+            MockSideEffects()
+            GuildLootDB.activeContainerIdx = nil
+            GuildLootDB.currentRaid.currentKillParticipants = { "Alice-Realm" }
+
+            -- darf nicht werfen — ENCOUNTER_END feuert auch ohne laufende Session
+            GuildLoot.RecordKillAttendance("Ulgrax", 2607)
+
+            AreEqual(0, #GuildLootDB.raidContainers)
+        end)
+    end
+
+    function Tests:testRecordKillAttendance_UnknownRaidMetaIsNoOp()
+        WithTestDB(function()
+            MockSideEffects()
+            local session = SetupKillSession({ "Alice-Realm" })
+            GuildLootDB.currentRaid.id = "raid-99"   -- kein raidMeta-Eintrag
+            GuildLootDB.currentRaid.currentKillParticipants = { "Bob-Realm" }
+
+            GuildLoot.RecordKillAttendance("Ulgrax", 2607)
+
+            AreEqual(nil, session.raidMeta["raid-99"])
+            AreEqual(nil, session.raidMeta["raid-01"].kills)
+        end)
+    end
+
 end)

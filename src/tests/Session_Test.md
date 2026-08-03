@@ -197,6 +197,30 @@ diese Lücke vor `GL.EnsureRaidMeta` in `OnEventEncounterEnd`.
 | `testEnsureRaidParticipants_SoloFillsEmptyList` | Leere Liste + solo → eigener Char wird eingetragen |
 | `testEnsureRaidParticipants_KeepsExistingList` | Befüllte Liste bleibt unangetastet (kumulativ, darf nicht auf den Gruppenstand zurückfallen) |
 
+### RecordKillAttendance
+
+`GL.EnsureRaidMeta` legt `raidMeta[id]` nur **einmal** pro Raid-ID an — und eine Raid-ID ist eine
+Tier+Difficulty-Kombination, kein Boss. Die Teilnehmerliste fror dadurch beim ersten Bosskill des
+Abends ein: wer später nachrückte, fehlte für den gesamten Abend, und eine Boss-Ebene gab es
+überhaupt nicht.
+
+`GL.RecordKillAttendance(bossName, encounterID)` läuft bei **jedem** Kill (aufgerufen in
+`OnEventEncounterEnd` direkt nach `GL.EnsureRaidMeta`) und tut zwei Dinge: den Gruppenstand zum
+Kill als eigenen `kills`-Eintrag anhängen und dieselben Namen in `meta.participants` vereinigen.
+Die Einzelliste wird zusätzlich gespeichert, weil sie nicht rekonstruierbar ist — aus den
+Einzellisten lässt sich die Vereinigung jederzeit bilden, umgekehrt nie.
+
+| Test | Prüft |
+|------|-------|
+| `testRecordKillAttendance_FirstKillCreatesKillsList` | Erster Kill legt `kills` an, mit `boss`, `encounterID`, `ts` und Teilnehmern |
+| `testRecordKillAttendance_SecondKillAppends` | Zweiter Kill hängt an statt zu überschreiben → eine Spalte je Boss |
+| `testRecordKillAttendance_LateJoinerAddedToNightList` | Nachrücker landet in `meta.participants` (der eigentliche Bug) |
+| `testRecordKillAttendance_NoDuplicatesInNightList` | Wiederholte Namen werden nicht dupliziert (Set-Semantik) |
+| `testRecordKillAttendance_LeaverStaysInNightList` | Wer geht, bleibt in der Abend-Liste; der Kill selbst kennt nur die Anwesenden |
+| `testRecordKillAttendance_EmptySnapshotFallsBackToNightList` | Ohne frischen Snapshot greift `currentRaid.participants` statt einer leeren Spalte |
+| `testRecordKillAttendance_NoSessionIsNoOp` | `ENCOUNTER_END` ohne laufende Session wirft nicht |
+| `testRecordKillAttendance_UnknownRaidMetaIsNoOp` | Fehlender `raidMeta`-Eintrag legt keinen an — das ist Sache von `EnsureRaidMeta` |
+
 ---
 
 ## Was diese Tests nicht abdecken

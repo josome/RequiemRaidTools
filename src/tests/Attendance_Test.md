@@ -19,6 +19,8 @@ rechnet nichts selbst. Rückgabe:
 - `WithDB(db, fn)` — swappt `GuildLootDB`, ruft `fn`, restauriert DB + Mocks.
 - `AttendanceDB(seasonFields, sessions, players)` — DB mit Season `s1` und Raid-Sessions
   (`{ startedAt, label, raids = { { id, participants } } }`); `raids` landet als `raidMeta`.
+  Ein Raid darf zusätzlich `kills = { { boss, ts, participants } }` tragen — die Boss-Ebene aus
+  `GL.RecordKillAttendance`. Ohne `kills` greift der Fallback für Altdaten.
 - `MockRoster(rows)` — mockt `GL.GetSeasonRoster`, damit das Aggregat ohne Gilden-API testbar ist.
 - `RowByName(result, name)` — sucht eine Zeile im Ergebnis.
 
@@ -40,6 +42,16 @@ rechnet nichts selbst. Rückgabe:
 | `testComputeAttendance_SeasonWindowFiltersNights` | Sessions vor `startedAt` und nach `endedAt` fallen raus — gleiche Fensterlogik wie `GL.GetSeasonAttendees`. |
 | `testComputeAttendance_NightCarriesKills` | Jeder Abend trägt seine Bosskills aus `raidMeta` als `kills`. |
 
+### Boss-Ebene (`raidMeta[*].kills`)
+
+| Test | Prüft |
+|------|-------|
+| `testComputeAttendance_KillsPerBossWhenRecorded` | Mit aufgezeichneten `kills` gibt es eine Spalte je Bosskill, ID stabil als `raidID#index`, `name` ist der Bossname. |
+| `testComputeAttendance_LateJoinerPresentOnlyFromHisKill` | Nachrücker ist beim ersten Boss abwesend, ab seinem Kill anwesend — der Abend zählt genau einmal. |
+| `testComputeAttendance_KillsSortedByTimestamp` | Kills eines Abends sind über `raidMeta`-Einträge hinweg nach `ts` sortiert. |
+| `testComputeAttendance_FallsBackToNightLevelWithoutKills` | Ohne `kills` (Altdaten, Observer-Sessions) bleibt es bei einem Eintrag je `raidMeta` — die Abend-Ebene stimmt unverändert. |
+| `testComputeAttendance_EmptyKillsListUsesFallback` | Leere `kills`-Liste verhält sich wie gar keine. |
+
 ### Präsenz und Att.%
 
 | Test | Prüft |
@@ -59,8 +71,17 @@ rechnet nichts selbst. Rückgabe:
 
 ## Hinweis
 
-`GL.EnsureRaidMeta` ([Core_Session.lua:309](../core/Core_Session.lua#L309)) legt `raidMeta[id]`
-nur **einmal** pro Raid an. Die `kills`-Ebene hat deshalb aktuell genau einen Eintrag je Abend,
-mit einem Teilnehmer-Schnappschuss vom ersten Bosskill — die Tests bauen mehrere Kills pro
-Session trotzdem schon nach, damit die Vereinigungslogik abgesichert ist, bevor Phase 1b
-(`RecordKillAttendance`) die Daten liefert.
+Die `kills`-Ebene kommt aus `raidMeta[*].kills`, geschrieben von `GL.RecordKillAttendance`
+(ein Eintrag je Bosskill). `GL.EnsureRaidMeta` legt den `raidMeta`-Eintrag weiterhin nur
+**einmal** pro Raid-ID an — eine Raid-ID ist eine Tier+Difficulty-Kombination, kein Boss.
+
+Zwei Datenstände existieren deshalb nebeneinander und werden beide getestet:
+
+| Fall | `kills` | Auflösung |
+|------|---------|-----------|
+| Ab Phase 1b aufgezeichnet | gefüllt | je Bosskill |
+| Altdaten, Observer-Sessions (`RAID_META` überträgt `kills` nicht) | fehlt | je Raid-Abend |
+
+Die Abend-Ebene (`present[nightId]`, `attended`, `pct`) stimmt in beiden Fällen. Der
+Attendance-Tab rendert vorerst nur Abend-Spalten; die Boss-Spalten sind eine reine
+UI-Erweiterung, die Daten liegen bereit.

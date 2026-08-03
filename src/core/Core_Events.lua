@@ -213,6 +213,9 @@ local function OnEventEncounterEnd(encounterID, encounterName, difficultyID, gro
             -- Solo feuert kein GROUP_ROSTER_UPDATE → participants wäre noch leer
             GL.EnsureRaidParticipants()
             GL.EnsureRaidMeta()
+            -- EnsureRaidMeta legt den Eintrag nur einmal an; die Kill-Ebene und die
+            -- Nachrücker müssen bei JEDEM Kill nachgezogen werden
+            GL.RecordKillAttendance(encounterName, encounterID)
             if GL.Comm and GL.Comm.SendMLAnnounce then
                 GL.Comm.SendMLAnnounce(UnitName("player") or "")
             end
