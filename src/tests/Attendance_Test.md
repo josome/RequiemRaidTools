@@ -52,6 +52,25 @@ rechnet nichts selbst. Rückgabe:
 | `testComputeAttendance_FallsBackToNightLevelWithoutKills` | Ohne `kills` (Altdaten, Observer-Sessions) bleibt es bei einem Eintrag je `raidMeta` — die Abend-Ebene stimmt unverändert. |
 | `testComputeAttendance_EmptyKillsListUsesFallback` | Leere `kills`-Liste verhält sich wie gar keine. |
 
+### Spaltenliste (`GL.BuildAttendanceColumns`)
+
+Verdichtet `nights` zu einer flachen Spaltenliste für den Tab: aufgeklappte Abende liefern eine
+Spalte je Bosskill, alle anderen genau eine. Liegt im Core-Modul statt in der UI, weil
+`UI_AttendanceTab.lua` nicht im busted-Loader ist — so bleibt die einzige nennenswerte Logik des
+Aufklappens pur und testbar. Helper `Nights(spec)` baut die Eingabe ohne DB.
+
+| Test | Prüft |
+|------|-------|
+| `testBuildColumns_CollapsedGivesOneColumnPerNight` | Eingeklappt → eine Spalte je Abend, `key == nightId`. |
+| `testBuildColumns_ExpandedGivesOneColumnPerKill` | Aufgeklappt → eine Spalte je Kill, `key == "nightId#index"`, `label` ist die Kill-Nummer; andere Abende bleiben einspaltig. |
+| `testBuildColumns_SingleKillNightIsNotExpandable` | Abend mit einem Kill bleibt auch explizit aufgeklappt eine Abend-Spalte. |
+| `testBuildColumns_ExpandableFlagFollowsKillCount` | `expandable` nur bei mehr als einem Kill — deckt Altdaten ohne `kills`-Ebene mit ab. |
+| `testBuildColumns_GroupStartOnFirstColumnOfEachNight` | `groupStart` sitzt genau auf der ersten Spalte jedes Abends (Trenner im Kopf). |
+| `testBuildColumns_NightIdOnEveryColumn` | Auch Bossspalten tragen `nightId` — der Klick-Handler braucht ihn zum Zuklappen. |
+| `testBuildColumns_KeepsNightOrder` | Reihenfolge aus `ComputeAttendance` (neueste zuerst) wird nicht umsortiert. |
+| `testBuildColumns_EmptyAndNilInputs` | Leere und fehlende Eingaben → leere Liste statt Fehler; `expanded` ist optional. |
+| `testBuildColumns_LabelsAndTooltips` | Abend-Tooltip nennt die Anzahl Bosse, Bossspalten nennen den Bossnamen. |
+
 ### Präsenz und Att.%
 
 | Test | Prüft |
@@ -82,6 +101,9 @@ Zwei Datenstände existieren deshalb nebeneinander und werden beide getestet:
 | Ab Phase 1b aufgezeichnet | gefüllt | je Bosskill |
 | Altdaten, Observer-Sessions (`RAID_META` überträgt `kills` nicht) | fehlt | je Raid-Abend |
 
-Die Abend-Ebene (`present[nightId]`, `attended`, `pct`) stimmt in beiden Fällen. Der
-Attendance-Tab rendert vorerst nur Abend-Spalten; die Boss-Spalten sind eine reine
-UI-Erweiterung, die Daten liegen bereit.
+Die Abend-Ebene (`present[nightId]`, `attended`, `pct`) stimmt in beiden Fällen. Im Tab lässt
+sich eine Abend-Spalte per Klick in ihre Bosskill-Spalten aufklappen — Abende ohne
+aufgezeichnete Kills sind dabei nicht klickbar (`expandable == false`).
+
+`Att.%` bleibt abend-basiert, auch bei aufgeklappten Spalten: eine Prozentzahl über Bosskills
+wäre eine andere Kennzahl.

@@ -269,6 +269,127 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
     end
 
     -- ========================================================
+    -- Spaltenliste (BuildAttendanceColumns)
+    -- ========================================================
+
+    --- Abende, wie ComputeAttendance sie liefert — ohne DB, die Funktion ist pur.
+    local function Nights(spec)
+        local nights = {}
+        for _, n in ipairs(spec) do
+            local kills = {}
+            for i, k in ipairs(n.kills or {}) do
+                table.insert(kills, { id = n.id .. "#" .. i, name = k.name, ts = k.ts or 0 })
+            end
+            table.insert(nights, {
+                id = n.id, label = n.label or "", startedAt = n.startedAt or 0, kills = kills,
+            })
+        end
+        return nights
+    end
+
+    function Tests:testBuildColumns_CollapsedGivesOneColumnPerNight()
+        local cols = GL.BuildAttendanceColumns(Nights({
+            { id = "n1", startedAt = 100, kills = { { name = "A" }, { name = "B" } } },
+            { id = "n2", startedAt = 200, kills = { { name = "C" } } },
+        }), {})
+        AreEqual(2,     #cols)
+        AreEqual("n1",  cols[1].key)
+        AreEqual("n2",  cols[2].key)
+        IsFalse(cols[1].isKill)
+    end
+
+    function Tests:testBuildColumns_ExpandedGivesOneColumnPerKill()
+        local cols = GL.BuildAttendanceColumns(Nights({
+            { id = "n1", startedAt = 100, kills = { { name = "A" }, { name = "B" } } },
+            { id = "n2", startedAt = 200, kills = { { name = "C" }, { name = "D" } } },
+        }), { n1 = true })
+        -- n1 aufgeklappt (2 Spalten) + n2 eingeklappt (1 Spalte)
+        AreEqual(3,      #cols)
+        AreEqual("n1#1", cols[1].key)
+        AreEqual("n1#2", cols[2].key)
+        AreEqual("n2",   cols[3].key)
+        AreEqual("1",    cols[1].label)
+        AreEqual("2",    cols[2].label)
+        IsTrue(cols[1].isKill)
+        IsFalse(cols[3].isKill)
+    end
+
+    function Tests:testBuildColumns_SingleKillNightIsNotExpandable()
+        local nights = Nights({
+            { id = "n1", startedAt = 100, kills = { { name = "A" } } },
+        })
+        -- auch explizit aufgeklappt bleibt es eine Abend-Spalte
+        local cols = GL.BuildAttendanceColumns(nights, { n1 = true })
+        AreEqual(1,    #cols)
+        AreEqual("n1", cols[1].key)
+        IsFalse(cols[1].expandable)
+        IsFalse(cols[1].isKill)
+    end
+
+    function Tests:testBuildColumns_ExpandableFlagFollowsKillCount()
+        local cols = GL.BuildAttendanceColumns(Nights({
+            { id = "n1", startedAt = 100, kills = { { name = "A" }, { name = "B" } } },
+            { id = "n2", startedAt = 200, kills = { { name = "C" } } },
+        }), {})
+        IsTrue(cols[1].expandable)
+        IsFalse(cols[2].expandable)
+    end
+
+    function Tests:testBuildColumns_GroupStartOnFirstColumnOfEachNight()
+        local cols = GL.BuildAttendanceColumns(Nights({
+            { id = "n1", startedAt = 100, kills = { { name = "A" }, { name = "B" } } },
+            { id = "n2", startedAt = 200, kills = { { name = "C" } } },
+        }), { n1 = true })
+        IsTrue(cols[1].groupStart)
+        IsFalse(cols[2].groupStart)   -- zweite Bossspalte desselben Abends
+        IsTrue(cols[3].groupStart)
+    end
+
+    function Tests:testBuildColumns_NightIdOnEveryColumn()
+        local cols = GL.BuildAttendanceColumns(Nights({
+            { id = "n1", startedAt = 100, kills = { { name = "A" }, { name = "B" } } },
+        }), { n1 = true })
+        -- der Klick-Handler braucht den Abend auch auf den Bossspalten (Zuklappen)
+        AreEqual("n1", cols[1].nightId)
+        AreEqual("n1", cols[2].nightId)
+    end
+
+    function Tests:testBuildColumns_KeepsNightOrder()
+        local cols = GL.BuildAttendanceColumns(Nights({
+            { id = "neu", startedAt = 300, kills = { { name = "A" } } },
+            { id = "alt", startedAt = 100, kills = { { name = "B" } } },
+        }), {})
+        -- ComputeAttendance sortiert bereits (neueste zuerst); hier wird nicht umsortiert
+        AreEqual("neu", cols[1].key)
+        AreEqual("alt", cols[2].key)
+    end
+
+    function Tests:testBuildColumns_EmptyAndNilInputs()
+        AreEqual(0, #GL.BuildAttendanceColumns({}, {}))
+        AreEqual(0, #GL.BuildAttendanceColumns(nil, nil))
+        -- expanded weglassen darf nicht werfen
+        AreEqual(1, #GL.BuildAttendanceColumns(Nights({
+            { id = "n1", startedAt = 100, kills = { { name = "A" } } },
+        })))
+    end
+
+    function Tests:testBuildColumns_LabelsAndTooltips()
+        local cols = GL.BuildAttendanceColumns(Nights({
+            { id = "n1", startedAt = 100, label = "Mittwoch",
+              kills = { { name = "Ulgrax", ts = 110 }, { name = "Sikran", ts = 120 } } },
+        }), {})
+        AreEqual("Mittwoch", cols[1].tooltipT)
+        Exists(cols[1].tooltipD:find("2 Bosse"))    -- Aufklapp-Hinweis
+
+        local open = GL.BuildAttendanceColumns(Nights({
+            { id = "n1", startedAt = 100,
+              kills = { { name = "Ulgrax", ts = 110 }, { name = "Sikran", ts = 120 } } },
+        }), { n1 = true })
+        AreEqual("Ulgrax", open[1].tooltipT)
+        AreEqual("Sikran", open[2].tooltipT)
+    end
+
+    -- ========================================================
     -- Präsenz und Att.%
     -- ========================================================
     function Tests:testComputeAttendance_PctFromAttendedNights()

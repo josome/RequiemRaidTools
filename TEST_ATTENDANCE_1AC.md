@@ -1,11 +1,14 @@
 # Attendance Phase 1a + 1c — In-Game Test-Checkliste
 
 **Branch:** `feat/attendance`
-**TOC:** 1.0.3.12
+**TOC:** 1.0.3.14
 **Was neu ist:** Season-Datenmodell (`Core_Season`), Gilden-/Season-Roster (`Core_Guild`),
 Attendance-Aggregat (`Core_Attendance`), Attendance-Tab + Season-Kopfzeile
 (`UI_AttendanceTab`, `UI_SeasonControls`). Tab-Slot 5 heißt jetzt **Attendance** —
 `UI_PlayerTab.lua` ist dafür aus der TOC genommen.
+Dazu Phase 1b: `GL.RecordKillAttendance` zeichnet jeden Bosskill einzeln auf und zieht
+Nachrücker in die Abend-Liste nach (Punkt 6). Und die Boss-Spalten im Tab: eine Abend-Spalte
+lässt sich per Klick in ihre Bosskills aufklappen (Punkt 7).
 
 ---
 
@@ -112,13 +115,34 @@ tauchte in der Matrix gar nicht auf. Gefixt durch `GL.EnsureRaidParticipants`.
 - [ ] Attendance-Tab: eigene Zeile hat eine **grüne Zelle** in der Spalte von heute
 - [ ] Falls die Spalte fehlt: liegt die Session vor dem Season-Start? → Startdatum zurücksetzen
 
-> **Bekannte Einschränkung, wird gerade in Phase 1b gefixt:** die Teilnehmerliste eines Abends
-> friert beim **ersten** Bosskill ein. Wer später nachrückt, fehlt für den ganzen Abend.
-> Das ist erwartet und **kein** Testfehler.
+Seit Phase 1b wird jeder Bosskill einzeln aufgezeichnet und Nachrücker werden nachgezogen:
+
+- [ ] **Zwei Bosse** hintereinander legen → beide landen in `raidMeta[id].kills`
+      (SavedVariables oder `/reqrt dbinfo`)
+- [ ] **Nachrücker**: jemand kommt erst zum zweiten Boss dazu → er ist in der Abend-Spalte
+      **grün** (früher fehlte er den ganzen Abend)
+- [ ] Wer nach dem ersten Boss **geht**, bleibt in der Abend-Spalte grün — die Liste ist kumulativ
 
 ---
 
-## 7 — Blättern & Leerzustände
+## 7 — Boss-Spalten (aufklappen)
+
+- [ ] Klick auf eine **Datums-Spalte** mit mehreren Bosskills klappt sie in Bossspalten auf,
+      beschriftet `1`, `2`, `3` …
+- [ ] **Tooltip** auf einer Bossspalte zeigt Bossnamen, Datum und Uhrzeit
+- [ ] Tooltip auf einer eingeklappten Spalte sagt „N Bosse — klicken zum Aufklappen"
+- [ ] Der aufgeklappte Abend rutscht ans **linke Ende** des Fensters (sonst schöbe er seine
+      eigenen Spalten aus dem Sichtbereich)
+- [ ] Senkrechter **Trennstrich** im Kopf zeigt, wo ein Abend anfängt
+- [ ] Nachrücker: in der **ersten** Bossspalte dunkel, ab seinem Kill grün — die Abend-Spalte
+      des Nachbarabends bleibt unberührt
+- [ ] Erneuter Klick klappt zu
+- [ ] Abend **ohne** aufgezeichnete Kills (Altdaten) ist gedämpft dargestellt, Klick tut nichts,
+      Tooltip sagt „Keine einzelnen Bosskills aufgezeichnet"
+- [ ] **Season-Wechsel** setzt alle aufgeklappten Abende zurück
+- [ ] Blättern mit aufgeklappten Spalten: Pager-Zählung (`1–8/14`) stimmt
+
+## 8 — Blättern & Leerzustände
 
 - [ ] Bei mehr Abenden als Spalten passen: `<` / `>` erscheinen mit Anzeige `1–8/14`
 - [ ] `<` ist auf der ersten Seite ausgegraut, `>` auf der letzten

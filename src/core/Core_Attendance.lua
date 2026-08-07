@@ -122,3 +122,68 @@ function GL.ComputeAttendance(seasonId)
 
     return { season = season, nights = nights, rows = rows }
 end
+
+--- Verdichtet die Abende zu einer flachen Spaltenliste für den Tab: aufgeklappte Abende
+--- liefern eine Spalte je Bosskill, alle anderen genau eine.
+---
+--- Liegt hier statt in der UI, weil es die einzige nennenswerte Logik des Aufklappens ist —
+--- so bleibt sie pur, in busted testbar und der Grundsatz "die UI rechnet nichts selbst"
+--- gewahrt. Der Tab iteriert nur noch über das Ergebnis.
+---
+--- @param nights    Array aus GL.ComputeAttendance(...).nights
+--- @param expanded  Set { [nightId] = true }; nil = alles eingeklappt
+--- Returns: Array von {
+---   key         Lookup-Schlüssel für row.present (nightId oder killId)
+---   label       Kopfzeilen-Text (Datum bzw. Kill-Nummer)
+---   tooltipT    Titelzeile des Tooltips
+---   tooltipD    Detailzeile des Tooltips
+---   nightId     zugehöriger Abend (Klick-Handler, Gruppierung)
+---   isKill      true = Bosskill-Spalte
+---   expandable  true wenn der Abend mehr als einen Kill hat
+---   groupStart  true bei der ersten Spalte eines Abends
+--- }
+function GL.BuildAttendanceColumns(nights, expanded)
+    expanded = expanded or {}
+    local cols = {}
+
+    for _, night in ipairs(nights or {}) do
+        local kills      = night.kills or {}
+        local killCount  = #kills
+        -- Ein einzelner Kill ergibt aufgeklappt dieselbe eine Spalte — dann lieber gar nicht
+        -- erst anbieten. Deckt zugleich Altdaten ohne kills-Ebene ab.
+        local expandable = killCount > 1
+        local dateLabel  = date("%d.%m", night.startedAt or 0)
+
+        if expandable and expanded[night.id] then
+            for i, kill in ipairs(kills) do
+                table.insert(cols, {
+                    key        = kill.id,
+                    label      = tostring(i),
+                    tooltipT   = kill.name or "",
+                    tooltipD   = dateLabel .. ", " .. date("%H:%M", kill.ts or 0)
+                                 .. "  |cff888888(Boss " .. i .. "/" .. killCount
+                                 .. " — klicken zum Zuklappen)|r",
+                    nightId    = night.id,
+                    isKill     = true,
+                    expandable = true,
+                    groupStart = (i == 1),
+                })
+            end
+        else
+            table.insert(cols, {
+                key        = night.id,
+                label      = dateLabel,
+                tooltipT   = (night.label ~= "" and night.label) or dateLabel,
+                tooltipD   = expandable
+                             and (killCount .. " Bosse — klicken zum Aufklappen")
+                             or  "Keine einzelnen Bosskills aufgezeichnet",
+                nightId    = night.id,
+                isKill     = false,
+                expandable = expandable,
+                groupStart = true,
+            })
+        end
+    end
+
+    return cols
+end

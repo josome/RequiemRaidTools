@@ -27,6 +27,15 @@ local PAGER_W = 92                          -- Platz für ◀ Seite x/y ▶
 local colOffset = 0
 local lastSeasonId = nil
 
+-- Aufgeklappte Abende: { [nightId] = true }. Wie colOffset bewusst nur Sitzungszustand —
+-- das Aufklappen ist eine Blickrichtung, keine Einstellung.
+local expanded = {}
+
+-- Nach dem Aufklappen soll dieser Abend im sichtbaren Fenster stehen; der nächste Refresh
+-- rechnet daraus den colOffset. Über eine Variable statt direkt im Klick-Handler, damit der
+-- Handler keine veraltete Spaltenliste einfängt.
+local pendingFocusNight = nil
+
 local COLOR_PRESENT = { 0.15, 0.65, 0.20, 1 }
 local COLOR_ABSENT  = { 1, 1, 1, 0.06 }
 
@@ -103,16 +112,47 @@ function UI.BuildAttendancePanel(parent)
     panel.prevBtn = prevBtn
     panel.nextBtn = nextBtn
 
-    -- Datums-Beschriftungen der Spalten (gepoolt, Anzahl variiert mit der Breite)
-    panel.datePool = UI.CreateFramePool(
+    -- Spaltenköpfe (gepoolt, Anzahl variiert mit der Breite). Buttons statt FontStrings,
+    -- weil ein Kopf klickbar sein muss (Auf-/Zuklappen) und einen Tooltip braucht — in
+    -- CELL_W passt kein Bossname, der Name lebt im Tooltip.
+    panel.headerPool = UI.CreateFramePool(
         function()
-            local fs = colHeader:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-            fs:SetWidth(CELL_W)
-            fs:SetJustifyH("CENTER")
-            fs:SetTextColor(1, 0.8, 0)
-            return fs
+            local btn = CreateFrame("Button", nil, colHeader)
+            btn:SetSize(CELL_W, 18)
+            btn.fs = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            btn.fs:SetAllPoints()
+            btn.fs:SetJustifyH("CENTER")
+            btn:SetScript("OnEnter", function(self)
+                if not self.tooltipT then return end
+                GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+                GameTooltip:AddLine(self.tooltipT, 1, 1, 1)
+                if self.tooltipD then
+                    GameTooltip:AddLine(self.tooltipD, 0.8, 0.8, 0.8, true)
+                end
+                GameTooltip:Show()
+            end)
+            btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+            return btn
         end,
-        function(_, fs) fs:Hide(); fs:ClearAllPoints() end
+        function(_, btn)
+            btn:Hide()
+            btn:ClearAllPoints()
+            -- OnClick muss weg, sonst hängt beim Recycling der Handler der Vorgängerspalte dran
+            btn:SetScript("OnClick", nil)
+            btn.tooltipT, btn.tooltipD = nil, nil
+        end
+    )
+
+    -- Senkrechte Trenner zwischen den Abend-Gruppen im Spaltenkopf: bei aufgeklappten
+    -- Bossspalten wäre sonst nicht erkennbar, welche Spalte zu welchem Abend gehört.
+    panel.groupSepPool = UI.CreateFramePool(
+        function()
+            local tex = colHeader:CreateTexture(nil, "ARTWORK")
+            tex:SetColorTexture(0.5, 0.5, 0.5, 0.7)
+            tex:SetSize(1, 16)
+            return tex
+        end,
+        function(_, tex) tex:Hide(); tex:ClearAllPoints() end
     )
 
     -- ── Trennlinie ────────────────────────────────────────────
@@ -213,17 +253,19 @@ function UI.RefreshAttendanceTab()
     local data   = season and GL.ComputeAttendance(season.id)
                    or { season = nil, nights = {}, rows = {} }
 
-    -- Season-Wechsel setzt das Blättern zurück
+    -- Season-Wechsel setzt Blättern und Aufklappen zurück
     local seasonId = season and season.id or nil
     if seasonId ~= lastSeasonId then
         colOffset    = 0
+        expanded     = {}
         lastSeasonId = seasonId
     end
 
     UI.RefreshSeasonControls(data)
 
     panel.rowPool:ReleaseAll()
-    panel.datePool:ReleaseAll()
+    panel.headerPool:ReleaseAll()
+    panel.groupSepPool:ReleaseAll()
     panel.sepLbl:Hide()
 
     -- ── Leerzustände: ein leerer Tab darf nicht wie ein Defekt aussehen ──
@@ -238,14 +280,26 @@ function UI.RefreshAttendanceTab()
     end
 
     -- ── Spaltenfenster bestimmen ──────────────────────────────
+    -- Spalten statt Abende: ein aufgeklappter Abend liefert mehrere (Core_Attendance)
+    local allCols   = GL.BuildAttendanceColumns(data.nights, expanded)
     local visible   = VisibleColumnCount(panel)
-    local totalCols = #data.nights
+    local totalCols = #allCols
+
+    -- Frisch aufgeklappt: ans linke Fensterende springen, sonst schiebt der Abend seine
+    -- eigenen Bossspalten aus dem Sichtbereich und der Klick sähe folgenlos aus
+    if pendingFocusNight then
+        for i, col in ipairs(allCols) do
+            if col.nightId == pendingFocusNight then colOffset = i - 1; break end
+        end
+        pendingFocusNight = nil
+    end
+
     local maxOffset = math.max(0, totalCols - visible)
     if colOffset > maxOffset then colOffset = maxOffset end
 
     local shown = {}
     for i = colOffset + 1, math.min(colOffset + visible, totalCols) do
-        table.insert(shown, data.nights[i])
+        table.insert(shown, allCols[i])
     end
 
     -- Pager nur zeigen, wenn es etwas zu blättern gibt
@@ -262,11 +316,37 @@ function UI.RefreshAttendanceTab()
     end
 
     -- ── Spaltenköpfe ──────────────────────────────────────────
-    for i, night in ipairs(shown) do
-        local fs = panel.datePool:Acquire()
-        fs:SetPoint("TOPLEFT", panel.colHeader, "TOPLEFT", LEFT_W + (i - 1) * CELL_W, 0)
-        fs:SetText(date("%d.%m", night.startedAt or 0))
-        fs:Show()
+    for i, col in ipairs(shown) do
+        local x   = LEFT_W + (i - 1) * CELL_W
+        local btn = panel.headerPool:Acquire()
+        btn:SetPoint("TOPLEFT", panel.colHeader, "TOPLEFT", x, 0)
+        btn.fs:SetText(col.label)
+        btn.tooltipT, btn.tooltipD = col.tooltipT, col.tooltipD
+
+        if col.expandable then
+            btn.fs:SetTextColor(1, 0.8, 0)
+            local nightId = col.nightId
+            btn:SetScript("OnClick", function()
+                if expanded[nightId] then
+                    expanded[nightId] = nil
+                else
+                    expanded[nightId]  = true
+                    pendingFocusNight  = nightId
+                end
+                UI.RefreshAttendanceTab()
+            end)
+        else
+            -- Abend ohne einzelne Bosskills: gedämpft, damit der tote Klick sichtbar ist
+            btn.fs:SetTextColor(0.65, 0.55, 0.3)
+        end
+        btn:Show()
+
+        -- Trenner links vor der ersten Spalte eines Abends (nicht ganz links außen)
+        if col.groupStart and i > 1 then
+            local tex = panel.groupSepPool:Acquire()
+            tex:SetPoint("TOPLEFT", panel.colHeader, "TOPLEFT", x - 1, 0)
+            tex:Show()
+        end
     end
 
     if msg then
@@ -307,8 +387,9 @@ function UI.RefreshAttendanceTab()
             db.players[playerName].trial = self:GetChecked() and true or false
         end)
 
-        for i, night in ipairs(shown) do
-            SetCell(row, i, entry.present[night.id])
+        for i, col in ipairs(shown) do
+            -- col.key ist je nach Zustand die Abend- oder die Bosskill-ID
+            SetCell(row, i, entry.present[col.key])
         end
         for i = #shown + 1, #row.cells do row.cells[i]:Hide() end
 
