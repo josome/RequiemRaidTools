@@ -218,8 +218,15 @@ Einzellisten lässt sich die Vereinigung jederzeit bilden, umgekehrt nie.
 | `testRecordKillAttendance_NoDuplicatesInNightList` | Wiederholte Namen werden nicht dupliziert (Set-Semantik) |
 | `testRecordKillAttendance_LeaverStaysInNightList` | Wer geht, bleibt in der Abend-Liste; der Kill selbst kennt nur die Anwesenden |
 | `testRecordKillAttendance_EmptySnapshotFallsBackToNightList` | Ohne frischen Snapshot greift `currentRaid.participants` statt einer leeren Spalte |
+| `testRecordKillAttendance_RecordsTrialStateAtKill` | `kill.trials` hält fest, wer zum Kill Trial war |
+| `testRecordKillAttendance_LaterPromotionLeavesOldKillUntouched` | Beförderung zwischen zwei Kills ändert den ersten nicht |
+| `testRecordKillAttendance_TrialsTableExistsWhenNobodyIsTrial` | Leere Tabelle statt `nil` — unterscheidet „niemand war Trial" von „nicht aufgezeichnet" |
 | `testRecordKillAttendance_NoSessionIsNoOp` | `ENCOUNTER_END` ohne laufende Session wirft nicht |
 | `testRecordKillAttendance_UnknownRaidMetaIsNoOp` | Fehlender `raidMeta`-Eintrag legt keinen an — das ist Sache von `EnsureRaidMeta` |
+
+**Trial-Stand beim Kill.** Die Trial-Rolle endet nach drei Raids. Würde die Matrix das aktuelle
+Flag einfärben, würde eine Beförderung rückwirkend alle bereits gelaufenen Abende der Season
+umdeuten. `kill.trials` friert den Stand deshalb pro Kill ein.
 
 ---
 

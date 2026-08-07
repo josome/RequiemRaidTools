@@ -184,3 +184,17 @@ function Tests:testNeueFunktion()
     -- ... eigentlicher Test
 end
 ```
+
+## `GL.TruncateText(text, maxChars)`
+
+Kürzt Text auf `maxChars` **Zeichen** und hängt „…" an. Zählt Zeichen statt Bytes: WoW-Lua hat
+keine `utf8`-Bibliothek, und ein Schnitt mitten in einer UTF-8-Sequenz erzeugt ein kaputtes
+Zeichen auf dem Bildschirm. Genutzt für Bossnamen in den schmalen Spaltenköpfen des
+Attendance-Tabs.
+
+| Test | Prüft |
+|------|-------|
+| `testTruncateText_ShortTextUnchanged` | Kürzer oder exakt passend → unverändert, kein „…" |
+| `testTruncateText_LongTextGetsEllipsis` | `"Bloodbound Horror"`, 8 → `"Bloodbo…"` (7 Zeichen + Auslassung) |
+| `testTruncateText_CountsCharactersNotBytes` | Umlaute zählen als ein Zeichen, kein Schnitt mitten in der Sequenz |
+| `testTruncateText_HandlesNilAndZero` | `nil` → `""`; `maxChars` `nil`/`0` → unverändert |

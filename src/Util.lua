@@ -351,6 +351,26 @@ function GL.ShortName(fullName)
     return fullName
 end
 
+--- Kürzt Text auf maxChars **Zeichen** und hängt ein Auslassungszeichen an.
+--- Zählt Zeichen, nicht Bytes: Bossnamen enthalten Umlaute und Apostrophe, und ein Schnitt
+--- mitten in einer UTF-8-Sequenz erzeugt Müll auf dem Bildschirm. WoW-Lua hat keine
+--- utf8-Bibliothek, also wird das Startbyte jedes Zeichens selbst gesucht.
+--- @param text     string   Eingabe (nil → "")
+--- @param maxChars number?  Höchstzahl Zeichen inklusive "…"; nil/0 → unverändert
+function GL.TruncateText(text, maxChars)
+    text = tostring(text or "")
+    if not maxChars or maxChars <= 0 then return text end
+
+    local starts, i, len = {}, 1, #text
+    while i <= len do
+        table.insert(starts, i)
+        local b = text:byte(i)
+        i = i + ((b < 0xC0 and 1) or (b < 0xE0 and 2) or (b < 0xF0 and 3) or 4)
+    end
+    if #starts <= maxChars then return text end
+    return text:sub(1, starts[maxChars] - 1) .. "…"
+end
+
 -- ============================================================
 -- Tooltip
 -- ============================================================

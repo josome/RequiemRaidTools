@@ -1,7 +1,7 @@
 # Attendance Phase 1a + 1c — In-Game Test-Checkliste
 
 **Branch:** `feat/attendance`
-**TOC:** 1.0.3.14
+**TOC:** 1.0.3.17
 **Was neu ist:** Season-Datenmodell (`Core_Season`), Gilden-/Season-Roster (`Core_Guild`),
 Attendance-Aggregat (`Core_Attendance`), Attendance-Tab + Season-Kopfzeile
 (`UI_AttendanceTab`, `UI_SeasonControls`). Tab-Slot 5 heißt jetzt **Attendance** —
@@ -102,7 +102,14 @@ Beide führen zu einem **leeren Tab, der wie ein Defekt aussieht** — sind aber
       `db.players[name].class`, nicht aus dem Gildenroster)
 - [ ] Grüne Zelle = anwesend, dunkle Zelle = abwesend; `Att.%` passt zur Zeile
 - [ ] **Trial-Checkbox** togglet und überlebt einen `/reload`
-      (nur ein Flag — noch ohne Loot-Wirkung, das ist Phase 2)
+      (noch ohne Loot-Wirkung, das ist Phase 2)
+- [ ] Trial-Spieler hat in Bosskills, die er **als Trial** bestritten hat, **türkise** statt
+      grüner Zellen
+- [ ] Haken **abnehmen** (= befördert): bereits aufgezeichnete Kills bleiben türkis,
+      erst neue Kills sind grün — nach der Regel „kein Trial mehr nach 3 Raids" darf die
+      Beförderung ältere Raids der Season nicht umdeuten
+- [ ] Haken **setzen** färbt **nichts** rückwirkend um: Kills von vor dem Haken bleiben grün.
+      Nur Kills ab jetzt werden türkis
 
 ---
 
@@ -127,9 +134,9 @@ Seit Phase 1b wird jeder Bosskill einzeln aufgezeichnet und Nachrücker werden n
 
 ## 7 — Boss-Spalten (aufklappen)
 
-- [ ] Klick auf eine **Datums-Spalte** mit mehreren Bosskills klappt sie in Bossspalten auf,
-      beschriftet `1`, `2`, `3` …
-- [ ] **Tooltip** auf einer Bossspalte zeigt Bossnamen, Datum und Uhrzeit
+- [ ] Klick auf eine **Datums-Spalte** mit mehreren Bosskills klappt sie in Bossspalten auf
+- [ ] Bossspalten sind **breiter** und zeigen den gekürzten Bossnamen (`Bloodbo…`)
+- [ ] **Tooltip** auf einer Bossspalte zeigt den vollen Bossnamen, Datum und Uhrzeit
 - [ ] Tooltip auf einer eingeklappten Spalte sagt „N Bosse — klicken zum Aufklappen"
 - [ ] Der aufgeklappte Abend rutscht ans **linke Ende** des Fensters (sonst schöbe er seine
       eigenen Spalten aus dem Sichtbereich)
@@ -142,7 +149,21 @@ Seit Phase 1b wird jeder Bosskill einzeln aufgezeichnet und Nachrücker werden n
 - [ ] **Season-Wechsel** setzt alle aufgeklappten Abende zurück
 - [ ] Blättern mit aufgeklappten Spalten: Pager-Zählung (`1–8/14`) stimmt
 
-## 8 — Blättern & Leerzustände
+## 8 — Raid-Tage statt Sessions
+
+Eine Spalte ist ein **Raid-Tag**, nicht eine Session. Tagesgrenze ist der Raid-Reset um 7 Uhr.
+
+- [ ] Session am **Folgetag fortsetzen** (anderer Raid) → **zwei** Spalten mit je eigenem Datum,
+      nicht eine
+- [ ] `Att.%` zählt beide Tage: wer nur an Tag 2 dabei war, hat 50 % statt 100 %
+- [ ] **Zwei Raids an einem Tag** → **eine** Spalte, egal ob in einer oder zwei Sessions;
+      beim Aufklappen stehen die Bosse beider Raids nebeneinander
+- [ ] Fallen zwei Sessions auf einen Tag, nennt der Tooltip **beide** Namen (`Vormittag · Abend`)
+- [ ] Kill **nach Mitternacht** (z. B. 01:30) landet noch in der Spalte des Vorabends
+- [ ] Tooltip einer Bossspalte zeigt das Datum des **Kills**, nicht das des Abends —
+      bei einer über Mitternacht laufenden Session also den Folgetag
+
+## 9 — Blättern & Leerzustände
 
 - [ ] Bei mehr Abenden als Spalten passen: `<` / `>` erscheinen mit Anzeige `1–8/14`
 - [ ] `<` ist auf der ersten Seite ausgegraut, `>` auf der letzten

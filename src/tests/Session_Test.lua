@@ -1267,6 +1267,57 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
         end)
     end
 
+    function Tests:testRecordKillAttendance_RecordsTrialStateAtKill()
+        WithTestDB(function()
+            MockSideEffects()
+            local session = SetupKillSession({})
+            GuildLootDB.players = {
+                ["Neu-Realm"] = { trial = true },
+                ["Alt-Realm"] = { trial = false },
+            }
+            GuildLootDB.currentRaid.currentKillParticipants = { "Neu-Realm", "Alt-Realm" }
+
+            GuildLoot.RecordKillAttendance("Ulgrax", 2607)
+
+            local trials = session.raidMeta["raid-01"].kills[1].trials
+            IsTrue(trials["Neu-Realm"])
+            AreEqual(nil, trials["Alt-Realm"])
+        end)
+    end
+
+    function Tests:testRecordKillAttendance_LaterPromotionLeavesOldKillUntouched()
+        WithTestDB(function()
+            MockSideEffects()
+            local session = SetupKillSession({})
+            GuildLootDB.players = { ["Neu-Realm"] = { trial = true } }
+            GuildLootDB.currentRaid.currentKillParticipants = { "Neu-Realm" }
+            GuildLoot.RecordKillAttendance("Ulgrax", 2607)
+
+            -- nach drei Raids kein Trial mehr — der alte Kill darf davon unberührt bleiben
+            GuildLootDB.players["Neu-Realm"].trial = false
+            GuildLoot.RecordKillAttendance("Sikran", 2599)
+
+            local kills = session.raidMeta["raid-01"].kills
+            IsTrue(kills[1].trials["Neu-Realm"])
+            AreEqual(nil, kills[2].trials["Neu-Realm"])
+        end)
+    end
+
+    function Tests:testRecordKillAttendance_TrialsTableExistsWhenNobodyIsTrial()
+        WithTestDB(function()
+            MockSideEffects()
+            local session = SetupKillSession({})
+            GuildLootDB.players = { ["Alt-Realm"] = { trial = false } }
+            GuildLootDB.currentRaid.currentKillParticipants = { "Alt-Realm" }
+
+            GuildLoot.RecordKillAttendance("Ulgrax", 2607)
+
+            -- leere Tabelle statt nil: nur so ist "niemand war Trial" von "nicht
+            -- aufgezeichnet" (Altdaten) unterscheidbar
+            Exists(session.raidMeta["raid-01"].kills[1].trials)
+        end)
+    end
+
     function Tests:testRecordKillAttendance_NoSessionIsNoOp()
         WithTestDB(function()
             MockSideEffects()

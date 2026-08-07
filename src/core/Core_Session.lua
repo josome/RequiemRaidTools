@@ -358,14 +358,22 @@ function GL.RecordKillAttendance(bossName, encounterID)
     local names = raid.currentKillParticipants or {}
     if #names == 0 then names = raid.participants or {} end
 
+    -- trials ist auch dann eine (leere) Tabelle, wenn niemand Trial war: nur so lässt sich
+    -- "damals war niemand auf Probe" von "gar nicht aufgezeichnet" (Altdaten) unterscheiden.
     local kill = {
         boss         = bossName or "",
         encounterID  = encounterID,
         ts           = time(),
         participants = {},
+        trials       = {},
     }
+    local players = db.players or {}
     for _, name in ipairs(names) do
         table.insert(kill.participants, name)
+        -- Trial-Stand zum Kill festhalten: die Rolle endet nach drei Raids, und das darf
+        -- die bereits gelaufenen Abende der Season nicht rückwirkend umdeuten
+        local p = players[name]
+        if p and p.trial then kill.trials[name] = true end
     end
     meta.kills = meta.kills or {}
     table.insert(meta.kills, kill)

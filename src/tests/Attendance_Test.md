@@ -10,13 +10,14 @@ rechnet nichts selbst. Rückgabe:
 
 ```
 { season, nights = { { id, label, startedAt, kills = { { id, name, ts } } } },
-          rows   = { { name, class, group, present, attended, total, pct, trial } } }
+          rows   = { { name, class, group, present, trialAt, attended, total, pct, trial } } }
 ```
 
 ## Setup
 
 - `Mock(tbl, key, fn)` / `MockRestore()` — ersetzt Funktionen und stellt sie wieder her.
 - `WithDB(db, fn)` — swappt `GuildLootDB`, ruft `fn`, restauriert DB + Mocks.
+- `TS(day, hour, min)` — Zeitstempel im August 2026, für Fixtures mit echten Tagesabständen.
 - `AttendanceDB(seasonFields, sessions, players)` — DB mit Season `s1` und Raid-Sessions
   (`{ startedAt, label, raids = { { id, participants } } }`); `raids` landet als `raidMeta`.
   Ein Raid darf zusätzlich `kills = { { boss, ts, participants } }` tragen — die Boss-Ebene aus
@@ -33,6 +34,27 @@ rechnet nichts selbst. Rückgabe:
 | `testComputeAttendance_UnknownSeason_EmptyResult` | Unbekannte Season-ID → `season = nil`, leere `nights`/`rows` statt Fehler. |
 | `testComputeAttendance_NoDB_EmptyResult` | Ganz ohne `GuildLootDB` → leeres Ergebnis, kein Fehler. |
 | `testComputeAttendance_SeasonWithoutRaids_RowsButNoNights` | Season ohne Raid-Abende: Zeilen erscheinen trotzdem, `total = 0` und `pct = 0` (keine Division durch null). |
+
+### Gruppierung nach Raid-Tag
+
+Ein Attendance-Abend ist ein **Raid-Tag**, nicht eine Session. Eine über zwei Tage fortgesetzte
+Session ergibt zwei Spalten, zwei Raids an einem Tag nur eine — damit hängt die Zählung nicht
+daran, ob zwischendurch eine neue Session angelegt wurde. Tagesgrenze ist der Raid-Reset um
+7 Uhr, ein Kill um 01:30 zählt also noch zum Vorabend.
+
+Welche Sessions überhaupt betrachtet werden, entscheidet weiterhin `session.startedAt` im
+Season-Fenster; erst die Kills darin werden nach ihrem eigenen Zeitstempel auf Tage verteilt.
+
+| Test | Prüft |
+|------|-------|
+| `testCollectNights_SessionAcrossTwoDaysSplitsIntoTwoNights` | Am Folgetag fortgesetzte Session → zwei Abende, `attended = 2`. |
+| `testCollectNights_TwoSessionsSameDayMergeIntoOneNight` | Zwei Sessions an einem Tag → ein Abend mit den Bossen beider; Label nennt beide Sessions. |
+| `testCollectNights_AfterMidnightBelongsToPreviousRaidDay` | Kill um 01:30 bleibt beim Vorabend. |
+| `testCollectNights_MorningAfterResetIsANewDay` | Gegenprobe: 9 Uhr liegt hinter dem Reset → neuer Abend. |
+| `testCollectNights_SessionWithoutKillsStillCounts` | Abgebrochener Abend ohne Bosskill bleibt als Spalte und im Nenner von `Att.%`. |
+
+> Fixtures brauchen seitdem echte Tagesabstände — Helper `TS(day, hour, min)` baut Zeitstempel
+> im August 2026. Werte wie `100`/`200` lägen alle am selben Raid-Tag.
 
 ### Spalten (`nights`) und Season-Fenster
 
@@ -51,6 +73,24 @@ rechnet nichts selbst. Rückgabe:
 | `testComputeAttendance_KillsSortedByTimestamp` | Kills eines Abends sind über `raidMeta`-Einträge hinweg nach `ts` sortiert. |
 | `testComputeAttendance_FallsBackToNightLevelWithoutKills` | Ohne `kills` (Altdaten, Observer-Sessions) bleibt es bei einem Eintrag je `raidMeta` — die Abend-Ebene stimmt unverändert. |
 | `testComputeAttendance_EmptyKillsListUsesFallback` | Leere `kills`-Liste verhält sich wie gar keine. |
+
+### Trial-Stand zum Zeitpunkt des Kills (`trialAt`)
+
+Die Trial-Rolle endet nach drei Raids. `row.trialAt[key]` hält deshalb fest, ob jemand **damals**
+Trial war, statt das aktuelle Flag zu spiegeln — sonst würde eine Beförderung rückwirkend alle
+Abende der Season umfärben.
+
+`nil` (Altdaten ohne aufgezeichneten Stand) gilt in der UI als **kein** Trial. Ein Rückgriff aufs
+aktuelle Flag wäre naheliegend, ist aber falsch: er färbt beim Setzen des Hakens die gesamte
+Historie um — genau die rückwirkende Umdeutung, die `trialAt` verhindern soll. Der Stand von
+damals ist für Altdaten schlicht nicht bekannt, und er lässt sich aus dem Heute nicht erschließen.
+
+| Test | Prüft |
+|------|-------|
+| `testComputeAttendance_TrialAtFromRecordedKill` | `trialAt` je Kill aus `kill.trials`. |
+| `testComputeAttendance_TrialAtIgnoresLaterPromotion` | Beförderung ändert ältere Kills nicht; `row.trial` (aktuelles Flag) bleibt davon getrennt. |
+| `testComputeAttendance_TrialAtNightIsTrueIfAnyKillWasTrial` | Abend-Ebene ist Trial, wenn bei mindestens einem Kill Trial. |
+| `testComputeAttendance_TrialAtEmptyForUnrecordedKills` | Altdaten ohne `trials` → kein Eintrag; das aktuelle Flag bleibt davon getrennt und färbt nichts ein. |
 
 ### Spaltenliste (`GL.BuildAttendanceColumns`)
 

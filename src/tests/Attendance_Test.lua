@@ -39,6 +39,13 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
         _mocks = {}
     end
 
+    --- Zeitstempel im August 2026. Seit die Abende nach Raid-Tag gruppiert werden, müssen
+    --- Fixtures echte Tagesabstände haben — Werte wie 100/200 lägen alle am selben Tag.
+    local function TS(day, hour, min)
+        return time({ year = 2026, month = 8, day = day,
+                      hour = hour or 20, min = min or 0, sec = 0 })
+    end
+
     local function WithDB(db, fn)
         local origDB = GuildLootDB
         GuildLootDB = db
@@ -139,9 +146,9 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
     -- ========================================================
     function Tests:testComputeAttendance_NightsNewestFirst()
         WithDB(AttendanceDB({ startedAt = 0 }, {
-            { startedAt = 100, label = "Alt" },
-            { startedAt = 300, label = "Neu" },
-            { startedAt = 200, label = "Mitte" },
+            { startedAt = TS(1), label = "Alt" },
+            { startedAt = TS(3), label = "Neu" },
+            { startedAt = TS(2), label = "Mitte" },
         }), function()
             MockRoster({})
             local nights = GL.ComputeAttendance("s1").nights
@@ -153,10 +160,10 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
     end
 
     function Tests:testComputeAttendance_SeasonWindowFiltersNights()
-        WithDB(AttendanceDB({ startedAt = 100, endedAt = 900 }, {
-            { startedAt = 50,   label = "davor" },
-            { startedAt = 500,  label = "drin" },
-            { startedAt = 1000, label = "danach" },
+        WithDB(AttendanceDB({ startedAt = TS(2), endedAt = TS(4) }, {
+            { startedAt = TS(1), label = "davor" },
+            { startedAt = TS(3), label = "drin" },
+            { startedAt = TS(5), label = "danach" },
         }), function()
             MockRoster({})
             local nights = GL.ComputeAttendance("s1").nights
@@ -269,6 +276,78 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
     end
 
     -- ========================================================
+    -- Trial-Stand zum Zeitpunkt des Kills (trialAt)
+    -- ========================================================
+    function Tests:testComputeAttendance_TrialAtFromRecordedKill()
+        WithDB(AttendanceDB({}, {
+            { startedAt = 100, raids = {
+                { id = "r1", participants = { "Neu-R", "Alt-R" }, kills = {
+                    { boss = "Ulgrax", ts = 110,
+                      participants = { "Neu-R", "Alt-R" },
+                      trials       = { ["Neu-R"] = true } },
+                } },
+            } },
+        }), function()
+            MockRoster({
+                { name = "Neu-R", group = "roster" },
+                { name = "Alt-R", group = "roster" },
+            })
+            local result = GL.ComputeAttendance("s1")
+            IsTrue(RowByName(result, "Neu-R").trialAt["r1#1"])
+            IsFalse(RowByName(result, "Alt-R").trialAt["r1#1"])
+        end)
+    end
+
+    function Tests:testComputeAttendance_TrialAtIgnoresLaterPromotion()
+        -- Kill 1 als Trial, Kill 2 nach der Beförderung — der alte Kill bleibt Trial,
+        -- obwohl db.players heute kein trial mehr sagt
+        WithDB(AttendanceDB({}, {
+            { startedAt = 100, raids = {
+                { id = "r1", participants = { "Neu-R" }, kills = {
+                    { boss = "A", ts = 110, participants = { "Neu-R" },
+                      trials = { ["Neu-R"] = true } },
+                    { boss = "B", ts = 120, participants = { "Neu-R" }, trials = {} },
+                } },
+            } },
+        }, { ["Neu-R"] = { trial = false } }), function()
+            MockRoster({ { name = "Neu-R", group = "roster" } })
+            local row = RowByName(GL.ComputeAttendance("s1"), "Neu-R")
+            IsTrue(row.trialAt["r1#1"])
+            IsFalse(row.trialAt["r1#2"])
+            IsFalse(row.trial)              -- aktuelles Flag steuert nur die Checkbox
+        end)
+    end
+
+    function Tests:testComputeAttendance_TrialAtNightIsTrueIfAnyKillWasTrial()
+        WithDB(AttendanceDB({}, {
+            { startedAt = 100, raids = {
+                { id = "r1", participants = { "Neu-R" }, kills = {
+                    { boss = "A", ts = 110, participants = { "Neu-R" }, trials = {} },
+                    { boss = "B", ts = 120, participants = { "Neu-R" },
+                      trials = { ["Neu-R"] = true } },
+                } },
+            } },
+        }), function()
+            MockRoster({ { name = "Neu-R", group = "roster" } })
+            local result = GL.ComputeAttendance("s1")
+            IsTrue(RowByName(result, "Neu-R").trialAt[result.nights[1].id])
+        end)
+    end
+
+    function Tests:testComputeAttendance_TrialAtEmptyForUnrecordedKills()
+        -- Altdaten ohne trials-Tabelle → kein Eintrag. Das aktuelle Flag darf hier NICHT
+        -- einspringen: sonst färbt das Setzen des Hakens die ganze Historie blau.
+        WithDB(AttendanceDB({}, {
+            { startedAt = 100, raids = { { id = "r1", participants = { "Neu-R" } } } },
+        }, { ["Neu-R"] = { trial = true } }), function()
+            MockRoster({ { name = "Neu-R", group = "roster" } })
+            local row = RowByName(GL.ComputeAttendance("s1"), "Neu-R")
+            AreEqual(nil, row.trialAt["r1"])
+            IsTrue(row.trial)   -- steuert nur die Checkbox, nicht die Zellfarbe
+        end)
+    end
+
+    -- ========================================================
     -- Spaltenliste (BuildAttendanceColumns)
     -- ========================================================
 
@@ -280,6 +359,7 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
             for i, k in ipairs(n.kills or {}) do
                 table.insert(kills, { id = n.id .. "#" .. i, name = k.name, ts = k.ts or 0 })
             end
+            -- BuildAttendanceColumns interessiert sich nicht für trials
             table.insert(nights, {
                 id = n.id, label = n.label or "", startedAt = n.startedAt or 0, kills = kills,
             })
@@ -308,8 +388,9 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
         AreEqual("n1#1", cols[1].key)
         AreEqual("n1#2", cols[2].key)
         AreEqual("n2",   cols[3].key)
-        AreEqual("1",    cols[1].label)
-        AreEqual("2",    cols[2].label)
+        -- Label ist der volle Bossname; die UI kürzt ihn auf die Spaltenbreite
+        AreEqual("A",    cols[1].label)
+        AreEqual("B",    cols[2].label)
         IsTrue(cols[1].isKill)
         IsFalse(cols[3].isKill)
     end
@@ -387,6 +468,101 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
         }), { n1 = true })
         AreEqual("Ulgrax", open[1].tooltipT)
         AreEqual("Sikran", open[2].tooltipT)
+        -- Bossname steht auch als Label bereit, nicht nur im Tooltip
+        AreEqual("Ulgrax", open[1].label)
+    end
+
+    -- ========================================================
+    -- Gruppierung nach Raid-Tag
+    -- ========================================================
+    function Tests:testCollectNights_SessionAcrossTwoDaysSplitsIntoTwoNights()
+        -- am Folgetag in einem anderen Raid fortgesetzt → zwei Spalten, nicht eine
+        WithDB(AttendanceDB({}, {
+            { startedAt = TS(3), raids = {
+                { id = "r1", participants = { "Alice-R" }, kills = {
+                    { boss = "A", ts = TS(3, 20), participants = { "Alice-R" } },
+                } },
+                { id = "r2", participants = { "Alice-R" }, kills = {
+                    { boss = "B", ts = TS(4, 20), participants = { "Alice-R" } },
+                } },
+            } },
+        }), function()
+            MockRoster({ { name = "Alice-R", group = "roster" } })
+            local result = GL.ComputeAttendance("s1")
+            AreEqual(2, #result.nights)
+            AreEqual(2, RowByName(result, "Alice-R").attended)   -- zwei Abende, nicht einer
+        end)
+    end
+
+    function Tests:testCollectNights_TwoSessionsSameDayMergeIntoOneNight()
+        -- zwei Raids an einem Tag, jeder in eigener Session → eine Spalte
+        WithDB(AttendanceDB({}, {
+            { startedAt = TS(3, 10), label = "Vormittag", raids = {
+                { id = "r1", participants = { "Alice-R" }, kills = {
+                    { boss = "A", ts = TS(3, 11), participants = { "Alice-R" } },
+                } },
+            } },
+            { startedAt = TS(3, 20), label = "Abend", raids = {
+                { id = "r2", participants = { "Alice-R" }, kills = {
+                    { boss = "B", ts = TS(3, 21), participants = { "Alice-R" } },
+                } },
+            } },
+        }), function()
+            MockRoster({ { name = "Alice-R", group = "roster" } })
+            local result = GL.ComputeAttendance("s1")
+            AreEqual(1, #result.nights)
+            AreEqual(2, #result.nights[1].kills)   -- Bosse beider Raids im selben Abend
+            AreEqual(1, RowByName(result, "Alice-R").attended)
+            -- der Tooltip nennt beide Sessions des Tages
+            AreEqual("Vormittag · Abend", result.nights[1].label)
+        end)
+    end
+
+    function Tests:testCollectNights_AfterMidnightBelongsToPreviousRaidDay()
+        -- Raid-Reset ist 7 Uhr: ein Kill um 01:30 gehört noch zum Vorabend
+        WithDB(AttendanceDB({}, {
+            { startedAt = TS(3, 20), raids = {
+                { id = "r1", participants = { "Alice-R" }, kills = {
+                    { boss = "A", ts = TS(3, 23),    participants = { "Alice-R" } },
+                    { boss = "B", ts = TS(4, 1, 30), participants = { "Alice-R" } },
+                } },
+            } },
+        }), function()
+            MockRoster({ { name = "Alice-R", group = "roster" } })
+            local result = GL.ComputeAttendance("s1")
+            AreEqual(1, #result.nights)
+            AreEqual(2, #result.nights[1].kills)
+            AreEqual(1, RowByName(result, "Alice-R").attended)
+        end)
+    end
+
+    function Tests:testCollectNights_MorningAfterResetIsANewDay()
+        -- Gegenprobe: 9 Uhr liegt hinter dem Reset und ist damit ein neuer Raid-Tag
+        WithDB(AttendanceDB({}, {
+            { startedAt = TS(3, 20), raids = {
+                { id = "r1", participants = { "Alice-R" }, kills = {
+                    { boss = "A", ts = TS(3, 23), participants = { "Alice-R" } },
+                    { boss = "B", ts = TS(4, 9),  participants = { "Alice-R" } },
+                } },
+            } },
+        }), function()
+            MockRoster({ { name = "Alice-R", group = "roster" } })
+            AreEqual(2, #GL.ComputeAttendance("s1").nights)
+        end)
+    end
+
+    function Tests:testCollectNights_SessionWithoutKillsStillCounts()
+        -- abgebrochener Abend darf nicht spurlos aus der Zählung verschwinden
+        WithDB(AttendanceDB({}, {
+            { startedAt = TS(3), label = "Abgebrochen" },
+        }), function()
+            MockRoster({ { name = "Alice-R", group = "roster" } })
+            local result = GL.ComputeAttendance("s1")
+            AreEqual(1, #result.nights)
+            AreEqual(0, #result.nights[1].kills)
+            AreEqual(1, RowByName(result, "Alice-R").total)
+            AreEqual(0, RowByName(result, "Alice-R").attended)
+        end)
     end
 
     -- ========================================================
@@ -394,10 +570,10 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
     -- ========================================================
     function Tests:testComputeAttendance_PctFromAttendedNights()
         WithDB(AttendanceDB({}, {
-            { startedAt = 100, raids = { { id = "r1", participants = { "Alice-R" } } } },
-            { startedAt = 200, raids = { { id = "r2", participants = { "Alice-R" } } } },
-            { startedAt = 300, raids = { { id = "r3", participants = { "Bob-R" } } } },
-            { startedAt = 400, raids = { { id = "r4", participants = { "Bob-R" } } } },
+            { startedAt = TS(1), raids = { { id = "r1", participants = { "Alice-R" } } } },
+            { startedAt = TS(2), raids = { { id = "r2", participants = { "Alice-R" } } } },
+            { startedAt = TS(3), raids = { { id = "r3", participants = { "Bob-R" } } } },
+            { startedAt = TS(4), raids = { { id = "r4", participants = { "Bob-R" } } } },
         }), function()
             MockRoster({
                 { name = "Alice-R", class = "MAGE",    group = "roster" },

@@ -23,6 +23,11 @@ local ROW_H   = 20
 local SEP_H   = 18
 local PAGER_W = 92                          -- Platz für ◀ Seite x/y ▶
 
+-- Aufgeklappte Bossspalten sind breiter: in CELL_W passt nur eine Zahl, hier steht der
+-- (gekürzte) Bossname. Der volle Name bleibt im Tooltip.
+local KILL_CELL_W      = 58
+local KILL_LABEL_CHARS = 8
+
 -- Spalten-Offset beim Blättern (0 = neueste Abende). Modul-lokal, kein DB-Zustand.
 local colOffset = 0
 local lastSeasonId = nil
@@ -37,13 +42,46 @@ local expanded = {}
 local pendingFocusNight = nil
 
 local COLOR_PRESENT = { 0.15, 0.65, 0.20, 1 }
+-- Trial: anwesend, aber auf Probe — eigene Farbe statt Grün, damit man es in der Matrix sieht
+local COLOR_TRIAL   = { 0.15, 0.55, 0.72, 1 }
 local COLOR_ABSENT  = { 1, 1, 1, 0.06 }
 
---- Wie viele Spalten passen in die aktuelle Breite? Mindestens eine.
-local function VisibleColumnCount(panel)
-    local w = panel:GetWidth() or 0
-    local usable = w - LEFT_W - PAGER_W - 12
-    return math.max(1, math.floor(usable / CELL_W))
+local function ColumnWidth(col)
+    return col.isKill and KILL_CELL_W or CELL_W
+end
+
+--- Nutzbare Breite für Spalten (ohne den fixen linken Block und den Pager).
+local function UsableWidth(panel)
+    return (panel:GetWidth() or 0) - LEFT_W - PAGER_W - 12
+end
+
+--- Spalten ab offset, so viele wie in die Breite passen. Seit die Bossspalten breiter sind
+--- als die Abend-Spalten lässt sich das nicht mehr als Division rechnen.
+--- Mindestens eine Spalte, sonst bliebe der Tab bei schmalem Fenster leer.
+local function SliceColumns(panel, cols, offset)
+    local usable     = UsableWidth(panel)
+    local shown, used = {}, 0
+    for i = offset + 1, #cols do
+        local w = ColumnWidth(cols[i])
+        if used + w > usable and #shown > 0 then break end
+        table.insert(shown, cols[i])
+        used = used + w
+    end
+    return shown
+end
+
+--- Wie viele Spalten passen rückwärts, wenn das Fenster bei endIndex endet?
+--- Basis fürs Zurückblättern und für den maximalen Offset.
+local function ColumnsEndingAt(panel, cols, endIndex)
+    local usable  = UsableWidth(panel)
+    local used, n = 0, 0
+    for i = math.min(endIndex, #cols), 1, -1 do
+        local w = ColumnWidth(cols[i])
+        if used + w > usable and n > 0 then break end
+        used = used + w
+        n    = n + 1
+    end
+    return math.max(1, n)
 end
 
 -- ============================================================
@@ -89,8 +127,10 @@ function UI.BuildAttendancePanel(parent)
     nextBtn:SetSize(20, 18)
     nextBtn:SetPoint("TOPRIGHT", colHeader, "TOPRIGHT", 0, 2)
     nextBtn:SetText(">")
+    -- Blättert um genau das, was zuletzt sichtbar war (panel.curCols/curShown setzt der
+    -- Refresh) — bei gemischten Spaltenbreiten gibt es keine feste Seitengröße mehr.
     nextBtn:SetScript("OnClick", function()
-        colOffset = colOffset + VisibleColumnCount(panel)
+        colOffset = colOffset + math.max(1, panel.curShown or 1)
         UI.RefreshAttendanceTab()
     end)
 
@@ -104,7 +144,8 @@ function UI.BuildAttendancePanel(parent)
     prevBtn:SetPoint("RIGHT", pageLbl, "LEFT", -4, 0)
     prevBtn:SetText("<")
     prevBtn:SetScript("OnClick", function()
-        colOffset = math.max(0, colOffset - VisibleColumnCount(panel))
+        local back = ColumnsEndingAt(panel, panel.curCols or {}, colOffset)
+        colOffset = math.max(0, colOffset - back)
         UI.RefreshAttendanceTab()
     end)
 
@@ -229,16 +270,19 @@ end
 -- ============================================================
 
 --- Holt eine Zelle der Zeile (legt sie beim ersten Bedarf an) und färbt sie.
-local function SetCell(row, index, present)
+--- Position und Breite kommen von außen, weil Bossspalten breiter sind als Abend-Spalten.
+--- @param trial boolean  anwesende Zelle eines Trials wird türkis statt grün
+local function SetCell(row, index, present, trial, x, w)
     local cell = row.cells[index]
     if not cell then
         cell = row:CreateTexture(nil, "ARTWORK")
-        cell:SetSize(CELL_W - 6, ROW_H - 6)
         row.cells[index] = cell
     end
+    cell:SetSize(w - 6, ROW_H - 6)
     cell:ClearAllPoints()
-    cell:SetPoint("LEFT", row, "LEFT", LEFT_W + (index - 1) * CELL_W + 3, 0)
-    local c = present and COLOR_PRESENT or COLOR_ABSENT
+    cell:SetPoint("LEFT", row, "LEFT", x + 3, 0)
+    local c = COLOR_ABSENT
+    if present then c = trial and COLOR_TRIAL or COLOR_PRESENT end
     cell:SetColorTexture(c[1], c[2], c[3], c[4])
     cell:Show()
 end
@@ -282,7 +326,6 @@ function UI.RefreshAttendanceTab()
     -- ── Spaltenfenster bestimmen ──────────────────────────────
     -- Spalten statt Abende: ein aufgeklappter Abend liefert mehrere (Core_Attendance)
     local allCols   = GL.BuildAttendanceColumns(data.nights, expanded)
-    local visible   = VisibleColumnCount(panel)
     local totalCols = #allCols
 
     -- Frisch aufgeklappt: ans linke Fensterende springen, sonst schiebt der Abend seine
@@ -294,16 +337,17 @@ function UI.RefreshAttendanceTab()
         pendingFocusNight = nil
     end
 
-    local maxOffset = math.max(0, totalCols - visible)
+    local maxOffset = math.max(0, totalCols - ColumnsEndingAt(panel, allCols, totalCols))
     if colOffset > maxOffset then colOffset = maxOffset end
 
-    local shown = {}
-    for i = colOffset + 1, math.min(colOffset + visible, totalCols) do
-        table.insert(shown, allCols[i])
-    end
+    local shown = SliceColumns(panel, allCols, colOffset)
+    -- Die Pager-Handler brauchen den Stand des letzten Refresh: ohne feste Seitengröße
+    -- lässt sich der Sprung nicht mehr aus der Fensterbreite allein ableiten
+    panel.curCols  = allCols
+    panel.curShown = #shown
 
     -- Pager nur zeigen, wenn es etwas zu blättern gibt
-    local hasPaging = totalCols > visible
+    local hasPaging = totalCols > #shown or colOffset > 0
     panel.prevBtn:SetShown(hasPaging)
     panel.nextBtn:SetShown(hasPaging)
     panel.prevBtn:SetEnabled(colOffset > 0)
@@ -316,11 +360,17 @@ function UI.RefreshAttendanceTab()
     end
 
     -- ── Spaltenköpfe ──────────────────────────────────────────
-    for i, col in ipairs(shown) do
-        local x   = LEFT_W + (i - 1) * CELL_W
+    local hx = LEFT_W
+    for _, col in ipairs(shown) do
+        local x   = hx
+        local w   = ColumnWidth(col)
+        hx = hx + w
+
         local btn = panel.headerPool:Acquire()
+        btn:SetSize(w, 18)
         btn:SetPoint("TOPLEFT", panel.colHeader, "TOPLEFT", x, 0)
-        btn.fs:SetText(col.label)
+        -- Bossnamen sind länger als die Spalte; der volle Name steht im Tooltip
+        btn.fs:SetText(col.isKill and GL.TruncateText(col.label, KILL_LABEL_CHARS) or col.label)
         btn.tooltipT, btn.tooltipD = col.tooltipT, col.tooltipD
 
         if col.expandable then
@@ -342,7 +392,7 @@ function UI.RefreshAttendanceTab()
         btn:Show()
 
         -- Trenner links vor der ersten Spalte eines Abends (nicht ganz links außen)
-        if col.groupStart and i > 1 then
+        if col.groupStart and x > LEFT_W then
             local tex = panel.groupSepPool:Acquire()
             tex:SetPoint("TOPLEFT", panel.colHeader, "TOPLEFT", x - 1, 0)
             tex:Show()
@@ -384,12 +434,21 @@ function UI.RefreshAttendanceTab()
         local playerName = entry.name
         row.trialCb:SetScript("OnClick", function(self)
             GL.CreatePlayerRecord(playerName)
+            -- Wirkt nur auf künftige Kills — bereits aufgezeichnete behalten ihren Stand,
+            -- daher hier bewusst kein Refresh: an der Matrix ändert sich nichts.
             db.players[playerName].trial = self:GetChecked() and true or false
         end)
 
+        local cx = LEFT_W
         for i, col in ipairs(shown) do
             -- col.key ist je nach Zustand die Abend- oder die Bosskill-ID
-            SetCell(row, i, entry.present[col.key])
+            local w = ColumnWidth(col)
+            -- Ausschließlich der beim Kill aufgezeichnete Stand. Kein Rückgriff aufs
+            -- aktuelle Flag: Altdaten kennen den Stand von damals nicht, und ihn aus dem
+            -- Heute zu erschließen färbt beim Setzen des Hakens die ganze Historie um —
+            -- genau die rückwirkende Umdeutung, die vermieden werden soll.
+            SetCell(row, i, entry.present[col.key], entry.trialAt[col.key], cx, w)
+            cx = cx + w
         end
         for i = #shown + 1, #row.cells do row.cells[i]:Hide() end
 

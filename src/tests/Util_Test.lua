@@ -494,4 +494,31 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
         local e = { timestamp = 100, player = "Alice-Malfurion", item = "[Axt]" }
         AreEqual(GL.SessionLootKey(e), GL.SessionLootKey(e))
     end
+
+    -- --------------------------------------------------------
+    -- TruncateText — Bossnamen in schmale Spaltenköpfe
+    -- --------------------------------------------------------
+
+    function Tests:testTruncateText_ShortTextUnchanged()
+        AreEqual("Ulgrax", GL.TruncateText("Ulgrax", 8))
+        AreEqual("Ulgrax", GL.TruncateText("Ulgrax", 6))   -- exakt passend
+    end
+
+    function Tests:testTruncateText_LongTextGetsEllipsis()
+        -- 8 Zeichen gesamt: 7 Zeichen Text + "…"
+        AreEqual("Bloodbo…", GL.TruncateText("Bloodbound Horror", 8))
+    end
+
+    function Tests:testTruncateText_CountsCharactersNotBytes()
+        -- "Nerub-ar Palast" mit Umlaut: ein Schnitt mitten in der UTF-8-Sequenz
+        -- ergäbe ein kaputtes Zeichen auf dem Bildschirm
+        local out = GL.TruncateText("Kärgeröd Rakhan", 6)
+        AreEqual("Kärge…", out)
+    end
+
+    function Tests:testTruncateText_HandlesNilAndZero()
+        AreEqual("",       GL.TruncateText(nil, 8))
+        AreEqual("Ulgrax", GL.TruncateText("Ulgrax", nil))   -- ohne Limit unverändert
+        AreEqual("Ulgrax", GL.TruncateText("Ulgrax", 0))
+    end
 end)
