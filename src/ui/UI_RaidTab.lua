@@ -123,10 +123,20 @@ local function BuildRaidActions(panel, cs)
     renameBtn:SetPoint("LEFT", exportBtn, "RIGHT", 4, 0)
     renameBtn:SetText("Rename")
     renameBtn:SetEnabled(false)
+    -- Gemeinsamer Dialog aus UI_Common — derselbe, den die Season-Kopfzeile nutzt.
     renameBtn:SetScript("OnClick", function()
-        if selectedRaid and selectedRaid.ci then
-            StaticPopup_Show("RLT_RENAME_SESSION")
-        end
+        local ci = selectedRaid and selectedRaid.ci
+        local session = ci and GuildLootDB.raidContainers[ci]
+        if not session then return end
+        UI.ShowRenameDialog("Session umbenennen:", session.label, function(name)
+            if GL.IsSessionLabelTaken(name, ci) then
+                GL.Print("Name bereits vergeben: " .. name)
+                return
+            end
+            session.label = name
+            UI.RefreshRaidTab()
+            UI.RefreshSessionBar()
+        end)
     end)
     panel.renameBtn = renameBtn
 
@@ -805,61 +815,6 @@ end
 -- StaticPopup-Definitionen (einmalig beim Laden registrieren)
 -- ============================================================
 
-StaticPopupDialogs["RLT_RENAME_SESSION"] = {
-    text         = "Session umbenennen:",
-    button1      = "OK",
-    button2      = "Abbrechen",
-    hasEditBox   = true,
-    maxLetters   = 48,
-    OnShow       = function(self)
-        self.EditBox:SetWidth(260)
-        if selectedRaid and selectedRaid.ci then
-            local session = GuildLootDB.raidContainers[selectedRaid.ci]
-            self.EditBox:SetText(session and session.label or "")
-            self.EditBox:HighlightText()
-        end
-    end,
-    OnAccept     = function(self)
-        local name = self.EditBox:GetText()
-        if name ~= "" and selectedRaid and selectedRaid.ci then
-            local ci      = selectedRaid.ci
-            local session = GuildLootDB.raidContainers[ci]
-            if session then
-                if GL.IsSessionLabelTaken(name, ci) then
-                    GL.Print("Name bereits vergeben: " .. name)
-                    return
-                end
-                session.label = name
-                GL.UI.RefreshRaidTab()
-                GL.UI.RefreshSessionBar()
-            end
-        end
-    end,
-    EditBoxOnEnterPressed = function(self)
-        local name = self:GetText()
-        if name ~= "" and selectedRaid and selectedRaid.ci then
-            local ci      = selectedRaid.ci
-            local session = GuildLootDB.raidContainers[ci]
-            if session then
-                if GL.IsSessionLabelTaken(name, ci) then
-                    GL.Print("Name bereits vergeben: " .. name)
-                    StaticPopup_Hide("RLT_RENAME_SESSION")
-                    return
-                end
-                session.label = name
-            end
-        end
-        StaticPopup_Hide("RLT_RENAME_SESSION")
-        GL.UI.RefreshRaidTab()
-        GL.UI.RefreshSessionBar()
-    end,
-    timeout        = 0,
-    whileDead      = false,
-    hideOnEscape   = true,
-    preferredIndex = 3,
-    EditBoxWidth   = 260,
-    wide           = 1,
-}
 
 -- ============================================================
 -- Session-Picker: Unassigned Raid einer Session zuweisen

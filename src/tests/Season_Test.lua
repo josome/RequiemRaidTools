@@ -263,6 +263,45 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
     end
 
     -- ========================================================
+    -- RenameSeason
+    -- ========================================================
+    function Tests:testRenameSeason_ChangesNameButNotId()
+        WithTestDB(FreshDB(), function()
+            local id = GL.CreateSeason("Alt")
+            IsTrue(GL.RenameSeason(id, "Neu"))
+            AreEqual("Neu", GuildLootDB.seasons[id].name)
+            -- die ID ist Schlüssel in db.seasons und Referenz in activeSeasonId und darf
+            -- sich beim Umbenennen nicht mitändern
+            AreEqual(id, GuildLootDB.seasons[id].id)
+            AreEqual(id, GuildLootDB.activeSeasonId)
+        end)
+    end
+
+    function Tests:testRenameSeason_TrimsWhitespace()
+        WithTestDB(FreshDB(), function()
+            local id = GL.CreateSeason("Alt")
+            IsTrue(GL.RenameSeason(id, "  Neu  "))
+            AreEqual("Neu", GuildLootDB.seasons[id].name)
+        end)
+    end
+
+    function Tests:testRenameSeason_RejectsEmptyName()
+        WithTestDB(FreshDB(), function()
+            local id = GL.CreateSeason("Alt")
+            IsFalse(GL.RenameSeason(id, "   "))
+            IsFalse(GL.RenameSeason(id, ""))
+            IsFalse(GL.RenameSeason(id, nil))
+            AreEqual("Alt", GuildLootDB.seasons[id].name)   -- unverändert
+        end)
+    end
+
+    function Tests:testRenameSeason_UnknownIdIsNoOp()
+        WithTestDB(FreshDB(), function()
+            IsFalse(GL.RenameSeason("nope", "Neu"))
+        end)
+    end
+
+    -- ========================================================
     -- SetSeasonStart — Zeitfenster nachträglich verschieben
     -- ========================================================
     function Tests:testSetSeasonStart_MovesWindowBack()

@@ -380,7 +380,7 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
             local kills = {}
             for i, k in ipairs(n.kills or {}) do
                 table.insert(kills, { id = n.id .. "#" .. i, name = k.name, ts = k.ts or 0,
-                                      difficulty = k.difficulty })
+                                      difficulty = k.difficulty, tier = k.tier })
             end
             -- BuildAttendanceColumns interessiert sich nicht für trials
             table.insert(nights, {
@@ -493,6 +493,35 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
         AreEqual("Sikran", open[2].tooltipT)
         -- Bossname steht auch als Label bereit, nicht nur im Tooltip
         AreEqual("Ulgrax", open[1].label)
+    end
+
+    function Tests:testBuildColumns_InstanceStartOnTierChange()
+        local cols = GL.BuildAttendanceColumns(Nights({
+            { id = "n1", startedAt = TS(3), kills = {
+                { name = "Ulgrax", tier = "Nerub-ar" },
+                { name = "Sikran", tier = "Nerub-ar" },
+                { name = "Kyveza", tier = "Castle Nathria" },
+                { name = "Sludge",  tier = "Castle Nathria" },
+            } },
+        }), { n1 = true })
+        IsFalse(cols[1].instanceStart)   -- erste Spalte trägt schon den Gruppentrenner
+        IsFalse(cols[2].instanceStart)
+        IsTrue(cols[3].instanceStart)    -- Wechsel der Raidinstanz
+        IsFalse(cols[4].instanceStart)
+    end
+
+    function Tests:testBuildColumns_SameInstanceDifferentDifficultyHasNoLine()
+        -- drei Durchläufe derselben Instanz auf N/H/M sind EINE Instanz — die Difficulty
+        -- unterscheidet die Tönung, nicht der Trennstrich
+        local cols = GL.BuildAttendanceColumns(Nights({
+            { id = "n1", startedAt = TS(3), kills = {
+                { name = "Ulgrax", tier = "Nerub-ar", difficulty = "N" },
+                { name = "Ulgrax", tier = "Nerub-ar", difficulty = "H" },
+                { name = "Ulgrax", tier = "Nerub-ar", difficulty = "M" },
+            } },
+        }), { n1 = true })
+        IsFalse(cols[2].instanceStart)
+        IsFalse(cols[3].instanceStart)
     end
 
     function Tests:testBuildColumns_GroupLabelIsSessionName()

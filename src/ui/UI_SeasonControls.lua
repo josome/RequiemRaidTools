@@ -11,6 +11,32 @@ local UI = GL.UI
 -- Gebaute Widgets; nil solange die Kopfzeile nicht existiert (Refresh ist dann No-Op).
 local S = nil
 
+-- Ausgewählte Season — getrennt von der AKTIVEN, genau wie selectedRaid im Raid-Tab.
+-- Nötig, weil GL.EndSeason activeSeasonId leert: ohne eigene Auswahl wäre nach dem
+-- Schließen keine Season mehr im Kopf und alle Buttons tot. So lässt sich eine beendete
+-- Season auch nur ansehen, ohne sie dafür wieder aufnehmen zu müssen.
+local selectedId = nil
+
+--- Die Season, auf die sich Kopfzeile und Matrix beziehen: die ausgewählte, sonst die
+--- aktive, sonst die neueste. Nie nil, solange überhaupt eine Season existiert.
+function UI.GetSelectedSeason()
+    local db = GuildLootDB
+    if not (db and db.seasons) then return nil end
+    if selectedId and db.seasons[selectedId] then return db.seasons[selectedId] end
+    local active = GL.GetActiveSeason()
+    if active then return active end
+    local newest = nil
+    for _, s in pairs(db.seasons) do
+        if not newest or (s.startedAt or 0) > (newest.startedAt or 0) then newest = s end
+    end
+    return newest
+end
+
+--- Setzt die Auswahl; nil fällt auf die Automatik in UI.GetSelectedSeason zurück.
+function UI.SetSelectedSeason(id)
+    selectedId = id
+end
+
 --- Rang-Indizes aufsteigend (0 = Gildenmeister); GetGuildRankNames kann lückenhaft sein.
 local function SortedRankIndices(names)
     local idx = {}
@@ -63,12 +89,12 @@ StaticPopupDialogs["REQRT_NEW_SEASON"] = {
     end,
     OnAccept   = function(self)
         local name = self.EditBox:GetText()
-        GL.CreateSeason(name ~= "" and name or nil)
+        UI.SetSelectedSeason(GL.CreateSeason(name ~= "" and name or nil))
         UI.RefreshAttendanceTab()
     end,
     EditBoxOnEnterPressed = function(self)
         local name = self:GetText()
-        GL.CreateSeason(name ~= "" and name or nil)
+        UI.SetSelectedSeason(GL.CreateSeason(name ~= "" and name or nil))
         StaticPopup_Hide("REQRT_NEW_SEASON")
         UI.RefreshAttendanceTab()
     end,
@@ -81,6 +107,7 @@ StaticPopupDialogs["REQRT_REOPEN_SEASON"] = {
     button2  = "Abbrechen",
     OnAccept = function(self)
         GL.ReopenSeason(self.data)
+        UI.SetSelectedSeason(self.data)
         UI.RefreshAttendanceTab()
     end,
     timeout = 0, whileDead = true, hideOnEscape = true,
@@ -96,7 +123,7 @@ StaticPopupDialogs["REQRT_SEASON_START"] = {
     OnShow     = function(self)
         -- Vorbelegung: ältester vorhandener Raid → ein Klick, und alles Bisherige zählt
         local suggest = EarliestSessionStart()
-        local season  = GL.GetActiveSeason()
+        local season  = UI.GetSelectedSeason()
         self.EditBox:SetWidth(160)
         self.EditBox:SetText(date("%d.%m.%Y", suggest or (season and season.startedAt) or time()))
         self.EditBox:HighlightText()
@@ -114,7 +141,7 @@ StaticPopupDialogs["REQRT_SEASON_START"] = {
 --- Parst "TT.MM.JJJJ" und setzt damit den Season-Start. Eigene Funktion, damit der
 --- Popup-Handler nur weiterreicht und das Parsen testbar/nachvollziehbar bleibt.
 function UI.ApplySeasonStart(text)
-    local season = GL.GetActiveSeason()
+    local season = UI.GetSelectedSeason()
     if not season then return false end
     local d, m, y = tostring(text or ""):match("^%s*(%d%d?)%.(%d%d?)%.(%d%d%d%d)%s*$")
     if not d then
@@ -149,14 +176,11 @@ function UI.BuildSeasonControls(header)
             info.notCheckable = true
             info.func = function()
                 CloseDropDownMenus()
-                if season.endedAt then
-                    -- Wiederaufnehmen beendet die laufende Season → nachfragen
-                    local dlg = StaticPopup_Show("REQRT_REOPEN_SEASON")
-                    if dlg then dlg.data = season.id end
-                else
-                    GL.SetActiveSeason(season.id)
-                    UI.RefreshAttendanceTab()
-                end
+                -- Auswählen heißt ansehen, nicht öffnen: eine beendete Season lässt sich
+                -- damit betrachten, ohne sie wieder aufnehmen zu müssen. Das Wiederaufnehmen
+                -- liegt auf [Resume].
+                UI.SetSelectedSeason(season.id)
+                UI.RefreshAttendanceTab()
             end
             UIDropDownMenu_AddButton(info)
         end
@@ -171,7 +195,7 @@ function UI.BuildSeasonControls(header)
     dateLbl:SetAllPoints()
     dateLbl:SetJustifyH("LEFT")
     dateBtn:SetScript("OnClick", function()
-        if GL.GetActiveSeason() then StaticPopup_Show("REQRT_SEASON_START") end
+        if UI.GetSelectedSeason() then StaticPopup_Show("REQRT_SEASON_START") end
     end)
     dateBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
@@ -182,22 +206,61 @@ function UI.BuildSeasonControls(header)
     end)
     dateBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
-    local newBtn = CreateFrame("Button", nil, header, "UIPanelButtonTemplate")
-    newBtn:SetSize(100, 20)
-    newBtn:SetPoint("LEFT", dateBtn, "RIGHT", 4, 0)
-    newBtn:SetText("Neue Season")
-    newBtn:SetScript("OnClick", function() StaticPopup_Show("REQRT_NEW_SEASON") end)
+    -- Umschalter wie sessionBtn im Raid-Tab: ohne laufende Season "New Season", mit
+    -- laufender "Close Season".
+    local seasonBtn = CreateFrame("Button", nil, header, "UIPanelButtonTemplate")
+    seasonBtn:SetSize(150, 22)
+    seasonBtn:SetPoint("LEFT", dateBtn, "RIGHT", 4, 0)
+    seasonBtn:SetText("New Season")
+    seasonBtn:SetScript("OnClick", function()
+        local active = GL.GetActiveSeason()
+        if active then
+            GL.EndSeason(active.id)
+            -- Auswahl auf der eben geschlossenen Season lassen, sonst springt die Ansicht
+            UI.SetSelectedSeason(active.id)
+            UI.RefreshAttendanceTab()
+        else
+            StaticPopup_Show("REQRT_NEW_SEASON")
+        end
+    end)
+
+    -- Wiederaufnehmen der ausgewählten, beendeten Season. Vorher nur im Dropdown versteckt.
+    local resumeBtn = CreateFrame("Button", nil, header, "UIPanelButtonTemplate")
+    resumeBtn:SetSize(90, 22)
+    resumeBtn:SetPoint("LEFT", seasonBtn, "RIGHT", 4, 0)
+    resumeBtn:SetText("Resume")
+    resumeBtn:SetScript("OnClick", function()
+        local season = UI.GetSelectedSeason()
+        if not season or not season.endedAt then return end
+        -- Beendet die laufende Season → nachfragen
+        local dlg = StaticPopup_Show("REQRT_REOPEN_SEASON")
+        if dlg then dlg.data = season.id end
+    end)
+
+    -- Umbenennen über den gemeinsamen Dialog aus UI_Common (UI.ShowRenameDialog)
+    local renameBtn = CreateFrame("Button", nil, header, "UIPanelButtonTemplate")
+    renameBtn:SetSize(60, 22)
+    renameBtn:SetPoint("LEFT", resumeBtn, "RIGHT", 4, 0)
+    renameBtn:SetText("Rename")
+    renameBtn:SetScript("OnClick", function()
+        local season = UI.GetSelectedSeason()
+        if not season then return end
+        UI.ShowRenameDialog("Season umbenennen:", season.name, function(name)
+            GL.RenameSeason(season.id, name)
+            UI.RefreshAttendanceTab()
+        end)
+    end)
 
     -- Löschen der aktiven Season, Muster wie der Delete-Button im Raid-Tab:
     -- erster Klick zeigt "Sure?", ein zweiter innerhalb von 3s löscht.
-    -- Beendete Seasons werden über den Dropdown wieder aufgenommen und dann gelöscht.
+    -- Wirkt auf die AUSGEWÄHLTE Season, damit sich auch eine beendete löschen lässt.
     local delBtn = CreateFrame("Button", nil, header, "UIPanelButtonTemplate")
-    delBtn:SetSize(60, 20)
-    delBtn:SetPoint("LEFT", newBtn, "RIGHT", 4, 0)
+    delBtn:SetSize(54, 22)
+    delBtn:SetPoint("LEFT", renameBtn, "RIGHT", 4, 0)
     delBtn:SetText("Delete")
     local delPending, delTimer = false, nil
     delBtn:SetScript("OnClick", function()
-        local season = GL.GetActiveSeason()
+        local season = UI.GetSelectedSeason()
         if not season then return end
         if delPending then
             if delTimer then delTimer:Cancel(); delTimer = nil end
@@ -213,7 +276,7 @@ function UI.BuildSeasonControls(header)
     end)
     delBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-        GameTooltip:AddLine("Aktive Season löschen", 1, 1, 1)
+        GameTooltip:AddLine("Ausgewählte Season löschen", 1, 1, 1)
         GameTooltip:AddLine("Raid-Sessions und Loot bleiben erhalten — nur die Season selbst geht weg.",
                             0.8, 0.8, 0.8, true)
         GameTooltip:Show()
@@ -224,7 +287,7 @@ function UI.BuildSeasonControls(header)
     -- GUILD_ROSTER_UPDATE aktualisiert, aber ohne sichtbaren Auslöser — und die
     -- Rang-Liste ist nach frischem Login kurz leer.
     local readBtn = CreateFrame("Button", nil, header, "UIPanelButtonTemplate")
-    readBtn:SetSize(100, 20)
+    readBtn:SetSize(100, 22)
     readBtn:SetPoint("LEFT", delBtn, "RIGHT", 4, 0)
     readBtn:SetText("Roster lesen")
     -- Stammt der Kader aus einer anderen Gilde, warnt der erste Klick und erst der zweite
@@ -270,7 +333,7 @@ function UI.BuildSeasonControls(header)
     UIDropDownMenu_Initialize(rankDD, function()
         local names  = GL.GetGuildRankNames()
         local sorted = SortedRankIndices(names)
-        local season = GL.GetActiveSeason()
+        local season = UI.GetSelectedSeason()
 
         -- Oben der Normalfall: ein Klick setzt Rang + alles darüber
         local title = UIDropDownMenu_CreateInfo()
@@ -320,7 +383,11 @@ function UI.BuildSeasonControls(header)
         rankDD   = rankDD,
         dateLbl  = dateLbl,
         countLbl = countLbl,
-        delBtn   = delBtn,
+        delBtn    = delBtn,
+        renameBtn = renameBtn,
+        seasonBtn = seasonBtn,
+        resumeBtn = resumeBtn,
+        readBtn   = readBtn,
     }
 end
 
@@ -332,10 +399,20 @@ end
 --- @param data  optional das Ergebnis von GL.ComputeAttendance (spart eine zweite Berechnung)
 function UI.RefreshSeasonControls(data)
     if not S then return end
-    local season = GL.GetActiveSeason()
+    local season = UI.GetSelectedSeason()
 
     UIDropDownMenu_SetText(S.seasonDD, SeasonLabel(season))
     S.delBtn:SetEnabled(season ~= nil)
+    S.renameBtn:SetEnabled(season ~= nil)
+
+    -- Umschalter wie im Raid-Tab: läuft eine Season, schließt der Knopf sie; sonst legt er
+    -- eine neue an. Resume greift nur bei einer ausgewählten, beendeten Season.
+    local active = GL.GetActiveSeason()
+    S.seasonBtn:SetText(active and "Close Season" or "New Season")
+    S.resumeBtn:SetEnabled((season ~= nil and season.endedAt ~= nil) and true or false)
+    -- Der Roster-Schnappschuss gehört zur laufenden Season; für eine beendete gibt es
+    -- nichts einzulesen
+    S.readBtn:SetEnabled(active ~= nil)
     S.dateLbl:SetText(season
         and ("|cff888888seit|r |cffffffff" .. date("%d.%m.%Y", season.startedAt or 0) .. "|r")
         or  "|cff888888noch keine Season angelegt|r")

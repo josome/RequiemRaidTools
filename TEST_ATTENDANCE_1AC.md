@@ -1,7 +1,7 @@
 # Attendance Phase 1a + 1c — In-Game Test-Checkliste
 
 **Branch:** `feat/attendance`
-**TOC:** 1.0.3.31
+**TOC:** 1.0.3.38
 **Was neu ist:** Season-Datenmodell (`Core_Season`), Gilden-/Season-Roster (`Core_Guild`),
 Attendance-Aggregat (`Core_Attendance`), Attendance-Tab + Season-Kopfzeile
 (`UI_AttendanceTab`, `UI_SeasonControls`). Tab-Slot 5 heißt jetzt **Attendance** —
@@ -41,20 +41,37 @@ Beide führen zu einem **leeren Tab, der wie ein Defekt aussieht** — sind aber
 - [ ] Tab-Slot 5 heißt **Attendance** und öffnet
 - [ ] Die anderen Tabs (Loot · Log · Raid · Roll) öffnen weiterhin fehlerfrei
 
-**Erwartet ohne Season:** Leerzustand „Keine Season aktiv. / Oben eine anlegen."
+**Erwartet ohne Season:** Leerzustand „Noch keine Season angelegt. / Oben auf \"New Season\"."
 
 ---
 
 ## 2 — Season-Kopfzeile
 
-- [ ] **[Neue Season]** → Popup, Name vorbelegt mit `Season JJJJ-MM` → Anlegen
-- [ ] Season-Dropdown zeigt die neue Season; ältere Seasons darunter, neueste zuerst
-- [ ] Eine **beendete** Season im Dropdown ist mit `(beendet)` markiert; Auswahl fragt
-      „Wieder aufnehmen?" nach (die laufende wird dabei beendet)
+Die Kopfzeile hat jetzt dieselben Knöpfe wie der Raid-Tab, und der Dropdown **wählt** eine
+Season nur aus, statt sie zu öffnen — beendete Seasons lassen sich damit ansehen, ohne sie
+wieder aufzunehmen.
+
+- [ ] **[New Season]** → Popup, Name vorbelegt mit `Season JJJJ-MM` → Anlegen; die neue Season
+      ist danach ausgewählt
+- [ ] Läuft eine Season, heißt der Knopf **[Close Season]** und beendet sie; die Ansicht bleibt
+      auf derselben Season stehen und zeigt sie als `(beendet)`
+- [ ] Season-Dropdown zeigt alle Seasons, neueste zuerst, beendete mit `(beendet)`
+- [ ] Eine **beendete** Season auswählen zeigt ihre Matrix — **ohne** Rückfrage und ohne sie
+      zu öffnen (früher kam sofort „Wieder aufnehmen?")
+- [ ] **[Resume]** ist nur bei einer ausgewählten, beendeten Season aktiv → fragt
+      „Wieder aufnehmen?" und beendet dabei die laufende
+- [ ] Bei einer beendeten Season ist **[Roster lesen]** ausgegraut — der Kader-Schnappschuss
+      gehört zur laufenden Season
 - [ ] **Startdatum** links neben [Neue Season] ist klickbar → Popup „TT.MM.JJJJ",
       vorbelegt mit dem ältesten vorhandenen Raid
 - [ ] Unsinniges Datum (z. B. `32.13.2026`) → Print „Datum bitte als TT.MM.JJJJ angeben.",
       nichts ändert sich
+- [ ] **[Rename]** → Popup mit dem aktuellen Namen vorbelegt und markiert; OK oder Enter
+      übernimmt, der Dropdown zeigt den neuen Namen sofort
+- [ ] Leerer Name (oder nur Leerzeichen) wird abgewiesen, der alte bleibt stehen
+- [ ] Ohne Season sind **[Rename]** und **[Delete]** ausgegraut
+- [ ] Session umbenennen im **Raid-Tab** funktioniert unverändert — beide nutzen jetzt
+      denselben Dialog (`UI.ShowRenameDialog`)
 - [ ] **[Delete]** erster Klick → roter Text `Sure?`; **nicht** klicken, 3 s warten →
       springt auf `Delete` zurück
 - [ ] [Delete] zweimal schnell → Season weg. **Raid-Sessions und Loot bleiben erhalten**
@@ -150,7 +167,11 @@ Seit Phase 1b wird jeder Bosskill einzeln aufgezeichnet und Nachrücker werden n
 - [ ] Tooltip auf einer eingeklappten Spalte sagt „N Bosse — klicken zum Aufklappen"
 - [ ] Der aufgeklappte Abend rutscht ans **linke Ende** des Fensters (sonst schöbe er seine
       eigenen Spalten aus dem Sichtbereich)
-- [ ] Senkrechter **Trennstrich** im Kopf zeigt, wo ein Abend anfängt
+- [ ] Senkrechte **Trennstriche** laufen durch die ganze Tabelle, nicht nur im Kopf:
+      kräftig beim Wechsel des Raid-Tags, heller beim Wechsel der **Raidinstanz**
+      innerhalb eines Abends (z. B. Dazar'alor → Castle Nathria)
+- [ ] Mehrere Durchläufe **derselben** Instanz auf N/H/M bekommen **keinen** Strich —
+      die unterscheidet die Tönung
 - [ ] Nachrücker: in der **ersten** Bossspalte dunkel, ab seinem Kill grün — die Abend-Spalte
       des Nachbarabends bleibt unberührt
 - [ ] Erneuter Klick klappt zu

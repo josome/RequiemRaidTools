@@ -18,12 +18,20 @@ local NAME_W  = 130
 local PCT_W   = 44
 local TRIAL_W = 40
 local LEFT_W  = NAME_W + PCT_W + TRIAL_W   -- Breite des fixen linken Blocks
-local CELL_W  = 34
+-- Breit genug für ein Datum "07.08." samt CELL_PAD auf beiden Seiten — bei 34 blieb davon
+-- nach dem Rand zu wenig übrig und das Datum wurde abgeschnitten.
+local CELL_W  = 44
 local ROW_H   = 20
+-- Linker Einzug der Zeilen im Content. Spaltenköpfe, Trenner und Gruppenlabels müssen
+-- denselben Einzug verwenden, sonst stehen die Zellen versetzt zu ihren Überschriften.
+local ROW_INSET = 4
+-- Rand je Seite innerhalb einer Spalte: die Zelle ist CELL_W - 2*CELL_PAD breit, und
+-- Spaltenkopf und Tönung nutzen denselben Rand, damit alles auf einer Linie steht.
+local CELL_PAD  = 2
 local SEP_H   = 18
 local PAGER_W = 92                          -- Platz für ◀ Seite x/y ▶
 
--- Aufgeklappte Bossspalten sind breiter: in CELL_W passt nur eine Zahl, hier steht der
+-- Aufgeklappte Bossspalten sind breiter: in CELL_W passt gerade das Datum, hier steht der
 -- (gekürzte) Bossname. Der volle Name bleibt im Tooltip.
 local KILL_CELL_W      = 58
 local KILL_LABEL_CHARS = 8
@@ -141,7 +149,7 @@ function UI.BuildAttendancePanel(parent)
 
     local function FixedHeader(text, x, w)
         local lbl = colHeader:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        lbl:SetPoint("TOPLEFT", colHeader, "TOPLEFT", x, 0)
+        lbl:SetPoint("TOPLEFT", colHeader, "TOPLEFT", ROW_INSET + x, 0)
         lbl:SetWidth(w)
         lbl:SetJustifyH("LEFT")
         lbl:SetText(text)
@@ -190,12 +198,15 @@ function UI.BuildAttendancePanel(parent)
         function()
             local btn = CreateFrame("Button", nil, colHeader)
             btn:SetSize(CELL_W, 18)
+            -- Hintergrund und Text sitzen in derselben Box wie die Zelle darunter
+            -- (CELL_PAD je Seite), damit Spaltenkopf und Zellenraster fluchten.
             btn.bg = btn:CreateTexture(nil, "BACKGROUND")
-            btn.bg:SetPoint("TOPLEFT",     btn, "TOPLEFT",      1, 0)
-            btn.bg:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", -1, 0)
+            btn.bg:SetPoint("TOPLEFT",     btn, "TOPLEFT",      CELL_PAD, 0)
+            btn.bg:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", -CELL_PAD, 0)
             btn.bg:Hide()
             btn.fs = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-            btn.fs:SetAllPoints()
+            btn.fs:SetPoint("TOPLEFT",     btn, "TOPLEFT",      CELL_PAD, 0)
+            btn.fs:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", -CELL_PAD, 0)
             btn.fs:SetJustifyH("CENTER")
             btn:SetScript("OnEnter", function(self)
                 if not self.tooltipT then return end
@@ -250,10 +261,11 @@ function UI.BuildAttendancePanel(parent)
 
     -- Senkrechte Trenner zwischen den Abend-Gruppen im Spaltenkopf: bei aufgeklappten
     -- Bossspalten wäre sonst nicht erkennbar, welche Spalte zu welchem Abend gehört.
+    -- Farbe wird beim Zeichnen gesetzt: derselbe Pool trägt den kräftigen Tages-Trenner und
+    -- den helleren Strich zwischen zwei Raidinstanzen desselben Abends.
     panel.groupSepPool = UI.CreateFramePool(
         function()
             local tex = colHeader:CreateTexture(nil, "ARTWORK")
-            tex:SetColorTexture(0.5, 0.5, 0.5, 0.7)
             tex:SetSize(1, 16)
             return tex
         end,
@@ -312,6 +324,17 @@ function UI.BuildAttendancePanel(parent)
         end
     )
 
+    -- Senkrechte Trenner durch den Zeilenbereich. Im Spaltenkopf allein sind sie 16 px hoch
+    -- und praktisch unsichtbar — erst über die volle Tabellenhöhe trennen sie wirklich.
+    panel.colSepPool = UI.CreateFramePool(
+        function()
+            local tex = content:CreateTexture(nil, "BACKGROUND")
+            tex:SetWidth(1)
+            return tex
+        end,
+        function(_, tex) tex:Hide(); tex:ClearAllPoints() end
+    )
+
     -- Trenner zwischen Kader- und Gast-Block (es gibt höchstens einen)
     local sep = content:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     sep:SetJustifyH("LEFT")
@@ -348,9 +371,9 @@ local function SetCell(row, index, present, trial, x, w)
         cell = row:CreateTexture(nil, "ARTWORK")
         row.cells[index] = cell
     end
-    cell:SetSize(w - 6, ROW_H - 6)
+    cell:SetSize(w - 2 * CELL_PAD, ROW_H - 6)
     cell:ClearAllPoints()
-    cell:SetPoint("LEFT", row, "LEFT", x + 3, 0)
+    cell:SetPoint("LEFT", row, "LEFT", x + CELL_PAD, 0)
     local c = COLOR_ABSENT
     if present then c = trial and COLOR_TRIAL or COLOR_PRESENT end
     cell:SetColorTexture(c[1], c[2], c[3], c[4])
@@ -363,7 +386,7 @@ function UI.RefreshAttendanceTab()
     if UI.activeTab ~= TAB_PLAYER then return end
 
     local db     = GuildLootDB
-    local season = GL.GetActiveSeason()
+    local season = UI.GetSelectedSeason()
     local data   = season and GL.ComputeAttendance(season.id)
                    or { season = nil, nights = {}, rows = {} }
 
@@ -380,13 +403,14 @@ function UI.RefreshAttendanceTab()
     panel.rowPool:ReleaseAll()
     panel.headerPool:ReleaseAll()
     panel.groupSepPool:ReleaseAll()
+    panel.colSepPool:ReleaseAll()
     panel.groupLabelPool:ReleaseAll()
     panel.sepLbl:Hide()
 
     -- ── Leerzustände: ein leerer Tab darf nicht wie ein Defekt aussehen ──
     local msg = nil
     if not season then
-        msg = "Keine Season aktiv.\n|cff888888Oben eine anlegen.|r"
+        msg = "Noch keine Season angelegt.\n|cff888888Oben auf \"New Season\".|r"
     elseif #data.rows == 0 then
         msg = "Kein Rang für den Kader gewählt.\n|cff888888Oben \"Kader ab Rang\" setzen.|r"
     elseif #data.nights == 0 then
@@ -439,7 +463,7 @@ function UI.RefreshAttendanceTab()
         if not run then return end
         local btn = panel.groupLabelPool:Acquire()
         btn:SetWidth(run.width)
-        btn:SetPoint("TOPLEFT", panel.groupHeader, "TOPLEFT", run.x, 0)
+        btn:SetPoint("TOPLEFT", panel.groupHeader, "TOPLEFT", ROW_INSET + run.x, 0)
         -- grobes Zeichenbudget: GameFontNormalSmall läuft bei ~6 px je Zeichen
         btn.fs:SetText(GL.TruncateText(run.label, math.max(3, math.floor(run.width / 6))))
         btn.tooltipT = run.label
@@ -467,6 +491,9 @@ function UI.RefreshAttendanceTab()
     FlushRun()
 
     -- ── Spaltenköpfe ──────────────────────────────────────────
+    -- x-Positionen der senkrechten Trenner; gezeichnet werden sie erst nach den Zeilen,
+    -- weil dann die Höhe der Tabelle feststeht
+    local seps = {}
     local hx = LEFT_W
     for _, col in ipairs(shown) do
         local x   = hx
@@ -475,7 +502,7 @@ function UI.RefreshAttendanceTab()
 
         local btn = panel.headerPool:Acquire()
         btn:SetSize(w, 18)
-        btn:SetPoint("TOPLEFT", panel.colHeader, "TOPLEFT", x, 0)
+        btn:SetPoint("TOPLEFT", panel.colHeader, "TOPLEFT", ROW_INSET + x, 0)
 
         -- Löschbar ist alles Eindeutige: ein einzelner Bosskill, eine Spalte mit genau einem
         -- Eintrag dahinter (auch Altdaten ohne Kill-Ebene), und eine Spalte, deren Tag gar
@@ -566,11 +593,18 @@ function UI.RefreshAttendanceTab()
         end)
         btn:Show()
 
-        -- Trenner links vor der ersten Spalte eines Abends (nicht ganz links außen)
-        if col.groupStart and x > LEFT_W then
+        -- Trenner links vor der Spalte (nicht ganz links außen). Zwei Stärken: der
+        -- Tageswechsel kräftig, der Wechsel der Raidinstanz innerhalb eines Abends heller.
+        if x > LEFT_W and (col.groupStart or col.instanceStart) then
             local tex = panel.groupSepPool:Acquire()
-            tex:SetPoint("TOPLEFT", panel.colHeader, "TOPLEFT", x - 1, 0)
+            if col.groupStart then
+                tex:SetColorTexture(0.50, 0.50, 0.50, 0.70)
+            else
+                tex:SetColorTexture(0.85, 0.85, 0.85, 0.45)
+            end
+            tex:SetPoint("TOPLEFT", panel.colHeader, "TOPLEFT", ROW_INSET + x - 1, 0)
             tex:Show()
+            table.insert(seps, { x = x, group = col.groupStart })
         end
     end
 
@@ -592,7 +626,7 @@ function UI.RefreshAttendanceTab()
         -- Trenner beim Wechsel Kader → Gäste
         if lastGroup == "roster" and entry.group == "guest" then
             panel.sepLbl:ClearAllPoints()
-            panel.sepLbl:SetPoint("TOPLEFT", panel.content, "TOPLEFT", 4, yOff - 3)
+            panel.sepLbl:SetPoint("TOPLEFT", panel.content, "TOPLEFT", ROW_INSET, yOff - 3)
             panel.sepLbl:Show()
             yOff = yOff - SEP_H
         end
@@ -600,7 +634,7 @@ function UI.RefreshAttendanceTab()
 
         local row = panel.rowPool:Acquire()
         row:SetWidth(rowW)
-        row:SetPoint("TOPLEFT", panel.content, "TOPLEFT", 4, yOff)
+        row:SetPoint("TOPLEFT", panel.content, "TOPLEFT", ROW_INSET, yOff)
 
         row.nameFS:SetText(GL.ColoredName(GL.ShortName(entry.name), entry.class))
         row.pctFS:SetText(string.format("%d%%", entry.pct or 0))
@@ -631,5 +665,21 @@ function UI.RefreshAttendanceTab()
         yOff = yOff - ROW_H
     end
 
-    panel.content:SetHeight(math.max(math.abs(yOff), 1))
+    local contentH = math.max(math.abs(yOff), 1)
+    panel.content:SetHeight(contentH)
+
+    -- Senkrechte Trenner durch die Zeilen, in derselben Anmutung wie die waagerechte Linie
+    -- unter dem Spaltenkopf. Zeilen sitzen bei x = 4 im Content, die Spalten-x sind relativ
+    -- zur Zeile — daher der Versatz.
+    for _, sep in ipairs(seps) do
+        local tex = panel.colSepPool:Acquire()
+        if sep.group then
+            tex:SetColorTexture(0.40, 0.40, 0.40, 1)      -- Tageswechsel: wie die Kopflinie
+        else
+            tex:SetColorTexture(0.55, 0.55, 0.55, 0.55)   -- Instanzwechsel: heller, leiser
+        end
+        tex:SetHeight(contentH)
+        tex:SetPoint("TOPLEFT", panel.content, "TOPLEFT", ROW_INSET + sep.x - 1, 0)
+        tex:Show()
+    end
 end

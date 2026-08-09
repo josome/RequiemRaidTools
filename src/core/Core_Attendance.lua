@@ -79,6 +79,8 @@ local function CollectNights(db, season)
                             killIndex    = i,
                             -- "N"/"H"/"M"; hängt am raidMeta, nicht am einzelnen Kill
                             difficulty   = meta.difficulty,
+                            -- Raidinstanz, für den Trennstrich zwischen Instanzen
+                            tier         = meta.tier,
                             participants = kill.participants or {},
                             -- nil = nicht aufgezeichnet (Altdaten), {} = niemand war Trial
                             trials       = kill.trials,
@@ -92,6 +94,7 @@ local function CollectNights(db, season)
                         name         = meta.tier,
                         ts           = meta.startedAt or ts,
                         difficulty   = meta.difficulty,
+                        tier         = meta.tier,
                         participants = meta.participants or {},
                         -- ohne killIndex: die Spalte steht für den ganzen raidMeta-Eintrag
                         sessionId    = session.id,
@@ -277,7 +280,13 @@ function GL.BuildAttendanceColumns(nights, expanded)
         local groupLabel = (night.label ~= "" and night.label) or dateLabel
 
         if expandable and expanded[night.id] then
+            local prevTier = nil
             for i, kill in ipairs(kills) do
+                -- Wechselt die Raidinstanz mitten im Abend, bekommt die erste Spalte der
+                -- neuen Instanz einen Trennstrich. Die allererste braucht keinen — dort
+                -- sitzt schon der Gruppentrenner.
+                local instanceStart = (i > 1) and (kill.tier ~= prevTier) or false
+                prevTier = kill.tier
                 table.insert(cols, {
                     -- voller Bossname; die UI kürzt ihn auf die Spaltenbreite
                     key        = kill.id,
@@ -296,10 +305,11 @@ function GL.BuildAttendanceColumns(nights, expanded)
                     sessionId  = kill.sessionId,
                     raidID     = kill.raidID,
                     killIndex  = kill.killIndex,
-                    nightId    = night.id,
-                    isKill     = true,
-                    expandable = true,
-                    groupStart = (i == 1),
+                    nightId       = night.id,
+                    isKill        = true,
+                    expandable    = true,
+                    groupStart    = (i == 1),
+                    instanceStart = instanceStart,
                 })
             end
         else

@@ -107,7 +107,9 @@ Aufklappens pur und testbar. Helper `Nights(spec)` baut die Eingabe ohne DB.
 | `testBuildColumns_ExpandedGivesOneColumnPerKill` | Aufgeklappt → eine Spalte je Kill, `key == "nightId#index"`, `label` ist die Kill-Nummer; andere Abende bleiben einspaltig. |
 | `testBuildColumns_SingleKillNightIsNotExpandable` | Abend mit einem Kill bleibt auch explizit aufgeklappt eine Abend-Spalte. |
 | `testBuildColumns_ExpandableFlagFollowsKillCount` | `expandable` nur bei mehr als einem Kill — deckt Altdaten ohne `kills`-Ebene mit ab. |
-| `testBuildColumns_GroupStartOnFirstColumnOfEachNight` | `groupStart` sitzt genau auf der ersten Spalte jedes Abends (Trenner im Kopf). |
+| `testBuildColumns_GroupStartOnFirstColumnOfEachNight` | `groupStart` sitzt genau auf der ersten Spalte jedes Abends (kräftiger Trenner). |
+| `testBuildColumns_InstanceStartOnTierChange` | `instanceStart` markiert den Wechsel der Raidinstanz innerhalb eines Abends (hellerer Trenner); die erste Spalte trägt schon `groupStart`. |
+| `testBuildColumns_SameInstanceDifferentDifficultyHasNoLine` | Mehrere Durchläufe derselben Instanz auf N/H/M sind **eine** Instanz — unterschieden werden sie über die Tönung, nicht über einen Strich. |
 | `testBuildColumns_NightIdOnEveryColumn` | Auch Bossspalten tragen `nightId` — der Klick-Handler braucht ihn zum Zuklappen. |
 | `testBuildColumns_KeepsNightOrder` | Reihenfolge aus `ComputeAttendance` (neueste zuerst) wird nicht umsortiert. |
 | `testBuildColumns_EmptyAndNilInputs` | Leere und fehlende Eingaben → leere Liste statt Fehler; `expanded` ist optional. |

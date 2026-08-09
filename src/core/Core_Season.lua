@@ -115,6 +115,23 @@ function GL.DeleteSeason(id)
     return true
 end
 
+--- Benennt eine Season um. Die ID bleibt unangetastet — sie wird zwar aus dem Namen
+--- erzeugt, ist danach aber der Schlüssel in db.seasons und die Referenz in
+--- db.activeSeasonId; sie mitzuändern würde beides brechen.
+--- Leere Namen werden abgewiesen: der Dropdown zeigte sonst nur "(ohne Namen)".
+--- Doppelte Namen sind erlaubt, wie beim Anlegen auch — unterschieden wird über die ID.
+--- Returns true bei Erfolg, false bei unbekannter ID oder leerem Namen.
+--- Writes: db.seasons[id].name
+function GL.RenameSeason(id, name)
+    local db = GuildLootDB
+    local season = db and db.seasons and db.seasons[id]
+    if not season then return false end
+    name = tostring(name or ""):match("^%s*(.-)%s*$")   -- trimmen
+    if name == "" then return false end
+    season.name = name
+    return true
+end
+
 --- Setzt das Startdatum einer Season. Nötig, weil eine heute angelegte Season sonst alle
 --- bereits vorhandenen Raid-Sessions aus ihrem Zeitfenster ausschließt — die Matrix bliebe
 --- leer, obwohl Daten da sind. Zugleich die Grundlage für das Nachtragen alter Raids.

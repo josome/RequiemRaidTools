@@ -43,6 +43,10 @@ in Phase 1c einen eigenen Selektor.
 | `testDeleteSeason_RemovesEntryAndClearsActive` | `DeleteSeason` entfernt den Eintrag; war es die aktive Season, ist danach keine aktiv. |
 | `testDeleteSeason_KeepsOtherSeasonsAndRaidData` | Andere Seasons, die aktive Season und `raidContainers` bleiben unberührt. |
 | `testDeleteSeason_UnknownReturnsFalse` | Unbekannte ID → `false`. |
+| `testRenameSeason_ChangesNameButNotId` | Umbenennen ändert nur `name`; `id` und `activeSeasonId` bleiben — die ID wird zwar aus dem Namen erzeugt, ist danach aber Schlüssel und Referenz. |
+| `testRenameSeason_TrimsWhitespace` | Führende/abschließende Leerzeichen werden entfernt. |
+| `testRenameSeason_RejectsEmptyName` | Leer, nur Leerzeichen oder `nil` → `false`, Name bleibt unverändert. |
+| `testRenameSeason_UnknownIdIsNoOp` | Unbekannte Season-ID → `false`. |
 | `testSetSeasonStart_MovesWindowBack` | `SetSeasonStart` verschiebt `startedAt`; `endedAt` bleibt unangetastet. |
 | `testSetSeasonStart_RejectsUnknownOrInvalid` | Unbekannte ID, `nil`, `0` und Nicht-Zahlen → `false`. |
 | `testSetSeasonStart_RejectsStartAfterEnd` | Ein Start nach dem Season-Ende wird abgewiesen. |

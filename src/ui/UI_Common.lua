@@ -122,6 +122,58 @@ function UI.CreateFramePool(createFn, resetFn)
 end
 
 -- ============================================================
+-- Umbenennen-Dialog
+-- ============================================================
+
+-- Ein einziger StaticPopup-Eintrag für alle Umbenennungen. Ohne das schreibt jeder Aufrufer
+-- seinen eigenen Dialog und dupliziert die Logik dabei zweimal — einmal in OnAccept und
+-- nochmal in EditBoxOnEnterPressed, weil WoW beide getrennt aufruft.
+StaticPopupDialogs = StaticPopupDialogs or {}
+
+local RENAME_DIALOG = "REQRT_RENAME"
+-- Was gerade umbenannt wird; von UI.ShowRenameDialog vor dem Öffnen gesetzt.
+local renameState = nil
+
+local function ApplyRename(text)
+    local state = renameState
+    if not state then return end
+    -- Trimmen gehört hierher, nicht in jeden Aufrufer
+    local name = tostring(text or ""):match("^%s*(.-)%s*$")
+    if name == "" then return end
+    state.apply(name)
+end
+
+StaticPopupDialogs[RENAME_DIALOG] = {
+    text       = "%s",
+    button1    = "OK",
+    button2    = "Abbrechen",
+    hasEditBox = true,
+    maxLetters = 48,
+    OnShow     = function(self)
+        self.EditBox:SetWidth(260)
+        self.EditBox:SetText((renameState and renameState.current) or "")
+        self.EditBox:HighlightText()
+    end,
+    OnAccept   = function(self) ApplyRename(self.EditBox:GetText()) end,
+    EditBoxOnEnterPressed = function(self)
+        ApplyRename(self:GetText())
+        StaticPopup_Hide(RENAME_DIALOG)
+    end,
+    OnHide     = function() renameState = nil end,
+    timeout = 0, whileDead = true, hideOnEscape = true,
+}
+
+--- Öffnet den Umbenennen-Dialog.
+--- @param title   string    Überschrift, z. B. "Session umbenennen:"
+--- @param current string    aktueller Name, vorbelegt und markiert
+--- @param apply   function  bekommt den getrimmten, nicht-leeren Namen
+function UI.ShowRenameDialog(title, current, apply)
+    if type(apply) ~= "function" then return end
+    renameState = { current = current or "", apply = apply }
+    StaticPopup_Show(RENAME_DIALOG, title or "Umbenennen:")
+end
+
+-- ============================================================
 -- Größenänderung
 -- ============================================================
 
