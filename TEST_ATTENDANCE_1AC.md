@@ -1,7 +1,7 @@
 # Attendance Phase 1a + 1c — In-Game Test-Checkliste
 
 **Branch:** `feat/attendance`
-**TOC:** 1.0.3.57
+**TOC:** 1.0.4.0-beta
 **Was neu ist:** Season-Datenmodell (`Core_Season`), Gilden-/Season-Roster (`Core_Guild`),
 Attendance-Aggregat (`Core_Attendance`), Attendance-Tab + Season-Kopfzeile
 (`UI_AttendanceTab`, `UI_SeasonControls`). Tab-Slot 5 heißt jetzt **Attendance** —
