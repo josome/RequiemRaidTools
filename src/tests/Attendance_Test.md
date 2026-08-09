@@ -9,7 +9,7 @@ Läuft in-game via WoWUnit (devMode) und standalone über busted
 rechnet nichts selbst. Rückgabe:
 
 ```
-{ season, nights = { { id, label, startedAt, kills = { { id, name, ts } } } },
+{ season, nights = { { id, label, startedAt, kills = { { id, name, ts, difficulty } } } },
           rows   = { { name, class, group, present, trialAt, attended, total, pct, trial } } }
 ```
 
@@ -74,6 +74,8 @@ Season-Fenster; erst die Kills darin werden nach ihrem eigenen Zeitstempel auf T
 | `testComputeAttendance_FallsBackToNightLevelWithoutKills` | Ohne `kills` (Altdaten, Observer-Sessions) bleibt es bei einem Eintrag je `raidMeta` — die Abend-Ebene stimmt unverändert. |
 | `testComputeAttendance_EmptyKillsListUsesFallback` | Leere `kills`-Liste verhält sich wie gar keine. |
 
+| `testComputeAttendance_PresenceMatchesDespiteRealmSpacing` | Präsenz wird über `GL.NameKey` nachgeschlagen: Kader aus dem Gildenroster (Realm mit Leerzeichen) und Kill-Teilnehmer aus der Raid-API (ohne) müssen dieselbe Zeile treffen — sonst bliebe sie trotz Teilnahme auf 0 %. |
+
 ### Trial-Stand zum Zeitpunkt des Kills (`trialAt`)
 
 Die Trial-Rolle endet nach drei Raids. `row.trialAt[key]` hält deshalb fest, ob jemand **damals**
@@ -110,6 +112,17 @@ Aufklappens pur und testbar. Helper `Nights(spec)` baut die Eingabe ohne DB.
 | `testBuildColumns_KeepsNightOrder` | Reihenfolge aus `ComputeAttendance` (neueste zuerst) wird nicht umsortiert. |
 | `testBuildColumns_EmptyAndNilInputs` | Leere und fehlende Eingaben → leere Liste statt Fehler; `expanded` ist optional. |
 | `testBuildColumns_LabelsAndTooltips` | Abend-Tooltip nennt die Anzahl Bosse, Bossspalten nennen den Bossnamen. |
+| `testBuildColumns_GroupLabelIsSessionName` | `groupLabel` trägt den Session-Namen — die UI schreibt ihn über die aufgeklappte Gruppe. |
+| `testBuildColumns_GroupLabelFallsBackToDate` | Session ohne Namen → Datum, damit die Gruppe nie unbeschriftet bleibt. |
+| `testBuildColumns_KillTooltipCarriesDifficulty` | Bosskill-Tooltip nennt N/H/M aus `meta.difficulty`. |
+| `testBuildColumns_KillTooltipWithoutDifficulty` | Altdaten ohne `difficulty` → kein leerer Trenner im Tooltip. |
+| `testBuildColumns_DifficultyOnKillColumns` | `difficulty` je Bossspalte — die UI hinterlegt den Kopf danach (N grün, H blau, M lila). |
+| `testBuildColumns_KillColumnsCarryDeleteHandles` | Bossspalten tragen `sessionId`/`raidID`/`killIndex` — der Rückweg, den der Tab zum Löschen braucht. |
+| `testBuildColumns_EmptyDayCarriesSessionsToDelete` | Tag ganz ohne Kill → `emptySessions` nennt die betroffenen Sessions. |
+| `testBuildColumns_DayWithKillsHasNoEmptySessions` | Spalte mit Kills trägt kein `emptySessions` — dort wäre nicht klar, was ein Löschen träfe. |
+| `testBuildColumns_SingleEntryNightIsDeletable` | Steht **genau ein** Eintrag hinter einer eingeklappten Spalte, trägt sie den Rückweg — der Fall für Altdaten ohne Kill-Ebene, `killIndex` bleibt `nil`. |
+| `testBuildColumns_MultiEntryNightIsNotDeletable` | Mehrere Kills hinter einer eingeklappten Spalte → kein Rückweg, weil mehrdeutig. |
+| `testBuildColumns_NightDifficultyOnlyWhenUniform` | Eingeklappte Spalte nur bei einheitlichem Abend; nach einem Wechsel H→M keine, statt eine zu behaupten. |
 
 ### Präsenz und Att.%
 

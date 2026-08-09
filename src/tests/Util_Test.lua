@@ -516,6 +516,75 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
         AreEqual("Kärge…", out)
     end
 
+    -- --------------------------------------------------------
+    -- NormalizeName — genau ein Realm, idempotent
+    -- --------------------------------------------------------
+
+    function Tests:testNormalizeName_CollapsesRepeatedRealm()
+        -- Altbestand aus der DB: der Realm hängt dutzendfach dran
+        AreEqual("Barbossbär-Antonidas",
+                 GL.NormalizeName("Barbossbär-Antonidas-Antonidas-Antonidas"))
+    end
+
+    function Tests:testNormalizeName_Idempotent()
+        local once  = GL.NormalizeName("Barbossbär-Antonidas")
+        AreEqual(once, GL.NormalizeName(once))
+        local bare  = GL.NormalizeName("Barbossbär")
+        AreEqual(bare, GL.NormalizeName(bare))
+    end
+
+    function Tests:testNormalizeName_KeepsFirstRealm()
+        -- der erste Realm ist der echte, spätere Segmente sind Müll
+        AreEqual("Barbossbär-Antonidas",
+                 GL.NormalizeName("Barbossbär-Antonidas-Malfurion"))
+    end
+
+    function Tests:testNormalizeName_AppendsRealmToBareName()
+        AreEqual("Bob-TestRealm", GL.NormalizeName("Bob"))
+    end
+
+    function Tests:testNormalizeName_EmptyAndNil()
+        AreEqual(nil, GL.NormalizeName(nil))
+        AreEqual("",  GL.NormalizeName(""))
+    end
+
+    -- --------------------------------------------------------
+    -- NameKey — Realm-Schreibweisen zusammenführen
+    -- --------------------------------------------------------
+
+    function Tests:testNameKey_IgnoresRealmSpacing()
+        -- GetRealmName() liefert Leerzeichen, WoW selbst nicht — derselbe Spieler
+        AreEqual(GL.NameKey("Barbossbär-Der Mithrilorden"),
+                 GL.NameKey("Barbossbär-DerMithrilorden"))
+    end
+
+    function Tests:testNameKey_IgnoresCase()
+        AreEqual(GL.NameKey("Barbossbär-Malfurion"), GL.NameKey("barbossbär-malfurion"))
+    end
+
+    function Tests:testNameKey_KeepsRealmDistinction()
+        -- zwei Spieler gleichen Namens auf verschiedenen Realms sind verschiedene Spieler
+        IsFalse(GL.NameKey("Barbossbär-Malfurion") == GL.NameKey("Barbossbär-Blackrock"))
+    end
+
+    function Tests:testNameKey_CollapsesRepeatedRealmSuffix()
+        -- in der DB stecken Namen mit mehrfach angehängtem Realm; ein Spielername enthält
+        -- nie einen Bindestrich, alles ab dem zweiten Segment ist Müll
+        AreEqual(GL.NameKey("Barbossbär-Malfurion"),
+                 GL.NameKey("Barbossbär-Malfurion-Malfurion"))
+        AreEqual(GL.NameKey("Barbossbär-Malfurion"),
+                 GL.NameKey("Barbossbär-Malfurion-Malfurion-Malfurion-Malfurion"))
+        -- der erste Realm bleibt maßgeblich, nicht der letzte
+        IsFalse(GL.NameKey("Barbossbär-Antonidas-Malfurion")
+                == GL.NameKey("Barbossbär-Malfurion"))
+    end
+
+    function Tests:testNameKey_BareNameStaysBare()
+        -- ohne Realm-Teil wird keiner erfunden — das ist Sache von GL.NormalizeName
+        AreEqual("barbossbär", GL.NameKey("Barbossbär"))
+        AreEqual("", GL.NameKey(nil))
+    end
+
     function Tests:testTruncateText_HandlesNilAndZero()
         AreEqual("",       GL.TruncateText(nil, 8))
         AreEqual("Ulgrax", GL.TruncateText("Ulgrax", nil))   -- ohne Limit unverändert

@@ -1,7 +1,7 @@
 # Attendance Phase 1a + 1c — In-Game Test-Checkliste
 
 **Branch:** `feat/attendance`
-**TOC:** 1.0.3.17
+**TOC:** 1.0.3.31
 **Was neu ist:** Season-Datenmodell (`Core_Season`), Gilden-/Season-Roster (`Core_Guild`),
 Attendance-Aggregat (`Core_Attendance`), Attendance-Tab + Season-Kopfzeile
 (`UI_AttendanceTab`, `UI_SeasonControls`). Tab-Slot 5 heißt jetzt **Attendance** —
@@ -136,7 +136,17 @@ Seit Phase 1b wird jeder Bosskill einzeln aufgezeichnet und Nachrücker werden n
 
 - [ ] Klick auf eine **Datums-Spalte** mit mehreren Bosskills klappt sie in Bossspalten auf
 - [ ] Bossspalten sind **breiter** und zeigen den gekürzten Bossnamen (`Bloodbo…`)
-- [ ] **Tooltip** auf einer Bossspalte zeigt den vollen Bossnamen, Datum und Uhrzeit
+- [ ] **Tooltip** auf einer Bossspalte zeigt den vollen Bossnamen, Datum, Uhrzeit und
+      den Schwierigkeitsgrad (`N`/`H`/`M`)
+- [ ] Bossköpfe sind nach Schwierigkeitsgrad **dezent hinterlegt**: N grün, H blau, M lila.
+      Erkennbar wenn man hinsieht, aber kein Blickfang — falls zu kräftig oder zu blass,
+      sind es die Werte in `DIFF_BG` (letzter Wert je Zeile = Deckkraft)
+- [ ] Abend mit **gemischten** Difficulties (H→M gewechselt): die eingeklappte Spalte hat
+      **keine** Tönung, erst die aufgeklappten Bossspalten zeigen ihre je eigene
+- [ ] Über der aufgeklappten Gruppe steht der **Session-Name in Langform**; ist er breiter
+      als die Gruppe, wird er gekürzt und der Tooltip zeigt ihn ganz
+- [ ] Klick auf den Session-Namen klappt die Gruppe wieder zu
+- [ ] Beim Auf- und Zuklappen **springt die Matrix nicht** — das Namensband bleibt stehen
 - [ ] Tooltip auf einer eingeklappten Spalte sagt „N Bosse — klicken zum Aufklappen"
 - [ ] Der aufgeklappte Abend rutscht ans **linke Ende** des Fensters (sonst schöbe er seine
       eigenen Spalten aus dem Sichtbereich)
@@ -163,7 +173,31 @@ Eine Spalte ist ein **Raid-Tag**, nicht eine Session. Tagesgrenze ist der Raid-R
 - [ ] Tooltip einer Bossspalte zeigt das Datum des **Kills**, nicht das des Abends —
       bei einer über Mitternacht laufenden Session also den Folgetag
 
-## 9 — Blättern & Leerzustände
+## 9 — Einträge löschen (Testleichen aufräumen)
+
+Löschen läuft zweistufig über **zwei verschiedene Tasten**: Rechtsklick auf den Spaltenkopf fragt
+(`Sure?` in Rot), ein **Linksklick** innerhalb von 4 s führt aus. Zwei gleiche Klicks ließen sich
+versehentlich durchziehen, ein Tastenwechsel nicht. Nichts davon fasst den **Loot** an.
+
+- [ ] Rechtsklick auf eine **Bossspalte** → `Sure?`; 4 s warten → Beschriftung kommt zurück
+- [ ] Rechtsklick, dann **Linksklick** → genau dieser Bosskill verschwindet, die anderen bleiben
+- [ ] Zweiter **Rechtsklick** statt Linksklick nimmt die Frage zurück, löscht nicht
+- [ ] War jemand **nur** bei diesem Kill dabei, ist er danach auch aus der Abend-Spalte raus
+- [ ] Letzter Kill eines Raids gelöscht → die ganze Spalte verschwindet
+- [ ] **Loot bleibt**: Session im Raid-Tab gegenprüfen, der Loot-Log ist unverändert
+- [ ] Rechtsklick auf eine **Datumsspalte ohne Bosskills** (abgebrochener Abend, Testleiche)
+      → nach Bestätigung ist die Session weg
+- [ ] Hat diese Session Loot, bleibt sie stehen und der Chat nennt den Grund
+      („Session kept — it has loot.")
+- [ ] Die **laufende** Session lässt sich nicht löschen („session is running")
+- [ ] **Altdaten ohne Bosskill-Tracking** (Raids von vor Phase 1b): die Spalte ist nicht
+      aufklappbar, lässt sich aber direkt löschen — dahinter steht genau ein Eintrag
+- [ ] Rechtsklick auf eine eingeklappte Spalte mit **mehreren** Kills tut nichts (mehrdeutig) —
+      erst aufklappen, dann die einzelne Bossspalte löschen
+- [ ] Linksklick funktioniert unverändert zum Auf- und Zuklappen
+- [ ] Tooltip nennt den Rechtsklick, wo er möglich ist
+
+## 10 — Blättern & Leerzustände
 
 - [ ] Bei mehr Abenden als Spalten passen: `<` / `>` erscheinen mit Anzeige `1–8/14`
 - [ ] `<` ist auf der ersten Seite ausgegraut, `>` auf der letzten

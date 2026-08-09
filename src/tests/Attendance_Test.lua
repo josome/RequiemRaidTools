@@ -275,6 +275,28 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
         end)
     end
 
+    function Tests:testComputeAttendance_PresenceMatchesDespiteRealmSpacing()
+        -- Kader kommt aus dem Gildenroster (Realm mit Leerzeichen), die Kill-Teilnehmer
+        -- aus der Raid-API (ohne). Ohne kanonischen Schlüssel bliebe die Zeile auf 0 %.
+        WithDB(AttendanceDB({}, {
+            { startedAt = TS(3), raids = {
+                { id = "r1", participants = { "Barbossbär-DerMithrilorden" }, kills = {
+                    { boss = "A", ts = TS(3, 21),
+                      participants = { "Barbossbär-DerMithrilorden" },
+                      trials       = { ["Barbossbär-DerMithrilorden"] = true } },
+                } },
+            } },
+        }), function()
+            MockRoster({ { name = "Barbossbär-Der Mithrilorden", group = "roster" } })
+            local result = GL.ComputeAttendance("s1")
+            local row    = result.rows[1]
+            AreEqual(1, row.attended)
+            AreEqual(100, row.pct)
+            IsTrue(row.present[result.nights[1].id])
+            IsTrue(row.trialAt["r1#1"])
+        end)
+    end
+
     -- ========================================================
     -- Trial-Stand zum Zeitpunkt des Kills (trialAt)
     -- ========================================================
@@ -357,7 +379,8 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
         for _, n in ipairs(spec) do
             local kills = {}
             for i, k in ipairs(n.kills or {}) do
-                table.insert(kills, { id = n.id .. "#" .. i, name = k.name, ts = k.ts or 0 })
+                table.insert(kills, { id = n.id .. "#" .. i, name = k.name, ts = k.ts or 0,
+                                      difficulty = k.difficulty })
             end
             -- BuildAttendanceColumns interessiert sich nicht für trials
             table.insert(nights, {
@@ -470,6 +493,161 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
         AreEqual("Sikran", open[2].tooltipT)
         -- Bossname steht auch als Label bereit, nicht nur im Tooltip
         AreEqual("Ulgrax", open[1].label)
+    end
+
+    function Tests:testBuildColumns_GroupLabelIsSessionName()
+        local nights = Nights({
+            { id = "n1", startedAt = TS(3), label = "RW 05.08. – 11.08.",
+              kills = { { name = "A" }, { name = "B" } } },
+        })
+        -- eingeklappt wie aufgeklappt: jede Spalte kennt den Session-Namen, die UI
+        -- schreibt ihn über die aufgeklappte Gruppe
+        AreEqual("RW 05.08. – 11.08.", GL.BuildAttendanceColumns(nights, {})[1].groupLabel)
+        local open = GL.BuildAttendanceColumns(nights, { n1 = true })
+        AreEqual("RW 05.08. – 11.08.", open[1].groupLabel)
+        AreEqual("RW 05.08. – 11.08.", open[2].groupLabel)
+    end
+
+    function Tests:testBuildColumns_GroupLabelFallsBackToDate()
+        -- Session ohne Namen: die Gruppe darf nicht unbeschriftet bleiben
+        local cols = GL.BuildAttendanceColumns(Nights({
+            { id = "n1", startedAt = TS(3), kills = { { name = "A" }, { name = "B" } } },
+        }), { n1 = true })
+        AreEqual("03.08", cols[1].groupLabel)
+    end
+
+    function Tests:testBuildColumns_KillColumnsCarryDeleteHandles()
+        WithDB(AttendanceDB({}, {
+            { startedAt = TS(3), raids = {
+                { id = "r1", participants = { "A-R" }, kills = {
+                    { boss = "A", ts = TS(3, 21), participants = { "A-R" } },
+                    { boss = "B", ts = TS(3, 22), participants = { "A-R" } },
+                } },
+            } },
+        }), function()
+            MockRoster({})
+            local night = GL.ComputeAttendance("s1").nights[1]
+            local cols  = GL.BuildAttendanceColumns({ night }, { [night.id] = true })
+            -- der Tab braucht den Rückweg zu den Daten, um einen Kill zu löschen
+            AreEqual("c1", cols[1].sessionId)
+            AreEqual("r1", cols[1].raidID)
+            AreEqual(1,    cols[1].killIndex)
+            AreEqual(2,    cols[2].killIndex)
+        end)
+    end
+
+    function Tests:testBuildColumns_EmptyDayCarriesSessionsToDelete()
+        WithDB(AttendanceDB({}, {
+            -- Session ohne jeden Bosskill — die Spalte erscheint trotzdem
+            { startedAt = TS(3), raids = {} },
+        }), function()
+            MockRoster({})
+            local result = GL.ComputeAttendance("s1")
+            local cols   = GL.BuildAttendanceColumns(result.nights, {})
+            AreEqual(1,    #cols)
+            AreEqual(1,    #cols[1].emptySessions)
+            AreEqual("c1", cols[1].emptySessions[1])
+        end)
+    end
+
+    function Tests:testBuildColumns_SingleEntryNightIsDeletable()
+        -- Altdaten ohne Kill-Ebene: ein raidMeta, kein kills-Array. Die Spalte lässt sich
+        -- nicht aufklappen, muss aber löschbar sein — killIndex bleibt nil, damit der
+        -- ganze raidMeta-Eintrag geht.
+        WithDB(AttendanceDB({}, {
+            { startedAt = TS(3), raids = { { id = "r1", participants = { "A-R" } } } },
+        }), function()
+            MockRoster({})
+            local cols = GL.BuildAttendanceColumns(GL.ComputeAttendance("s1").nights, {})
+            AreEqual(1,    #cols)
+            IsFalse(cols[1].expandable)
+            AreEqual("c1", cols[1].sessionId)
+            AreEqual("r1", cols[1].raidID)
+            AreEqual(nil,  cols[1].killIndex)
+        end)
+    end
+
+    function Tests:testBuildColumns_MultiEntryNightIsNotDeletable()
+        -- Mehrere Kills hinter einer eingeklappten Spalte → mehrdeutig, kein Rückweg
+        WithDB(AttendanceDB({}, {
+            { startedAt = TS(3), raids = {
+                { id = "r1", participants = { "A-R" }, kills = {
+                    { boss = "A", ts = TS(3, 21), participants = { "A-R" } },
+                    { boss = "B", ts = TS(3, 22), participants = { "A-R" } },
+                } },
+            } },
+        }), function()
+            MockRoster({})
+            local cols = GL.BuildAttendanceColumns(GL.ComputeAttendance("s1").nights, {})
+            AreEqual(1,   #cols)
+            IsTrue(cols[1].expandable)
+            AreEqual(nil, cols[1].sessionId)
+        end)
+    end
+
+    function Tests:testBuildColumns_DayWithKillsHasNoEmptySessions()
+        WithDB(AttendanceDB({}, {
+            { startedAt = TS(3), raids = {
+                { id = "r1", participants = { "A-R" }, kills = {
+                    { boss = "A", ts = TS(3, 21), participants = { "A-R" } },
+                } },
+            } },
+        }), function()
+            MockRoster({})
+            local result = GL.ComputeAttendance("s1")
+            local cols   = GL.BuildAttendanceColumns(result.nights, {})
+            -- bei einer Spalte MIT Kills wäre nicht klar, was ein Löschen treffen soll
+            AreEqual(nil, cols[1].emptySessions)
+        end)
+    end
+
+    function Tests:testBuildColumns_KillTooltipCarriesDifficulty()
+        local cols = GL.BuildAttendanceColumns(Nights({
+            { id = "n1", startedAt = TS(3), kills = {
+                { name = "Ulgrax", ts = TS(3, 21), difficulty = "H" },
+                { name = "Sikran", ts = TS(3, 22), difficulty = "H" },
+            } },
+        }), { n1 = true })
+        Exists(cols[1].tooltipD:find("H"))
+    end
+
+    function Tests:testBuildColumns_DifficultyOnKillColumns()
+        local cols = GL.BuildAttendanceColumns(Nights({
+            { id = "n1", startedAt = TS(3), kills = {
+                { name = "A", ts = TS(3, 21), difficulty = "H" },
+                { name = "B", ts = TS(3, 22), difficulty = "M" },
+            } },
+        }), { n1 = true })
+        AreEqual("H", cols[1].difficulty)
+        AreEqual("M", cols[2].difficulty)
+    end
+
+    function Tests:testBuildColumns_NightDifficultyOnlyWhenUniform()
+        -- einheitlicher Abend → Difficulty auch auf der eingeklappten Spalte
+        local same = GL.BuildAttendanceColumns(Nights({
+            { id = "n1", startedAt = TS(3), kills = {
+                { name = "A", difficulty = "H" }, { name = "B", difficulty = "H" },
+            } },
+        }), {})
+        AreEqual("H", same[1].difficulty)
+
+        -- gemischter Abend → keine, statt eine zu behaupten
+        local mixed = GL.BuildAttendanceColumns(Nights({
+            { id = "n1", startedAt = TS(3), kills = {
+                { name = "A", difficulty = "H" }, { name = "B", difficulty = "M" },
+            } },
+        }), {})
+        AreEqual(nil, mixed[1].difficulty)
+    end
+
+    function Tests:testBuildColumns_KillTooltipWithoutDifficulty()
+        -- Altdaten ohne difficulty → kein leerer Trenner im Tooltip
+        local cols = GL.BuildAttendanceColumns(Nights({
+            { id = "n1", startedAt = TS(3), kills = {
+                { name = "A", ts = TS(3, 21) }, { name = "B", ts = TS(3, 22) },
+            } },
+        }), { n1 = true })
+        AreEqual(nil, cols[1].tooltipD:find("·  |cff"))
     end
 
     -- ========================================================

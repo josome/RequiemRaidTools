@@ -82,13 +82,17 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
     end
 
     --- Season-DB mit Raid-Sessions, aus denen GetSeasonAttendees die Teilnehmer zieht.
-    --- sessions: Array von { startedAt, participants = { name, ... } }
+    --- sessions: Array von { startedAt, participants = { name, ... }, kills = { {…} } }
+    --- Mit kills greift die Kill-Ebene, ohne der Fallback auf participants.
     local function SeasonDBWithRaids(rankFilter, seasonFields, sessions)
         local db = SeasonDB(rankFilter, seasonFields)
         for i, s in ipairs(sessions or {}) do
             db.raidContainers[i] = {
                 startedAt = s.startedAt,
-                raidMeta  = { ["r" .. i] = { participants = s.participants or {} } },
+                raidMeta  = { ["r" .. i] = {
+                    participants = s.participants or {},
+                    kills        = s.kills,
+                } },
             }
         end
         return db
@@ -234,6 +238,129 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
             local count = 0
             for _ in pairs(names) do count = count + 1 end
             AreEqual(0, count)
+        end)
+    end
+
+    -- ========================================================
+    -- Gildenwechsel-Schutz für den Kader-Schnappschuss
+    -- ========================================================
+    function Tests:testSnapshotSeasonRoster_RecordsGuildName()
+        WithDB(SeasonDB({ [1] = true }), function()
+            MockGuild({ { name = "Alice-TestRealm", rankIndex = 1, class = "MAGE" } })
+            Mock(GL, "GetCurrentGuildName", function() return "Requiem" end)
+            GL.SnapshotSeasonRoster("s1")
+            AreEqual("Requiem", GuildLootDB.seasons["s1"].rosterGuild)
+        end)
+    end
+
+    function Tests:testSeasonRosterGuildMismatch_DetectsOtherGuild()
+        WithDB(SeasonDB({ [1] = true }, { rosterGuild = "Requiem" }), function()
+            Mock(GL, "GetCurrentGuildName", function() return "Zweitgilde" end)
+            local stored, current = GL.SeasonRosterGuildMismatch("s1")
+            AreEqual("Requiem",    stored)
+            AreEqual("Zweitgilde", current)
+        end)
+    end
+
+    function Tests:testSeasonRosterGuildMismatch_SameGuildIsFine()
+        WithDB(SeasonDB({ [1] = true }, { rosterGuild = "Requiem" }), function()
+            Mock(GL, "GetCurrentGuildName", function() return "Requiem" end)
+            AreEqual(nil, GL.SeasonRosterGuildMismatch("s1"))
+        end)
+    end
+
+    function Tests:testSeasonRosterGuildMismatch_NoGuildOrNoSnapshot()
+        WithDB(SeasonDB({ [1] = true }, { rosterGuild = "Requiem" }), function()
+            -- gildenlos oder Gildendaten noch nicht geladen → keine Warnung erzwingen
+            Mock(GL, "GetCurrentGuildName", function() return "" end)
+            AreEqual(nil, GL.SeasonRosterGuildMismatch("s1"))
+        end)
+        WithDB(SeasonDB({ [1] = true }), function()
+            -- noch nie gelesen → nichts zu schützen
+            Mock(GL, "GetCurrentGuildName", function() return "Zweitgilde" end)
+            AreEqual(nil, GL.SeasonRosterGuildMismatch("s1"))
+        end)
+    end
+
+    function Tests:testReadGuildRosterNow_AbortsOnGuildMismatch()
+        WithDB(SeasonDB({ [1] = true }, { rosterGuild = "Requiem", roster = {
+            { name = "Alt-TestRealm", class = "MAGE" },
+        } }), function()
+            GuildLootDB.activeSeasonId = "s1"
+            MockGuild({ { name = "Fremd-TestRealm", rankIndex = 1, class = "ROGUE" } })
+            Mock(GL, "GetCurrentGuildName", function() return "Zweitgilde" end)
+            Mock(GL, "Print", function() end)
+
+            GL.ReadGuildRosterNow()   -- ohne force
+
+            -- der alte Kader muss unangetastet bleiben
+            local roster = GuildLootDB.seasons["s1"].roster
+            AreEqual(1, #roster)
+            AreEqual("Alt-TestRealm", roster[1].name)
+        end)
+    end
+
+    -- ========================================================
+    -- Realm-Schreibweisen: derselbe Spieler darf nicht doppelt erscheinen
+    -- ========================================================
+    function Tests:testGetSeasonRoster_KaderMatchesDespiteRealmSpacing()
+        WithDB(SeasonDBWithRaids({ [1] = true }, {}, {
+            -- Teilnehmer kommt aus der Raid-API ohne Leerzeichen im Realm
+            { startedAt = 100, participants = { "Barbossbär-DerMithrilorden" } },
+        }), function()
+            -- Kader kommt aus dem Gildenroster mit Leerzeichen (via GetRealmName)
+            MockGuild({ { name = "Barbossbär-Der Mithrilorden", rankIndex = 1, class = "WARRIOR" } })
+            GL.SnapshotSeasonRoster("s1")
+
+            local rows = GL.GetSeasonRoster("s1")
+            -- genau eine Zeile: der Gildenroster-Eintrag wird wiedererkannt
+            AreEqual(1, #rows)
+            AreEqual("roster", rows[1].group)
+        end)
+    end
+
+    function Tests:testGetSeasonRoster_DifferentRealmsStaySeparate()
+        WithDB(SeasonDBWithRaids({ [1] = true }, {}, {
+            { startedAt = 100, participants = { "Barbossbär-Blackrock" } },
+        }), function()
+            MockGuild({ { name = "Barbossbär-Malfurion", rankIndex = 1, class = "WARRIOR" } })
+            GL.SnapshotSeasonRoster("s1")
+
+            -- gleicher Name, anderer Realm = anderer Spieler; darf NICHT zusammenfallen
+            local rows = GL.GetSeasonRoster("s1")
+            AreEqual(2, #rows)
+        end)
+    end
+
+    function Tests:testGetSeasonAttendees_DedupesRealmSpellings()
+        WithDB(SeasonDBWithRaids({}, {}, {
+            { startedAt = 100, participants = { "Bob-Der Mithrilorden" } },
+            { startedAt = 200, participants = { "Bob-DerMithrilorden" } },
+        }), function()
+            AreEqual(1, #GL.GetSeasonAttendees("s1"))
+        end)
+    end
+
+    function Tests:testGetSeasonAttendees_PrefersKillListsOverNightList()
+        WithDB(SeasonDBWithRaids({}, {}, {
+            { startedAt = 100,
+              -- Bob stand beim Anlegen des Raids in der Gruppe, war aber bei keinem Kill
+              participants = { "Alice-TestRealm", "Bob-TestRealm" },
+              kills = { { participants = { "Alice-TestRealm" } } } },
+        }), function()
+            local out = GL.GetSeasonAttendees("s1")
+            -- sonst erschiene Bob als Gast ohne eine einzige grüne Zelle
+            AreEqual(1, #out)
+            AreEqual("Alice-TestRealm", out[1])
+        end)
+    end
+
+    function Tests:testGetSeasonAttendees_FallsBackToNightListWithoutKills()
+        WithDB(SeasonDBWithRaids({}, {}, {
+            { startedAt = 100, participants = { "Alice-TestRealm", "Bob-TestRealm" } },
+        }), function()
+            -- Altdaten und Observer-Sessions haben keine Kill-Ebene
+            AreEqual(2, #GL.GetSeasonAttendees("s1"))
         end)
     end
 

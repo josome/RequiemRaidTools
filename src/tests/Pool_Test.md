@@ -29,6 +29,25 @@ Die Factory ist Frame-API-agnostisch: sie ruft selbst nie `Hide`/`ClearAllPoints
 | `testTwoPools_AreIsolated` | Zwei Pools teilen keine Frames; getrennte Zähler |
 | `testReleaseAll_EmptyPool_IsNoOp` | `ReleaseAll` auf leerem Pool: kein Error, kein `resetFn`-Aufruf |
 
+## `UI.RefreshOnResize(frame, fn)`
+
+Panels, deren Aufteilung von der Fensterbreite abhängt, rechnen sie erst beim Zeichnen aus — ohne
+Haken bleibt die Anzeige beim Aufziehen des Fensters stehen. Der Helper kapselt die zwei
+Feinheiten, die das Muster sonst an jeder Stelle wiederholen würde: `OnSizeChanged` feuert während
+des Ziehens **pro Frame** (Aufrufe werden auf einen je Frame zusammengefasst), und ein
+ausgeblendetes Panel bekommt beim Vergrößern gar kein `OnSizeChanged` (deshalb zusätzlich
+`OnShow`).
+
+Getestet über ein Fake-Frame mit gesammelten Skripten; `C_Timer.After` wird im Test ersetzt,
+einmal auf „sofort ausführen" und einmal auf „sammeln", um das Zusammenfassen zu prüfen.
+
+| Test | Was geprüft |
+|------|-------------|
+| `testRefreshOnResize_HooksSizeAndShow` | Beide Skripte werden gehakt und lösen je einen Aufruf aus |
+| `testRefreshOnResize_CoalescesWithinOneFrame` | Drei `OnSizeChanged` in einem Frame → **ein** geplanter Durchlauf, ein `fn`-Aufruf |
+| `testRefreshOnResize_ReschedulesAfterRun` | Nach dem Durchlauf greift der nächste Resize wieder |
+| `testRefreshOnResize_NilArgsAreNoOp` | Fehlender Frame oder fehlende Funktion → `nil`, kein Error |
+
 ---
 
 ## Tests erweitern

@@ -1318,6 +1318,137 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
         end)
     end
 
+    -- ========================================================
+    -- DeleteKillAttendance / DeleteEmptySession — Aufräumen
+    -- ========================================================
+
+    --- Session mit id, raidMeta und zwei Kills; Loot optional.
+    local function SetupDeletableSession(kills, extras)
+        GuildLoot.StartContainer("Delete-Test")
+        local session = GuildLootDB.raidContainers[1]
+        session.id = "sess-del"
+        session.raidMeta = { ["raid-01"] = {
+            tier = "T", difficulty = "H", startedAt = 1700000000,
+            participants = {}, kills = kills or {},
+        } }
+        for k, v in pairs(extras or {}) do session[k] = v end
+        -- Session nicht aktiv lassen, sonst greift der Schutz für den laufenden Raid
+        GuildLootDB.activeContainerIdx = nil
+        return session
+    end
+
+    function Tests:testDeleteKillAttendance_RemovesOnlyThatKill()
+        WithTestDB(function()
+            MockSideEffects()
+            local session = SetupDeletableSession({
+                { boss = "A", participants = { "Alice-Realm" }, trials = {} },
+                { boss = "B", participants = { "Bob-Realm" },   trials = {} },
+            })
+
+            IsTrue(GuildLoot.DeleteKillAttendance("sess-del", "raid-01", 1))
+
+            local kills = session.raidMeta["raid-01"].kills
+            AreEqual(1,   #kills)
+            AreEqual("B", kills[1].boss)
+        end)
+    end
+
+    function Tests:testDeleteKillAttendance_RebuildsNightParticipants()
+        WithTestDB(function()
+            MockSideEffects()
+            local session = SetupDeletableSession({
+                { boss = "A", participants = { "Alice-Realm" }, trials = {} },
+                { boss = "B", participants = { "Bob-Realm" },   trials = {} },
+            })
+            session.raidMeta["raid-01"].participants = { "Alice-Realm", "Bob-Realm" }
+
+            GuildLoot.DeleteKillAttendance("sess-del", "raid-01", 1)
+
+            -- Alice war nur bei Kill 1 dabei → darf nicht im Abend stehen bleiben
+            local parts = session.raidMeta["raid-01"].participants
+            AreEqual(1,            #parts)
+            AreEqual("Bob-Realm",  parts[1])
+        end)
+    end
+
+    function Tests:testDeleteKillAttendance_LastKillRemovesRaidMeta()
+        WithTestDB(function()
+            MockSideEffects()
+            local session = SetupDeletableSession({
+                { boss = "A", participants = { "Alice-Realm" }, trials = {} },
+            })
+
+            GuildLoot.DeleteKillAttendance("sess-del", "raid-01", 1)
+
+            -- ein raidMeta ohne Kills wäre eine Geisterspalte
+            AreEqual(nil, session.raidMeta["raid-01"])
+        end)
+    end
+
+    function Tests:testDeleteKillAttendance_KeepsLootLog()
+        WithTestDB(function()
+            MockSideEffects()
+            local session = SetupDeletableSession(
+                { { boss = "A", participants = { "Alice-Realm" }, trials = {} } },
+                { lootLog = { { item = "[Axt]", player = "Alice-Realm" } } })
+
+            GuildLoot.DeleteKillAttendance("sess-del", "raid-01", 1)
+
+            -- Loot-Historie ist nicht wiederherstellbar und bleibt deshalb unangetastet
+            AreEqual(1, #session.lootLog)
+            AreEqual(1, #GuildLootDB.raidContainers)
+        end)
+    end
+
+    function Tests:testDeleteKillAttendance_UnknownTargetsAreNoOp()
+        WithTestDB(function()
+            MockSideEffects()
+            SetupDeletableSession({ { boss = "A", participants = {}, trials = {} } })
+            IsFalse(GuildLoot.DeleteKillAttendance("nope",     "raid-01", 1))
+            IsFalse(GuildLoot.DeleteKillAttendance("sess-del", "raid-99", 1))
+            IsFalse(GuildLoot.DeleteKillAttendance("sess-del", "raid-01", 7))
+        end)
+    end
+
+    function Tests:testDeleteEmptySession_RemovesSessionWithoutKillsOrLoot()
+        WithTestDB(function()
+            MockSideEffects()
+            SetupDeletableSession({})
+            IsTrue(GuildLoot.DeleteEmptySession("sess-del"))
+            AreEqual(0, #GuildLootDB.raidContainers)
+        end)
+    end
+
+    function Tests:testDeleteEmptySession_RefusesWhenSomethingIsWorthKeeping()
+        WithTestDB(function()
+            MockSideEffects()
+            SetupDeletableSession({ { boss = "A", participants = {}, trials = {} } })
+            local ok, why = GuildLoot.DeleteEmptySession("sess-del")
+            IsFalse(ok)
+            AreEqual("it has boss kills", why)
+            AreEqual(1, #GuildLootDB.raidContainers)
+        end)
+        WithTestDB(function()
+            MockSideEffects()
+            SetupDeletableSession({}, { lootLog = { { item = "[Axt]" } } })
+            local ok, why = GuildLoot.DeleteEmptySession("sess-del")
+            IsFalse(ok)
+            AreEqual("it has loot", why)
+        end)
+    end
+
+    function Tests:testDeleteEmptySession_RefusesActiveSession()
+        WithTestDB(function()
+            MockSideEffects()
+            SetupDeletableSession({})
+            GuildLootDB.activeContainerIdx = 1
+            local ok, why = GuildLoot.DeleteEmptySession("sess-del")
+            IsFalse(ok)
+            AreEqual("session is running", why)
+            AreEqual(1, #GuildLootDB.raidContainers)
+        end)
+    end
+
     function Tests:testRecordKillAttendance_NoSessionIsNoOp()
         WithTestDB(function()
             MockSideEffects()

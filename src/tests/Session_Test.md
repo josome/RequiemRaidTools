@@ -228,6 +228,31 @@ Einzellisten lässt sich die Vereinigung jederzeit bilden, umgekehrt nie.
 Flag einfärben, würde eine Beförderung rückwirkend alle bereits gelaufenen Abende der Season
 umdeuten. `kill.trials` friert den Stand deshalb pro Kill ein.
 
+### DeleteKillAttendance / DeleteEmptySession
+
+Zum Aufräumen von Testleichen und Fehlaufzeichnungen aus dem Attendance-Tab (Rechtsklick auf den
+Spaltenkopf, zweistufig). Beide fassen die **Loot-Historie nicht an** — gelöschter Loot ist nicht
+wiederherstellbar, und wer die Attendance korrigiert, will selten den Loot verlieren.
+
+`GL.DeleteKillAttendance(sessionId, raidID, killIndex)` entfernt einen einzelnen Bosskill. Bleibt
+der `raidMeta`-Eintrag ohne Kills zurück, verschwindet er ganz (sonst bliebe eine Geisterspalte
+mit Teilnehmern ohne Kill). Sonst wird `meta.participants` aus den verbliebenen Kills neu gebildet.
+
+`GL.DeleteEmptySession(sessionId)` entfernt eine Session, an der nichts mehr hängt — der einzige
+Weg, eine Spalte **ohne** Bosskill loszuwerden. Sie verweigert bei Kills, Loot, aussortiertem oder
+offenem Loot und bei der laufenden Session, und nennt den Grund.
+
+| Test | Prüft |
+|------|-------|
+| `testDeleteKillAttendance_RemovesOnlyThatKill` | Nur der gewählte Kill geht, der Rest bleibt |
+| `testDeleteKillAttendance_RebuildsNightParticipants` | Wer nur bei diesem Kill dabei war, verschwindet aus der Abend-Liste |
+| `testDeleteKillAttendance_LastKillRemovesRaidMeta` | Letzter Kill nimmt den `raidMeta`-Eintrag mit |
+| `testDeleteKillAttendance_KeepsLootLog` | `lootLog` und Session bleiben bestehen |
+| `testDeleteKillAttendance_UnknownTargetsAreNoOp` | Unbekannte Session/raidID/Index → `false` |
+| `testDeleteEmptySession_RemovesSessionWithoutKillsOrLoot` | Leere Session wird entfernt |
+| `testDeleteEmptySession_RefusesWhenSomethingIsWorthKeeping` | Kills bzw. Loot → Ablehnung mit Grund |
+| `testDeleteEmptySession_RefusesActiveSession` | Die laufende Session wird nie angefasst |
+
 ---
 
 ## Was diese Tests nicht abdecken

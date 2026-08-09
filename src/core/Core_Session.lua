@@ -390,6 +390,97 @@ function GL.RecordKillAttendance(bossName, encounterID)
     end
 end
 
+--- Entfernt einen aufgezeichneten Bosskill aus der Attendance — zum Aufräumen von
+--- Testleichen und Fehlaufzeichnungen.
+---
+--- Der lootLog der Session bleibt **unangetastet**: gelöschte Loot-Historie ist nicht
+--- wiederherstellbar, und wer die Attendance korrigiert, will selten den Loot verlieren.
+--- Die Session selbst bleibt ebenfalls stehen; sie zu löschen ist Sache des Raid-Tabs.
+---
+--- Bleibt ein raidMeta-Eintrag ohne Kills zurück, verschwindet er ganz — er trüge sonst nur
+--- noch eine Teilnehmerliste ohne zugehörigen Kill und erzeugte eine Geisterspalte.
+--- Andernfalls wird meta.participants aus den verbliebenen Kills neu gebildet: sonst bliebe
+--- jemand im Abend stehen, dessen einziger Kill gerade entfernt wurde.
+---
+--- @param sessionId string       id der Raid-Session
+--- @param raidID    string       Schlüssel in session.raidMeta
+--- @param killIndex number|nil   1-basiert; nil entfernt den ganzen raidMeta-Eintrag
+---                               (Altdaten ohne Kill-Ebene)
+--- Writes: db.raidContainers[i].raidMeta
+--- @return boolean  true wenn etwas entfernt wurde
+function GL.DeleteKillAttendance(sessionId, raidID, killIndex)
+    local db = GuildLootDB
+    if not db or not sessionId or not raidID then return false end
+
+    local session
+    for _, s in ipairs(db.raidContainers or {}) do
+        if s.id == sessionId then session = s; break end
+    end
+    if not session or not session.raidMeta then return false end
+    local meta = session.raidMeta[raidID]
+    if not meta then return false end
+
+    if not killIndex then
+        session.raidMeta[raidID] = nil
+        return true
+    end
+
+    local kills = meta.kills
+    if not kills or not kills[killIndex] then return false end
+    table.remove(kills, killIndex)
+
+    if #kills == 0 then
+        session.raidMeta[raidID] = nil
+        return true
+    end
+
+    -- Teilnehmer des Abends neu bilden — Vereinigung der verbliebenen Kills
+    local names, seen = {}, {}
+    for _, kill in ipairs(kills) do
+        for _, name in ipairs(kill.participants or {}) do
+            if not seen[name] then
+                seen[name] = true
+                table.insert(names, name)
+            end
+        end
+    end
+    meta.participants = names
+    return true
+end
+
+--- Entfernt eine Session, die nichts mehr enthält — der Weg, eine Spalte ohne Bosskill aus
+--- der Attendance zu bekommen (abgebrochener Abend, Testleiche).
+---
+--- Verweigert die Arbeit, sobald irgendetwas Erhaltenswertes dranhängt: aufgezeichnete Kills,
+--- Loot-Historie, aussortierter oder noch offener Loot. Die Session mit Loot zu löschen ist
+--- eine andere Entscheidung und gehört in den Raid-Tab, wo sie sichtbar getroffen wird.
+--- Die aktive Session wird nie angefasst — sie läuft gerade.
+---
+--- @param sessionId string
+--- Writes: db.raidContainers (via GL.DeleteSession)
+--- @return boolean, string|nil  Erfolg, sonst Grund für die Ablehnung
+function GL.DeleteEmptySession(sessionId)
+    local db = GuildLootDB
+    if not db or not sessionId then return false end
+
+    local idx, session
+    for i, s in ipairs(db.raidContainers or {}) do
+        if s.id == sessionId then idx, session = i, s; break end
+    end
+    if not session then return false, "not found" end
+    if db.activeContainerIdx == idx then return false, "session is running" end
+
+    for _, meta in pairs(session.raidMeta or {}) do
+        if meta.kills and #meta.kills > 0 then return false, "it has boss kills" end
+    end
+    if #(session.lootLog or {})     > 0 then return false, "it has loot"          end
+    if #(session.trashedLoot or {}) > 0 then return false, "it has trashed loot"  end
+    if #(session.pendingLoot or {}) > 0 then return false, "it has pending loot"  end
+
+    GL.DeleteSession(idx)
+    return true
+end
+
 --- Setzt db.currentRaid auf leeren Ausgangszustand.
 --- Writes: db.currentRaid (alle Felder)
 function GL.ResetCurrentRaid()

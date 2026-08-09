@@ -201,14 +201,50 @@ end
 -- Hilfsfunktionen
 -- ============================================================
 
---- Stellt sicher dass ein Name das Format "Name-Realm" hat.
+--- Stellt sicher dass ein Name das Format "Name-Realm" hat — mit GENAU EINEM Realm.
 --- WoW gibt auf gleichem Realm nur "Name" zurück; cross-realm enthält "-" bereits.
+---
+--- Der zweite Teil ist eine Reparatur: in der DB stecken Namen, an denen der Realm dutzendfach
+--- hängt ("Foo-Antonidas-Antonidas-…"). Diese Funktion erzeugt das nicht — sie ist gegen
+--- doppeltes Anhängen geschützt und war es immer. Die Strings entstehen außerhalb, vermutlich
+--- durch ein anderes Addon, das GetGuildRosterInfo umhängt. Ein Spielername enthält nie einen
+--- Bindestrich, also ist alles ab dem zweiten Segment sicher Müll und wird abgeschnitten.
+--- Dadurch ist die Funktion idempotent und heilt Altbestand beim nächsten Schreiben.
 function GL.NormalizeName(name)
-    if name and not name:find("-") then
-        local realm = GetRealmName()
-        if realm then name = name .. "-" .. realm end
+    if not name or name == "" then return name end
+    local short, rest = name:match("^([^%-]+)%-(.+)$")
+    if short then
+        return short .. "-" .. (rest:match("^([^%-]+)") or rest)
     end
+    local realm = GetRealmName()
+    if realm then return name .. "-" .. realm end
     return name
+end
+
+--- Vergleichsschlüssel für Spielernamen: Realm ohne Leerzeichen, alles kleingeschrieben.
+---
+--- Nötig, weil derselbe Spieler in zwei Schreibweisen in der DB landen kann. `GetRealmName()`
+--- liefert den Realm MIT Leerzeichen ("Der Mithrilorden"), WoW selbst qualifiziert Namen aber
+--- OHNE ("Barbossbär-DerMithrilorden"). Kommt ein Name aus einer API nackt und aus der anderen
+--- schon qualifiziert, erzeugt GL.NormalizeName zwei verschiedene Strings — der Gildenroster-
+--- Eintrag wird dann nicht wiedererkannt und der Spieler ein zweites Mal angelegt.
+--- Dieselbe Stolperstelle ist in Comm.lua bereits mit einem Kurznamen-Vergleich umschifft.
+---
+--- Der Realm bleibt Teil des Schlüssels: zwei Spieler gleichen Namens auf verschiedenen
+--- Realms sind verschiedene Spieler und dürfen nicht zusammenfallen.
+--- @return string  Schlüssel, NICHT zur Anzeige geeignet
+function GL.NameKey(name)
+    name = tostring(name or "")
+    local short, realm = name:match("^([^%-]+)%-(.+)$")
+    if short then
+        -- Nur das ERSTE Realm-Segment zählt. In der DB stecken Namen, an denen der Realm
+        -- mehrfach hängt ("Foo-Malfurion-Malfurion"); ein Spielername enthält nie einen
+        -- Bindestrich, alles ab dem zweiten ist also Müll und darf den Vergleich nicht
+        -- auseinanderreißen.
+        realm = realm:match("^([^%-]+)") or realm
+        return (short .. "-" .. realm:gsub("%s+", "")):lower()
+    end
+    return name:lower()
 end
 
 function GL.IsMasterLooter()

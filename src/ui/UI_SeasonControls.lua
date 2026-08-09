@@ -227,8 +227,27 @@ function UI.BuildSeasonControls(header)
     readBtn:SetSize(100, 20)
     readBtn:SetPoint("LEFT", delBtn, "RIGHT", 4, 0)
     readBtn:SetText("Roster lesen")
+    -- Stammt der Kader aus einer anderen Gilde, warnt der erste Klick und erst der zweite
+    -- liest wirklich — sonst ersetzt ein Zweitchar den Kader lautlos durch seine Gilde.
+    -- Gleiches Muster wie der Delete-Button.
+    local readForce, readTimer = false, nil
     readBtn:SetScript("OnClick", function()
-        GL.ReadGuildRosterNow()
+        local season = GL.GetActiveSeason()
+        local stored = season and GL.SeasonRosterGuildMismatch(season.id)
+        if stored and not readForce then
+            GL.ReadGuildRosterNow(false)        -- meldet die Gilden im Chat
+            readForce = true
+            readBtn:SetText("|cffff8000Trotzdem?|r")
+            if readTimer then readTimer:Cancel() end
+            readTimer = C_Timer.NewTimer(5, function()
+                readForce = false; readTimer = nil; readBtn:SetText("Roster lesen")
+            end)
+            return
+        end
+        if readTimer then readTimer:Cancel(); readTimer = nil end
+        readForce = false
+        readBtn:SetText("Roster lesen")
+        GL.ReadGuildRosterNow(true)
         UI.RefreshAttendanceTab()
     end)
     readBtn:SetScript("OnEnter", function(self)

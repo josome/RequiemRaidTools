@@ -82,6 +82,38 @@ jemand befördert oder degradiert wird.
 | `testGetSeasonAttendees_IgnoresSessionsOutsideSeasonWindow` | Sessions vor `startedAt` und nach `endedAt` zählen nicht. |
 | `testGetSeasonAttendees_NoRaidMeta_Empty` | Session ganz ohne `raidMeta` → `{}` statt Fehler. |
 | `testGetSeasonAttendees_UnknownSeason_Empty` | Unbekannte Season-ID → `{}`. |
+| `testGetSeasonAttendees_PrefersKillListsOverNightList` | Quelle sind die Kill-Listen, nicht `meta.participants` — sonst erschiene als Gast, wer beim Anlegen des Raids in der Gruppe stand, aber bei keinem Kill dabei war. |
+| `testGetSeasonAttendees_FallsBackToNightListWithoutKills` | Ohne Kill-Ebene (Altdaten, Observer-Sessions) weiterhin `meta.participants`. |
+| `testGetSeasonAttendees_DedupesRealmSpellings` | Dedup über `GL.NameKey`, nicht über den rohen String. |
+
+### Gildenwechsel-Schutz für den Kader-Schnappschuss
+
+`season.roster` ist ein Schnappschuss, aber die SavedVariables sind account-weit: auf einem
+Zweitchar in einer **anderen** Gilde würde ein Klick auf „Roster lesen" den Kader lautlos durch
+die Mitglieder der falschen Gilde ersetzen. `SnapshotSeasonRoster` hält deshalb in
+`season.rosterGuild` fest, aus welcher Gilde der Kader stammt; `GL.ReadGuildRosterNow` bricht bei
+Abweichung ab und meldet beide Gildennamen. Der zweite Klick (`force`) liest trotzdem — für den
+Fall eines echten Gildenwechsels. Die UI zeigt dazwischen „Trotzdem?", wie der Delete-Button.
+
+| Test | Prüft |
+|------|-------|
+| `testSnapshotSeasonRoster_RecordsGuildName` | `rosterGuild` wird beim Schnappschuss gesetzt. |
+| `testSeasonRosterGuildMismatch_DetectsOtherGuild` | Andere Gilde → gespeicherter und aktueller Name werden zurückgegeben. |
+| `testSeasonRosterGuildMismatch_SameGuildIsFine` | Gleiche Gilde → `nil`. |
+| `testSeasonRosterGuildMismatch_NoGuildOrNoSnapshot` | Gildenlos bzw. Gildendaten noch nicht geladen → keine Warnung; nie gelesener Kader → nichts zu schützen. |
+| `testReadGuildRosterNow_AbortsOnGuildMismatch` | Ohne `force` bleibt der bestehende Kader unangetastet. |
+
+### Realm-Schreibweisen
+
+Der Gildenroster und die Raid-API liefern denselben Spieler nicht zwingend gleich geschrieben —
+`GetRealmName()` hat Leerzeichen, WoWs eigene Qualifizierung nicht. Verglichen wird deshalb über
+`GL.NameKey` ([Util_Test.md](Util_Test.md)); sonst wird der Kader-Eintrag nicht wiedererkannt und
+der Spieler steht ein zweites Mal als Gast in der Matrix.
+
+| Test | Prüft |
+|------|-------|
+| `testGetSeasonRoster_KaderMatchesDespiteRealmSpacing` | `Name-Der Mithrilorden` im Kader und `Name-DerMithrilorden` in den Teilnehmern → **eine** Zeile, Gruppe `roster`. |
+| `testGetSeasonRoster_DifferentRealmsStaySeparate` | Gleicher Name auf verschiedenen Realms → zwei Zeilen; der Realm darf nicht wegnormalisiert werden. |
 
 ### Roster-Vollständigkeit
 

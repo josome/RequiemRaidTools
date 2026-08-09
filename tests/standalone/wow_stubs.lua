@@ -95,6 +95,7 @@ function CreateFrame(frameType, name, parent, template)
     function f:NumLines()        return 0 end
     function f:AddLine()         end
     function f:GetLeft()         return nil end
+    function f:RegisterForClicks() end
     function f:HookScript(t, fn)
         local prev = self._scripts[t]
         self._scripts[t] = function(...)

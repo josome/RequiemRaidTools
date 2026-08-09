@@ -42,7 +42,10 @@ local function CollectNights(db, season)
         local key = RaidDayStart(ts)
         local day = days[key]
         if not day then
-            day = { startedAt = key, kills = {}, seen = {}, labels = {} }
+            -- emptySessions: Sessions, die zu diesem Tag KEINEN Kill beisteuern. Nur solche
+            -- Spalten lassen sich im Tab entfernen — bei einer Spalte mit Kills wäre nicht
+            -- klar, was gemeint ist.
+            day = { startedAt = key, kills = {}, seen = {}, labels = {}, emptySessions = {} }
             days[key] = day
             table.insert(order, key)
         end
@@ -70,6 +73,12 @@ local function CollectNights(db, season)
                             id           = raidID .. "#" .. i,
                             name         = (kill.boss ~= "" and kill.boss) or meta.tier,
                             ts           = kill.ts or meta.startedAt or ts,
+                            -- Rückweg zu den Daten, damit der Tab einen Kill löschen kann
+                            sessionId    = session.id,
+                            raidID       = raidID,
+                            killIndex    = i,
+                            -- "N"/"H"/"M"; hängt am raidMeta, nicht am einzelnen Kill
+                            difficulty   = meta.difficulty,
                             participants = kill.participants or {},
                             -- nil = nicht aufgezeichnet (Altdaten), {} = niemand war Trial
                             trials       = kill.trials,
@@ -82,14 +91,20 @@ local function CollectNights(db, season)
                         id           = raidID,
                         name         = meta.tier,
                         ts           = meta.startedAt or ts,
+                        difficulty   = meta.difficulty,
                         participants = meta.participants or {},
+                        -- ohne killIndex: die Spalte steht für den ganzen raidMeta-Eintrag
+                        sessionId    = session.id,
+                        raidID       = raidID,
                     })
                 end
             end
             if #kills == 0 then
                 -- Session ohne Bosskill: der Tag erscheint trotzdem, sonst verschwände ein
                 -- abgebrochener Abend spurlos aus der Zählung
-                AddLabel(DayFor(ts), session.label)
+                local day = DayFor(ts)
+                AddLabel(day, session.label)
+                table.insert(day.emptySessions, session.id)
             else
                 for _, kill in ipairs(kills) do
                     local day = DayFor(kill.ts)
@@ -109,6 +124,9 @@ local function CollectNights(db, season)
             label     = table.concat(day.labels, " · "),
             startedAt = day.startedAt,
             kills     = day.kills,
+            -- nur gefüllt, solange der Tag gar keinen Kill hat — dann ist die Spalte
+            -- eindeutig einer oder mehreren leeren Sessions zuzuordnen
+            emptySessions = (#day.kills == 0) and day.emptySessions or nil,
         })
     end
     table.sort(nights, function(a, b) return (a.startedAt or 0) > (b.startedAt or 0) end)
@@ -151,17 +169,22 @@ function GL.ComputeAttendance(seasonId)
     for _, night in ipairs(nights) do
         for _, kill in ipairs(night.kills) do
             for _, name in ipairs(kill.participants) do
-                local p = presenceOf[name]
-                if not p then p = {}; presenceOf[name] = p end
+                -- Schlüssel statt Rohname: der Kader kommt aus dem Gildenroster, die
+                -- Teilnehmer aus der Raid-API — beide können denselben Spieler in
+                -- unterschiedlicher Realm-Schreibweise liefern (siehe GL.NameKey).
+                -- Ohne das bliebe eine Kader-Zeile trotz Teilnahme auf 0 %.
+                local key = GL.NameKey(name)
+                local p = presenceOf[key]
+                if not p then p = {}; presenceOf[key] = p end
                 p[kill.id] = true
                 if not p[night.id] then
                     p[night.id] = true
-                    attendedOf[name] = (attendedOf[name] or 0) + 1
+                    attendedOf[key] = (attendedOf[key] or 0) + 1
                 end
 
                 if kill.trials then
-                    local t = trialOf[name]
-                    if not t then t = {}; trialOf[name] = t end
+                    local t = trialOf[key]
+                    if not t then t = {}; trialOf[key] = t end
                     local wasTrial = kill.trials[name] and true or false
                     t[kill.id] = wasTrial
                     -- Abend-Ebene: Trial, wenn bei mindestens einem Kill des Abends
@@ -179,16 +202,17 @@ function GL.ComputeAttendance(seasonId)
     local total = #nights
     local rows  = {}
     for _, entry in ipairs(GL.GetSeasonRoster(seasonId)) do
-        local attended = attendedOf[entry.name] or 0
+        local key      = GL.NameKey(entry.name)
+        local attended = attendedOf[key] or 0
         local player   = players[entry.name]
         table.insert(rows, {
             name     = entry.name,
             class    = entry.class,
             group    = entry.group,
-            present  = presenceOf[entry.name] or {},
+            present  = presenceOf[key] or {},
             -- Trial-Stand je Spalte zum Zeitpunkt des Kills; nil-Einträge = nicht
             -- aufgezeichnet, dort fällt die UI auf das aktuelle Flag zurück
-            trialAt  = trialOf[entry.name] or {},
+            trialAt  = trialOf[key] or {},
             attended = attended,
             total    = total,
             pct      = (total > 0) and math.floor((attended / total) * 100 + 0.5) or 0,
@@ -211,7 +235,8 @@ end
 --- @param expanded  Set { [nightId] = true }; nil = alles eingeklappt
 --- Returns: Array von {
 ---   key         Lookup-Schlüssel für row.present (nightId oder killId)
----   label       Kopfzeilen-Text (Datum bzw. Kill-Nummer)
+---   label       Kopfzeilen-Text (Datum bzw. Bossname)
+---   groupLabel  Session-Name des Abends; die UI schreibt ihn über eine aufgeklappte Gruppe
 ---   tooltipT    Titelzeile des Tooltips
 ---   tooltipD    Detailzeile des Tooltips
 ---   nightId     zugehöriger Abend (Klick-Handler, Gruppierung)
@@ -219,6 +244,23 @@ end
 ---   expandable  true wenn der Abend mehr als einen Kill hat
 ---   groupStart  true bei der ersten Spalte eines Abends
 --- }
+--- Difficulty eines ganzen Abends — nur wenn alle Kills dieselbe haben. Ein Abend, in dem
+--- von Heroisch auf Mythisch gewechselt wurde, bekommt keine, statt eine zu behaupten.
+local function UnifiedDifficulty(kills)
+    local found = nil
+    for _, kill in ipairs(kills) do
+        local d = kill.difficulty
+        if d and d ~= "" then
+            if found == nil then
+                found = d
+            elseif found ~= d then
+                return nil
+            end
+        end
+    end
+    return found
+end
+
 function GL.BuildAttendanceColumns(nights, expanded)
     expanded = expanded or {}
     local cols = {}
@@ -230,6 +272,9 @@ function GL.BuildAttendanceColumns(nights, expanded)
         -- erst anbieten. Deckt zugleich Altdaten ohne kills-Ebene ab.
         local expandable = killCount > 1
         local dateLabel  = date("%d.%m", night.startedAt or 0)
+        -- Über der aufgeklappten Gruppe steht der Session-Name; ohne Namen das Datum,
+        -- damit die Gruppe nie unbeschriftet bleibt
+        local groupLabel = (night.label ~= "" and night.label) or dateLabel
 
         if expandable and expanded[night.id] then
             for i, kill in ipairs(kills) do
@@ -241,8 +286,16 @@ function GL.BuildAttendanceColumns(nights, expanded)
                     -- Datum des Kills, nicht des Abends: eine über Mitternacht oder auf den
                     -- Folgetag fortgesetzte Session hat Kills mit abweichendem Datum
                     tooltipD   = date("%d.%m", kill.ts or 0) .. ", " .. date("%H:%M", kill.ts or 0)
+                                 .. ((kill.difficulty and kill.difficulty ~= "")
+                                     and ("  ·  " .. kill.difficulty) or "")
                                  .. "  |cff888888(Boss " .. i .. "/" .. killCount
                                  .. " — klicken zum Zuklappen)|r",
+                    groupLabel = groupLabel,
+                    difficulty = kill.difficulty,
+                    -- Rückweg zum Löschen
+                    sessionId  = kill.sessionId,
+                    raidID     = kill.raidID,
+                    killIndex  = kill.killIndex,
                     nightId    = night.id,
                     isKill     = true,
                     expandable = true,
@@ -257,6 +310,19 @@ function GL.BuildAttendanceColumns(nights, expanded)
                 tooltipD   = expandable
                              and (killCount .. " Bosse — klicken zum Aufklappen")
                              or  "Keine einzelnen Bosskills aufgezeichnet",
+                groupLabel = groupLabel,
+                -- nur wenn der ganze Abend eine Difficulty hatte
+                difficulty = UnifiedDifficulty(kills),
+                -- Tag ganz ohne Kill: die Spalte gehört zu leeren Sessions und lässt sich
+                -- als solche entfernen. Bei einer Spalte mit Kills bleibt das leer.
+                emptySessions = night.emptySessions,
+                -- Steht hinter der Spalte GENAU EIN Eintrag, ist sie eindeutig und damit
+                -- direkt löschbar — ohne sie aufklappen zu müssen. Das ist der Fall bei
+                -- Altdaten ohne Kill-Ebene (killIndex bleibt nil, dann geht der ganze
+                -- raidMeta-Eintrag) und bei einem Abend mit einem einzigen Bosskill.
+                sessionId  = (killCount == 1) and kills[1].sessionId or nil,
+                raidID     = (killCount == 1) and kills[1].raidID    or nil,
+                killIndex  = (killCount == 1) and kills[1].killIndex or nil,
                 nightId    = night.id,
                 isKill     = false,
                 expandable = expandable,

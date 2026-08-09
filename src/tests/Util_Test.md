@@ -185,6 +185,49 @@ function Tests:testNeueFunktion()
 end
 ```
 
+## `GL.NormalizeName(name)`
+
+Bringt einen Namen auf `Name-Realm` mit **genau einem** Realm. Nackte Namen bekommen den eigenen
+Realm angehängt (WoW liefert auf gleichem Realm nur den Namen).
+
+Der zweite Teil ist eine **Reparatur**: in der DB stecken Namen, an denen der Realm dutzendfach
+hängt (`Foo-Antonidas-Antonidas-…`, bis der String abgeschnitten wird). Diese Funktion erzeugt das
+nicht — sie war seit ihrer Einführung gegen doppeltes Anhängen geschützt, und die Diagnose zeigt
+sie idempotent auf den rohen API-Strings. Die Verdopplung entsteht außerhalb, vermutlich durch ein
+anderes Addon, das `GetGuildRosterInfo` umhängt. Da ein Spielername nie einen Bindestrich enthält,
+ist alles ab dem zweiten Segment sicher Müll und wird abgeschnitten — die Funktion heilt damit
+Altbestand beim nächsten Schreiben.
+
+| Test | Prüft |
+|------|-------|
+| `testNormalizeName_CollapsesRepeatedRealm` | Mehrfach angehängter Realm wird auf einen reduziert |
+| `testNormalizeName_Idempotent` | Zweiter Aufruf ändert nichts — für qualifizierte wie nackte Namen |
+| `testNormalizeName_KeepsFirstRealm` | Der **erste** Realm gilt, spätere Segmente sind Müll |
+| `testNormalizeName_AppendsRealmToBareName` | Nackter Name bekommt den eigenen Realm |
+| `testNormalizeName_EmptyAndNil` | `nil` und `""` gehen unverändert durch |
+
+## `GL.NameKey(name)`
+
+Vergleichsschlüssel für Spielernamen: Realm ohne Leerzeichen, alles kleingeschrieben. **Nicht
+zur Anzeige geeignet.**
+
+Derselbe Spieler kann in zwei Schreibweisen in der DB landen: `GetRealmName()` liefert den Realm
+**mit** Leerzeichen (`Barbossbär-Der Mithrilorden`), WoW qualifiziert Namen selbst aber **ohne**
+(`Barbossbär-DerMithrilorden`). Kommt ein Name aus einer API nackt und aus der anderen bereits
+qualifiziert, erzeugt `GL.NormalizeName` zwei verschiedene Strings — der Gildenroster-Eintrag
+wird dann nicht wiedererkannt und der Spieler ein zweites Mal als Gast angelegt. Dieselbe
+Stolperstelle ist in `Comm.lua` bereits mit einem Kurznamen-Vergleich umschifft.
+
+Der Realm bleibt **Teil** des Schlüssels — zwei Spieler gleichen Namens auf verschiedenen Realms
+sind verschiedene Spieler.
+
+| Test | Prüft |
+|------|-------|
+| `testNameKey_IgnoresRealmSpacing` | `Name-Der Mithrilorden` und `Name-DerMithrilorden` ergeben denselben Schlüssel |
+| `testNameKey_IgnoresCase` | Groß-/Kleinschreibung ist egal |
+| `testNameKey_KeepsRealmDistinction` | Gleicher Name, anderer Realm → anderer Schlüssel |
+| `testNameKey_BareNameStaysBare` | Ohne Realm-Teil wird keiner erfunden (das ist Sache von `GL.NormalizeName`); `nil` → `""` |
+
 ## `GL.TruncateText(text, maxChars)`
 
 Kürzt Text auf `maxChars` **Zeichen** und hängt „…" an. Zählt Zeichen statt Bytes: WoW-Lua hat

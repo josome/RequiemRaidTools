@@ -22,6 +22,12 @@ SlashCmdList["REQUIEMRAIDTOOLS"] = function(input)
     elseif cmd == "start" then
         GL.StartRaid(arg ~= "" and arg or nil)
 
+    elseif cmd == "names" then
+        GL.PrintNameVariants(arg)
+
+    elseif cmd == "realms" then
+        GL.PrintRealmSpread()
+
     elseif cmd == "history" or cmd == "h" then
         GL.ShowHistory(arg ~= "" and arg or UnitName("player"))
 

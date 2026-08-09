@@ -41,10 +41,29 @@ local expanded = {}
 -- Handler keine veraltete Spaltenliste einfängt.
 local pendingFocusNight = nil
 
+-- Rechtsklick auf einen Spaltenkopf löscht — erster Klick fragt, zweiter führt aus.
+-- Gemerkt wird der Spalten-Key, damit die Rückfrage an genau dieser Spalte hängt.
+local pendingDeleteKey   = nil
+local pendingDeleteTimer = nil
+
+local function ClearPendingDelete()
+    pendingDeleteKey = nil
+    if pendingDeleteTimer then pendingDeleteTimer:Cancel(); pendingDeleteTimer = nil end
+end
+
 local COLOR_PRESENT = { 0.15, 0.65, 0.20, 1 }
 -- Trial: anwesend, aber auf Probe — eigene Farbe statt Grün, damit man es in der Matrix sieht
 local COLOR_TRIAL   = { 0.15, 0.55, 0.72, 1 }
 local COLOR_ABSENT  = { 1, 1, 1, 0.06 }
+
+-- Dezenter Hintergrund der Spaltenköpfe nach Schwierigkeitsgrad. Bewusst niedrige Deckkraft:
+-- Grün und Blau sind im Zellenraster mit "anwesend" und "Trial" belegt, die Kopfzeile darf
+-- damit nicht verwechselt werden.
+local DIFF_BG = {
+    N = { 0.16, 0.55, 0.22, 0.28 },
+    H = { 0.16, 0.42, 0.78, 0.30 },
+    M = { 0.52, 0.26, 0.72, 0.34 },
+}
 
 local function ColumnWidth(col)
     return col.isKill and KILL_CELL_W or CELL_W
@@ -102,10 +121,21 @@ function UI.BuildAttendancePanel(parent)
     panel.header = header
     UI.BuildSeasonControls(header)
 
+    -- ── Gruppen-Kopfzeile ─────────────────────────────────────
+    -- Über einer aufgeklappten Gruppe steht der Session-Name: sonst sieht man nur
+    -- Bossnamen und weiß nicht mehr, zu welchem Abend sie gehören. Eigenes Band über dem
+    -- Spaltenkopf, damit Pager und alles darunter unberührt bleiben — und es bleibt auch
+    -- leer stehen, damit die Matrix beim Auf- und Zuklappen nicht springt.
+    local groupHeader = CreateFrame("Frame", nil, panel)
+    groupHeader:SetPoint("TOPLEFT",  header, "BOTTOMLEFT",  0, -4)
+    groupHeader:SetPoint("TOPRIGHT", header, "BOTTOMRIGHT", 0, -4)
+    groupHeader:SetHeight(14)
+    panel.groupHeader = groupHeader
+
     -- ── Spaltenkopf ───────────────────────────────────────────
     local colHeader = CreateFrame("Frame", nil, panel)
-    colHeader:SetPoint("TOPLEFT",  header, "BOTTOMLEFT",  0, -4)
-    colHeader:SetPoint("TOPRIGHT", header, "BOTTOMRIGHT", 0, -4)
+    colHeader:SetPoint("TOPLEFT",  groupHeader, "BOTTOMLEFT",  0, -2)
+    colHeader:SetPoint("TOPRIGHT", groupHeader, "BOTTOMRIGHT", 0, -2)
     colHeader:SetHeight(18)
     panel.colHeader = colHeader
 
@@ -160,6 +190,10 @@ function UI.BuildAttendancePanel(parent)
         function()
             local btn = CreateFrame("Button", nil, colHeader)
             btn:SetSize(CELL_W, 18)
+            btn.bg = btn:CreateTexture(nil, "BACKGROUND")
+            btn.bg:SetPoint("TOPLEFT",     btn, "TOPLEFT",      1, 0)
+            btn.bg:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", -1, 0)
+            btn.bg:Hide()
             btn.fs = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
             btn.fs:SetAllPoints()
             btn.fs:SetJustifyH("CENTER")
@@ -178,9 +212,39 @@ function UI.BuildAttendancePanel(parent)
         function(_, btn)
             btn:Hide()
             btn:ClearAllPoints()
+            btn.bg:Hide()
             -- OnClick muss weg, sonst hängt beim Recycling der Handler der Vorgängerspalte dran
             btn:SetScript("OnClick", nil)
             btn.tooltipT, btn.tooltipD = nil, nil
+        end
+    )
+
+    -- Session-Name über einer aufgeklappten Gruppe. Button statt FontString: der Name kann
+    -- breiter sein als die Gruppe (dann Tooltip mit der Langform), und ein Klick darauf
+    -- klappt die Gruppe wieder zu.
+    panel.groupLabelPool = UI.CreateFramePool(
+        function()
+            local btn = CreateFrame("Button", nil, groupHeader)
+            btn:SetHeight(14)
+            btn.fs = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            btn.fs:SetAllPoints()
+            btn.fs:SetJustifyH("CENTER")
+            btn.fs:SetTextColor(0.9, 0.75, 0.35)
+            btn:SetScript("OnEnter", function(self)
+                if not self.tooltipT then return end
+                GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+                GameTooltip:AddLine(self.tooltipT, 1, 1, 1)
+                GameTooltip:AddLine("Klicken zum Zuklappen", 0.8, 0.8, 0.8, true)
+                GameTooltip:Show()
+            end)
+            btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+            return btn
+        end,
+        function(_, btn)
+            btn:Hide()
+            btn:ClearAllPoints()
+            btn:SetScript("OnClick", nil)
+            btn.tooltipT = nil
         end
     )
 
@@ -255,6 +319,12 @@ function UI.BuildAttendancePanel(parent)
     sep:Hide()
     panel.sepLbl = sep
 
+    -- ── Größenänderung ────────────────────────────────────────
+    -- Wie viele Spalten ins Fenster passen, rechnet erst der Refresh aus — ohne diesen Haken
+    -- bliebe die Tabelle beim Aufziehen stehen. Aufruf über einen Wrapper, weil
+    -- UI.RefreshAttendanceTab erst weiter unten in dieser Datei definiert wird.
+    UI.RefreshOnResize(panel, function() UI.RefreshAttendanceTab() end)
+
     -- ── Leerzustand ───────────────────────────────────────────
     local emptyLbl = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     emptyLbl:SetPoint("CENTER", scroll, "CENTER", 0, 0)
@@ -310,6 +380,7 @@ function UI.RefreshAttendanceTab()
     panel.rowPool:ReleaseAll()
     panel.headerPool:ReleaseAll()
     panel.groupSepPool:ReleaseAll()
+    panel.groupLabelPool:ReleaseAll()
     panel.sepLbl:Hide()
 
     -- ── Leerzustände: ein leerer Tab darf nicht wie ein Defekt aussehen ──
@@ -359,6 +430,42 @@ function UI.RefreshAttendanceTab()
         panel.pageLbl:SetText("")
     end
 
+    -- ── Gruppen-Kopfzeile: Session-Name über aufgeklappten Gruppen ──
+    -- Erst die zusammenhängenden Bossspalten-Läufe bestimmen, dann je Lauf ein Label über
+    -- die volle Gruppenbreite. Eingeklappte Spalten tragen ihr Datum selbst.
+    local gx = LEFT_W
+    local run = nil
+    local function FlushRun()
+        if not run then return end
+        local btn = panel.groupLabelPool:Acquire()
+        btn:SetWidth(run.width)
+        btn:SetPoint("TOPLEFT", panel.groupHeader, "TOPLEFT", run.x, 0)
+        -- grobes Zeichenbudget: GameFontNormalSmall läuft bei ~6 px je Zeichen
+        btn.fs:SetText(GL.TruncateText(run.label, math.max(3, math.floor(run.width / 6))))
+        btn.tooltipT = run.label
+        local nightId = run.nightId
+        btn:SetScript("OnClick", function()
+            expanded[nightId] = nil
+            UI.RefreshAttendanceTab()
+        end)
+        btn:Show()
+        run = nil
+    end
+    for _, col in ipairs(shown) do
+        local w = ColumnWidth(col)
+        if col.isKill then
+            if run and run.nightId ~= col.nightId then FlushRun() end
+            if not run then
+                run = { x = gx, width = 0, label = col.groupLabel or "", nightId = col.nightId }
+            end
+            run.width = run.width + w
+        else
+            FlushRun()
+        end
+        gx = gx + w
+    end
+    FlushRun()
+
     -- ── Spaltenköpfe ──────────────────────────────────────────
     local hx = LEFT_W
     for _, col in ipairs(shown) do
@@ -369,26 +476,94 @@ function UI.RefreshAttendanceTab()
         local btn = panel.headerPool:Acquire()
         btn:SetSize(w, 18)
         btn:SetPoint("TOPLEFT", panel.colHeader, "TOPLEFT", x, 0)
-        -- Bossnamen sind länger als die Spalte; der volle Name steht im Tooltip
-        btn.fs:SetText(col.isKill and GL.TruncateText(col.label, KILL_LABEL_CHARS) or col.label)
-        btn.tooltipT, btn.tooltipD = col.tooltipT, col.tooltipD
+
+        -- Löschbar ist alles Eindeutige: ein einzelner Bosskill, eine Spalte mit genau einem
+        -- Eintrag dahinter (auch Altdaten ohne Kill-Ebene), und eine Spalte, deren Tag gar
+        -- keinen Kill hat. Eine eingeklappte Spalte mit MEHREREN Kills bleibt außen vor —
+        -- dort wäre nicht klar, was der Klick treffen soll.
+        local deletable = (col.sessionId ~= nil)
+                          or (col.emptySessions and #col.emptySessions > 0)
+        local asking    = deletable and pendingDeleteKey == col.key
+
+        if asking then
+            btn.fs:SetText("|cffff4444Sure?|r")
+        else
+            -- Bossnamen sind länger als die Spalte; der volle Name steht im Tooltip
+            btn.fs:SetText(col.isKill and GL.TruncateText(col.label, KILL_LABEL_CHARS) or col.label)
+        end
+        btn.tooltipT = col.tooltipT
+        btn.tooltipD = deletable
+            and ((col.tooltipD or "")
+                 .. (asking and "\n|cffff4444Left-click to confirm deletion.|r"
+                             or  "\n|cffff8000Right-click to delete, then left-click to confirm.|r"))
+            or  col.tooltipD
+
+        local bg = DIFF_BG[col.difficulty or ""]
+        if bg then
+            btn.bg:SetColorTexture(bg[1], bg[2], bg[3], bg[4])
+            btn.bg:Show()
+        end
 
         if col.expandable then
-            btn.fs:SetTextColor(1, 0.8, 0)
-            local nightId = col.nightId
-            btn:SetScript("OnClick", function()
-                if expanded[nightId] then
-                    expanded[nightId] = nil
-                else
-                    expanded[nightId]  = true
-                    pendingFocusNight  = nightId
-                end
-                UI.RefreshAttendanceTab()
-            end)
-        else
+            if not asking then btn.fs:SetTextColor(1, 0.8, 0) end
+        elseif not asking then
             -- Abend ohne einzelne Bosskills: gedämpft, damit der tote Klick sichtbar ist
             btn.fs:SetTextColor(0.65, 0.55, 0.3)
         end
+
+        local colKey, nightId = col.key, col.nightId
+        local sessionId, raidID, killIndex = col.sessionId, col.raidID, col.killIndex
+        local emptySessions = col.emptySessions
+        btn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+        btn:SetScript("OnClick", function(_, button)
+            -- Rechtsklick fragt nur; ein zweiter nimmt die Frage zurück
+            if button == "RightButton" then
+                if not deletable then return end
+                if pendingDeleteKey == colKey then
+                    ClearPendingDelete()
+                else
+                    ClearPendingDelete()
+                    pendingDeleteKey = colKey
+                    pendingDeleteTimer = C_Timer.NewTimer(4, function()
+                        pendingDeleteTimer = nil
+                        pendingDeleteKey   = nil
+                        UI.RefreshAttendanceTab()
+                    end)
+                end
+                UI.RefreshAttendanceTab()
+                return
+            end
+
+            -- Bestätigt wird mit der ANDEREN Taste: zweimal dieselbe lässt sich
+            -- versehentlich durchklicken, ein Tastenwechsel nicht
+            if pendingDeleteKey == colKey then
+                ClearPendingDelete()
+                if sessionId then
+                    -- killIndex nil = Altdaten ohne Kill-Ebene → ganzer raidMeta-Eintrag
+                    GL.DeleteKillAttendance(sessionId, raidID, killIndex)
+                else
+                    for _, sid in ipairs(emptySessions or {}) do
+                        local ok, why = GL.DeleteEmptySession(sid)
+                        if not ok and why then
+                            GL.Print("Session kept — " .. why .. ".")
+                        end
+                    end
+                end
+                UI.RefreshAttendanceTab()
+                return
+            end
+
+            -- Linksklick sonst: auf-/zuklappen, nur wo es mehrere Kills gibt
+            ClearPendingDelete()
+            if not col.expandable then return end
+            if expanded[nightId] then
+                expanded[nightId] = nil
+            else
+                expanded[nightId] = true
+                pendingFocusNight = nightId
+            end
+            UI.RefreshAttendanceTab()
+        end)
         btn:Show()
 
         -- Trenner links vor der ersten Spalte eines Abends (nicht ganz links außen)

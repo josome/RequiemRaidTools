@@ -95,4 +95,69 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
         AreEqual(0, stats.resets)
         AreEqual(0, pool:GetNumActive())
     end
+
+    -- ========================================================
+    -- UI.RefreshOnResize
+    -- ========================================================
+
+    --- Fake-Frame, der Skripte sammelt und auf Kommando feuert. C_Timer.After wird auf
+    --- "sofort ausführen" gesetzt, damit die Verzögerung im Test nicht im Weg steht.
+    local function ResizeHarness()
+        local scripts = {}
+        local frame = {}
+        function frame:HookScript(kind, fn)
+            local prev = scripts[kind]
+            scripts[kind] = function(...) if prev then prev(...) end fn(...) end
+        end
+        local calls = { fn = 0, scheduled = 0 }
+        local origAfter = C_Timer.After
+        C_Timer.After = function(_, fn)
+            calls.scheduled = calls.scheduled + 1
+            fn()
+        end
+        local trigger = UI.RefreshOnResize(frame, function() calls.fn = calls.fn + 1 end)
+        return frame, scripts, calls, trigger, function() C_Timer.After = origAfter end
+    end
+
+    function Tests:testRefreshOnResize_HooksSizeAndShow()
+        local _, scripts, calls, _, restore = ResizeHarness()
+        IsTrue(scripts.OnSizeChanged ~= nil)
+        IsTrue(scripts.OnShow ~= nil)
+        scripts.OnSizeChanged()
+        AreEqual(1, calls.fn)
+        -- OnShow zählt eigenständig: ein verstecktes Panel bekommt kein OnSizeChanged
+        scripts.OnShow()
+        AreEqual(2, calls.fn)
+        restore()
+    end
+
+    function Tests:testRefreshOnResize_CoalescesWithinOneFrame()
+        local _, scripts, calls, _, restore = ResizeHarness()
+        -- OnSizeChanged feuert beim Ziehen pro Frame — hier bewusst ohne zwischenzeitliches
+        -- Ausführen des Timers, indem der Timer erst am Ende läuft
+        local pendingFns = {}
+        C_Timer.After = function(_, fn) table.insert(pendingFns, fn) end
+        scripts.OnSizeChanged()
+        scripts.OnSizeChanged()
+        scripts.OnSizeChanged()
+        AreEqual(1, #pendingFns)      -- nur EIN geplanter Durchlauf
+        pendingFns[1]()
+        AreEqual(1, calls.fn)
+        restore()
+    end
+
+    function Tests:testRefreshOnResize_ReschedulesAfterRun()
+        local _, scripts, calls, _, restore = ResizeHarness()
+        scripts.OnSizeChanged()
+        AreEqual(1, calls.fn)
+        -- nach dem Durchlauf muss der nächste Resize wieder greifen
+        scripts.OnSizeChanged()
+        AreEqual(2, calls.fn)
+        restore()
+    end
+
+    function Tests:testRefreshOnResize_NilArgsAreNoOp()
+        AreEqual(nil, UI.RefreshOnResize(nil, function() end))
+        AreEqual(nil, UI.RefreshOnResize({}, nil))
+    end
 end)

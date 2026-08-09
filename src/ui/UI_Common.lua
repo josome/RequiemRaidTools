@@ -120,3 +120,38 @@ function UI.CreateFramePool(createFn, resetFn)
 
     return pool
 end
+
+-- ============================================================
+-- Größenänderung
+-- ============================================================
+
+--- Ruft fn im nächsten Frame auf, wenn frame seine Größe ändert oder eingeblendet wird.
+---
+--- Panels, deren Layout von der Fensterbreite abhängt, rechnen ihre Aufteilung erst beim
+--- Zeichnen aus. Ohne diesen Haken bliebe die Anzeige beim Aufziehen des Fensters stehen,
+--- bis irgendetwas anderes ein Neuzeichnen auslöst.
+---
+--- Zwei Feinheiten, die den Helper rechtfertigen:
+---   * OnSizeChanged feuert während des Ziehens in JEDEM Frame — die Aufrufe werden auf
+---     genau einen je Frame zusammengefasst.
+---   * OnShow gehört dazu, weil ein ausgeblendetes Panel beim Vergrößern kein
+---     OnSizeChanged bekommt; sein Layout wäre beim Einblenden sonst veraltet.
+---
+--- @param frame Frame     beobachteter Frame
+--- @param fn    function  wird höchstens einmal je Frame gerufen
+--- @return function       der Auslöser selbst, für manuelles Anstoßen
+function UI.RefreshOnResize(frame, fn)
+    if not (frame and fn) then return end
+    local pending = false
+    local function Schedule()
+        if pending then return end
+        pending = true
+        C_Timer.After(0, function()
+            pending = false
+            fn()
+        end)
+    end
+    frame:HookScript("OnSizeChanged", Schedule)
+    frame:HookScript("OnShow",        Schedule)
+    return Schedule
+end
