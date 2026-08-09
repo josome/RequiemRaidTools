@@ -242,6 +242,47 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
     end
 
     -- ========================================================
+    -- Liste ohne Kader-Schnappschuss: aus der Attendance gebildet
+    -- ========================================================
+    function Tests:testGetSeasonRoster_WithoutSnapshotBuildsFromAttendees()
+        WithDB(SeasonDBWithRaids({ [1] = true }, {}, {
+            { startedAt = 100, participants = { "Bob-TestRealm", "Alice-TestRealm" } },
+        }), function()
+            -- kein SnapshotSeasonRoster-Aufruf → season.roster fehlt
+            local rows = GL.GetSeasonRoster("s1")
+            AreEqual(2, #rows)
+            -- ein Block, alphabetisch; ohne Kader gibt es kein "darunter"
+            AreEqual("Alice-TestRealm", rows[1].name)
+            AreEqual("roster",          rows[1].group)
+            AreEqual("Bob-TestRealm",   rows[2].name)
+            AreEqual("roster",          rows[2].group)
+        end)
+    end
+
+    function Tests:testGetSeasonRoster_EmptySnapshotAlsoBuildsFromAttendees()
+        WithDB(SeasonDBWithRaids({}, { roster = {} }, {
+            { startedAt = 100, participants = { "Alice-TestRealm" } },
+        }), function()
+            -- leerer Schnappschuss (Rang-Filter traf niemanden) zählt wie keiner
+            AreEqual(1, #GL.GetSeasonRoster("s1"))
+        end)
+    end
+
+    function Tests:testGetSeasonRoster_SnapshotStillWinsWhenPresent()
+        WithDB(SeasonDBWithRaids({ [1] = true }, {}, {
+            { startedAt = 100, participants = { "Gast-TestRealm" } },
+        }), function()
+            MockGuild({ { name = "Kader-TestRealm", rankIndex = 1, class = "MAGE" } })
+            GL.SnapshotSeasonRoster("s1")
+
+            local rows = GL.GetSeasonRoster("s1")
+            AreEqual(2, #rows)
+            AreEqual("roster", rows[1].group)   -- Kader aus dem Schnappschuss
+            AreEqual("guest",  rows[2].group)   -- Teilnehmer ohne Kader-Rang
+        end)
+    end
+
+    -- ========================================================
     -- Gildenwechsel-Schutz für den Kader-Schnappschuss
     -- ========================================================
     function Tests:testSnapshotSeasonRoster_RecordsGuildName()
@@ -279,6 +320,26 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
             -- noch nie gelesen → nichts zu schützen
             Mock(GL, "GetCurrentGuildName", function() return "Zweitgilde" end)
             AreEqual(nil, GL.SeasonRosterGuildMismatch("s1"))
+        end)
+    end
+
+    function Tests:testReadGuildRosterNow_TargetsGivenSeason()
+        WithDB(SeasonDB({ [1] = true }), function()
+            -- zweite, beendete Season: die soll den Kader bekommen, nicht die aktive
+            GuildLootDB.seasons["s2"] = {
+                id = "s2", name = "Alt", rankFilter = { [1] = true },
+                startedAt = 100, endedAt = 200,
+            }
+            GuildLootDB.activeSeasonId = "s1"
+            MockGuild({ { name = "Alice-TestRealm", rankIndex = 1, class = "MAGE" } })
+            Mock(GL, "GetCurrentGuildName", function() return "Requiem" end)
+            Mock(GL, "Print", function() end)
+            Mock(_G, "C_Timer", nil)   -- ohne Timer läuft der Read synchron durch
+
+            GL.ReadGuildRosterNow(true, "s2")
+
+            AreEqual(1, #(GuildLootDB.seasons["s2"].roster or {}))
+            AreEqual(nil, GuildLootDB.seasons["s1"].roster)
         end)
     end
 

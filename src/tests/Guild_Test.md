@@ -86,6 +86,19 @@ jemand befördert oder degradiert wird.
 | `testGetSeasonAttendees_FallsBackToNightListWithoutKills` | Ohne Kill-Ebene (Altdaten, Observer-Sessions) weiterhin `meta.participants`. |
 | `testGetSeasonAttendees_DedupesRealmSpellings` | Dedup über `GL.NameKey`, nicht über den rohen String. |
 
+### Liste ohne Kader-Schnappschuss
+
+Ohne `season.roster` bildet sich die Liste aus der Attendance selbst. Für eine nachgetragene
+alte Season ist der heutige Gildenstand ohnehin die falsche Referenz — und eine leere Matrix
+wäre das schlechteste Ergebnis. Dann gibt es **einen** Block ohne Kader/Gast-Trennung: ohne
+Kader gibt es kein „darunter".
+
+| Test | Prüft |
+|------|-------|
+| `testGetSeasonRoster_WithoutSnapshotBuildsFromAttendees` | Ohne Schnappschuss erscheinen alle Teilnehmer der Season, alphabetisch, als ein Block. |
+| `testGetSeasonRoster_EmptySnapshotAlsoBuildsFromAttendees` | Ein leerer Schnappschuss (Rang-Filter traf niemanden) zählt wie keiner. |
+| `testGetSeasonRoster_SnapshotStillWinsWhenPresent` | Mit Schnappschuss bleibt es bei Kader-Block + Gast-Block. |
+
 ### Gildenwechsel-Schutz für den Kader-Schnappschuss
 
 `season.roster` ist ein Schnappschuss, aber die SavedVariables sind account-weit: auf einem
@@ -102,6 +115,7 @@ Fall eines echten Gildenwechsels. Die UI zeigt dazwischen „Trotzdem?", wie der
 | `testSeasonRosterGuildMismatch_SameGuildIsFine` | Gleiche Gilde → `nil`. |
 | `testSeasonRosterGuildMismatch_NoGuildOrNoSnapshot` | Gildenlos bzw. Gildendaten noch nicht geladen → keine Warnung; nie gelesener Kader → nichts zu schützen. |
 | `testReadGuildRosterNow_AbortsOnGuildMismatch` | Ohne `force` bleibt der bestehende Kader unangetastet. |
+| `testReadGuildRosterNow_TargetsGivenSeason` | Mit `seasonId` geht der Schnappschuss in genau diese Season — auch in eine beendete, damit eine nachgetragene alte Season überhaupt einen Kader bekommt. |
 
 ### Realm-Schreibweisen
 

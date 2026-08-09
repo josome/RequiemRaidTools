@@ -249,10 +249,12 @@ function GL.PrintRealmSpread()
              .. "NormalizeName hängt den EIGENEN Realm an.")
 end
 
---- Liest den Gildenroster sofort neu ein — der explizite Knopfdruck aus der Kopfzeile.
 --- Läuft ein angeforderter Roster-Read noch? Der Schnappschuss wartet dann auf die Daten.
 local pendingRosterRead = false
 local pendingReadTimer  = nil
+-- In welche Season der Schnappschuss geht. Muss über das Warten hinweg gemerkt werden,
+-- sonst landet er nach dem Event in der falschen (oder in gar keiner) Season.
+local pendingSeasonId   = nil
 
 --- Nimmt den Kader-Schnappschuss und meldet das Ergebnis. Gemeinsamer Endpunkt für beide
 --- Wege: das eintreffende GUILD_ROSTER_UPDATE und den Timeout-Fallback.
@@ -264,14 +266,17 @@ local function FinishRosterRead()
     GL.UpdateGuildRankNames()
     local reported, readCount = GL.CheckGuildRosterCompleteness()
 
-    local season = GL.GetActiveSeason()
+    local db = GuildLootDB
+    local season = (pendingSeasonId and db and db.seasons and db.seasons[pendingSeasonId])
+                   or GL.GetActiveSeason()
+    pendingSeasonId = nil
     local kader  = season and GL.SnapshotSeasonRoster(season.id)
     if kader then
         GL.Print(string.format("Gildenroster gelesen: %d Mitglieder, Kader: %d.",
                                readCount, kader))
     else
         GL.Print(string.format("Gildenroster gelesen: %d Mitglieder. "
-                               .. "|cff888888Keine aktive Season — kein Kader gesetzt.|r",
+                               .. "|cff888888Keine Season gewählt — kein Kader gesetzt.|r",
                                readCount))
     end
     if GL.UI and GL.UI.RefreshAttendanceTab then GL.UI.RefreshAttendanceTab() end
@@ -290,9 +295,16 @@ end
 ---
 --- Stammt der bestehende Kader aus einer anderen Gilde, bricht der Read ab und meldet das.
 --- Mit force = true wird trotzdem gelesen (bewusster Gildenwechsel).
+---
+--- @param seasonId string|nil  Ziel-Season; ohne Angabe die aktive. Explizit, damit auch
+---   eine beendete Season einen Kader bekommt — eine nachgetragene alte Season hätte sonst
+---   gar keinen und die Matrix bliebe leer. Der Roster ist dann zwangsläufig der von heute.
 --- Returns: reported, readCount — nur im synchronen Fallback ohne C_Timer.
-function GL.ReadGuildRosterNow(force)
-    local season = GL.GetActiveSeason()
+function GL.ReadGuildRosterNow(force, seasonId)
+    local db = GuildLootDB
+    local season = (seasonId and db and db.seasons and db.seasons[seasonId])
+                   or GL.GetActiveSeason()
+    pendingSeasonId = season and season.id or nil
     if not force and season then
         local stored, current = GL.SeasonRosterGuildMismatch(season.id)
         if stored then
@@ -471,6 +483,21 @@ function GL.GetSeasonRoster(seasonId)
 
     -- Attendance bestimmt, wer unterhalb des Kaders als Gast erscheint
     local attended = GL.GetSeasonAttendees(seasonId)
+    local players  = db.players or {}
+
+    -- Ohne Kader-Schnappschuss bildet sich die Liste aus der Attendance selbst. Für eine
+    -- nachgetragene alte Season ist der heutige Gildenstand ohnehin die falsche Referenz —
+    -- und eine leere Matrix wäre das schlechteste Ergebnis. Ein Block, keine Trennung:
+    -- ohne Kader gibt es kein "darunter".
+    if not season.roster or #season.roster == 0 then
+        local rows = {}
+        for _, name in ipairs(attended) do
+            local p = players[name]
+            table.insert(rows, { name = name, class = p and p.class, group = "roster" })
+        end
+        table.sort(rows, function(a, b) return a.name:lower() < b.name:lower() end)
+        return rows
+    end
 
     local rows, inKader = {}, {}
     for _, m in ipairs(season.roster or {}) do
@@ -482,7 +509,6 @@ function GL.GetSeasonRoster(seasonId)
         inKader[GL.NameKey(m.name)] = true
     end
 
-    local players = db.players or {}
     for _, name in ipairs(attended) do
         if not inKader[GL.NameKey(name)] then
             local p = players[name]

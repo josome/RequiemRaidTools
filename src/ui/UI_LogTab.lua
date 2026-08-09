@@ -143,21 +143,51 @@ function UI.ShowExportPopup(raidData, textOverride)
 
         local copyBtn = CreateFrame("Button", nil, exportPopup, "UIPanelButtonTemplate")
         copyBtn:SetSize(100, 22)
-        copyBtn:SetPoint("BOTTOM", exportPopup, "BOTTOM", 0, 10)
+        copyBtn:SetPoint("BOTTOM", exportPopup, "BOTTOM", -55, 10)
         copyBtn:SetText("Mark All")
         copyBtn:SetScript("OnClick", function()
             eb:SetFocus()
             eb:HighlightText()
         end)
+
+        -- Zweiter Knopf für den Import: dasselbe Fenster nimmt eingefügten Text entgegen.
+        -- Die EditBox war ohnehin editierbar — ein eigenes Fenster wäre reine Doppelung.
+        local acceptBtn = CreateFrame("Button", nil, exportPopup, "UIPanelButtonTemplate")
+        acceptBtn:SetSize(100, 22)
+        acceptBtn:SetPoint("BOTTOM", exportPopup, "BOTTOM", 55, 10)
+        acceptBtn:Hide()
+        exportPopup.acceptBtn = acceptBtn
+        exportPopup.copyBtn   = copyBtn
     end
 
     local fmt = GuildLootDB.settings.exportFormat or "JSON"
     exportPopup.titleText:SetText(fmt .. " Export – press Mark All, then Ctrl+C")
     local text = textOverride
                  or ((fmt == "CSV") and GL.ExportCSV(raidData) or GL.ExportJSON(raidData))
+    exportPopup.acceptBtn:Hide()
+    exportPopup.copyBtn:SetPoint("BOTTOM", exportPopup, "BOTTOM", 0, 10)
     exportPopup.editBox:SetText(text)
     exportPopup.editBox:HighlightText()
     exportPopup:Show()
+    exportPopup.editBox:SetFocus()
+end
+
+--- Öffnet dasselbe Textfenster leer und mit Bestätigen-Knopf, um Text entgegenzunehmen.
+--- @param title    string    Überschrift
+--- @param btnText  string    Beschriftung des Bestätigen-Knopfs
+--- @param onAccept function  bekommt den eingegebenen Text
+function UI.ShowTextInputPopup(title, btnText, onAccept)
+    UI.ShowExportPopup(nil, "")            -- Fenster bauen/anzeigen, leer
+    exportPopup.titleText:SetText(title)
+    exportPopup.copyBtn:SetPoint("BOTTOM", exportPopup, "BOTTOM", -55, 10)
+    exportPopup.acceptBtn:SetText(btnText)
+    exportPopup.acceptBtn:SetScript("OnClick", function()
+        local text = exportPopup.editBox:GetText()
+        exportPopup:Hide()
+        if onAccept then onAccept(text) end
+    end)
+    exportPopup.acceptBtn:Show()
+    exportPopup.editBox:SetText("")
     exportPopup.editBox:SetFocus()
 end
 

@@ -28,6 +28,9 @@ local ROW_INSET = 4
 -- Rand je Seite innerhalb einer Spalte: die Zelle ist CELL_W - 2*CELL_PAD breit, und
 -- Spaltenkopf und Tönung nutzen denselben Rand, damit alles auf einer Linie steht.
 local CELL_PAD  = 2
+-- Kantenlänge der BIS-Markierung (Krone) in der Zelle. Klein genug, dass die Zellfarbe
+-- darunter noch trägt.
+local BIS_ICON  = 12
 local SEP_H   = 18
 local PAGER_W = 92                          -- Platz für ◀ Seite x/y ▶
 
@@ -125,6 +128,8 @@ function UI.BuildAttendancePanel(parent)
     local header = CreateFrame("Frame", nil, panel)
     header:SetPoint("TOPLEFT",  panel, "TOPLEFT",   8, -6)
     header:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -8, -6)
+    -- 2 Zeilen à ~24 px (Season-Fenster+Resume+Rename / Aktionen+Kader nebeneinander)
+    -- plus Rand — siehe UI.BuildSeasonControls in UI_SeasonControls.lua
     header:SetHeight(52)
     panel.header = header
     UI.BuildSeasonControls(header)
@@ -314,6 +319,7 @@ function UI.BuildAttendancePanel(parent)
             row.trialCb.text:SetText("")
 
             row.cells = {}
+            row.stars = {}
             return row
         end,
         function(_, row)
@@ -321,6 +327,7 @@ function UI.BuildAttendancePanel(parent)
             row:ClearAllPoints()
             row.trialCb:SetScript("OnClick", nil)
             for _, cell in ipairs(row.cells) do cell:Hide() end
+            for _, star in ipairs(row.stars) do star:Hide() end
         end
     )
 
@@ -365,7 +372,8 @@ end
 --- Holt eine Zelle der Zeile (legt sie beim ersten Bedarf an) und färbt sie.
 --- Position und Breite kommen von außen, weil Bossspalten breiter sind als Abend-Spalten.
 --- @param trial boolean  anwesende Zelle eines Trials wird türkis statt grün
-local function SetCell(row, index, present, trial, x, w)
+--- @param bis   boolean  hier wurde Loot mit Prio BIS gewonnen → Krone in der Ecke
+local function SetCell(row, index, present, trial, bis, x, w)
     local cell = row.cells[index]
     if not cell then
         cell = row:CreateTexture(nil, "ARTWORK")
@@ -378,6 +386,30 @@ local function SetCell(row, index, present, trial, x, w)
     if present then c = trial and COLOR_TRIAL or COLOR_PRESENT end
     cell:SetColorTexture(c[1], c[2], c[3], c[4])
     cell:Show()
+
+    -- Die BIS-Markierung liegt als eigene Ebene über der Zelle, an der Zeile gepoolt wie
+    -- die Zellen selbst. Wie row.cells IMMER angelegt (nur sichtbar/unsichtbar geschaltet) —
+    -- sonst bleibt row.stars an Indizes ohne BIS-Krone dauerhaft nil, ein Loch im Array.
+    -- #row.stars ist mit Löchern undefiniert und riss in den Hide-Schleifen weiter unten
+    -- (und im Pool-Release) ab, bevor spätere Indizes versteckt wurden — die alte Krone
+    -- einer vorherigen Zeile blieb an einem falschen Index sichtbar stehen.
+    local star = row.stars[index]
+    if not star then
+        -- Die Krone der Raidleitung als Textur statt eines Zeichens: WoWs Schriftarten
+        -- decken "★" nicht ab (leeres Kästchen), und ein ASCII-* geht auf der kleinen
+        -- Zelle unter. Der Pfad existiert seit Vanilla und wird in den Unit-Frames benutzt.
+        star = row:CreateTexture(nil, "OVERLAY")
+        star:SetTexture("Interface\\GroupFrame\\UI-Group-LeaderIcon")
+        star:SetSize(BIS_ICON, BIS_ICON)
+        row.stars[index] = star
+    end
+    if bis then
+        star:ClearAllPoints()
+        star:SetPoint("TOPRIGHT", cell, "TOPRIGHT", 1, 2)
+        star:Show()
+    else
+        star:Hide()
+    end
 end
 
 function UI.RefreshAttendanceTab()
@@ -412,7 +444,10 @@ function UI.RefreshAttendanceTab()
     if not season then
         msg = "Noch keine Season angelegt.\n|cff888888Oben auf \"New Season\".|r"
     elseif #data.rows == 0 then
-        msg = "Kein Rang für den Kader gewählt.\n|cff888888Oben \"Kader ab Rang\" setzen.|r"
+        -- Ohne Kader-Schnappschuss bildet sich die Liste aus der Attendance — leer ist sie
+        -- also nur, wenn in dieser Season auch niemand geraidet hat
+        msg = "Niemand in dieser Season.\n"
+              .. "|cff888888Kein Raid im Zeitraum, und kein Kader eingelesen.|r"
     elseif #data.nights == 0 then
         msg = "Noch keine Raid-Abende in dieser Season.\n"
               .. "|cff888888Liegen die Raids davor? Dann das Startdatum der Season zurücksetzen.|r"
@@ -656,10 +691,12 @@ function UI.RefreshAttendanceTab()
             -- aktuelle Flag: Altdaten kennen den Stand von damals nicht, und ihn aus dem
             -- Heute zu erschließen färbt beim Setzen des Hakens die ganze Historie um —
             -- genau die rückwirkende Umdeutung, die vermieden werden soll.
-            SetCell(row, i, entry.present[col.key], entry.trialAt[col.key], cx, w)
+            SetCell(row, i, entry.present[col.key], entry.trialAt[col.key],
+                    entry.bisAt[col.key], cx, w)
             cx = cx + w
         end
         for i = #shown + 1, #row.cells do row.cells[i]:Hide() end
+        for i = #shown + 1, #row.stars do row.stars[i]:Hide() end
 
         row:Show()
         yOff = yOff - ROW_H

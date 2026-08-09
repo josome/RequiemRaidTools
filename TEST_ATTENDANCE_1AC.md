@@ -1,7 +1,7 @@
 # Attendance Phase 1a + 1c — In-Game Test-Checkliste
 
 **Branch:** `feat/attendance`
-**TOC:** 1.0.3.38
+**TOC:** 1.0.3.57
 **Was neu ist:** Season-Datenmodell (`Core_Season`), Gilden-/Season-Roster (`Core_Guild`),
 Attendance-Aggregat (`Core_Attendance`), Attendance-Tab + Season-Kopfzeile
 (`UI_AttendanceTab`, `UI_SeasonControls`). Tab-Slot 5 heißt jetzt **Attendance** —
@@ -51,21 +51,43 @@ Die Kopfzeile hat jetzt dieselben Knöpfe wie der Raid-Tab, und der Dropdown **w
 Season nur aus, statt sie zu öffnen — beendete Seasons lassen sich damit ansehen, ohne sie
 wieder aufzunehmen.
 
+- [ ] **Alle Knöpfe liegen innerhalb des Fensterrahmens** — mit zehn Knöpfen (inkl. Export/
+      Import) reichte eine Zeile nicht mehr. Zeile 1: Dropdown, Start, Ende, `[New Season]`,
+      `[Resume]`, `[Rename]`. Zeile 2: links der Kader-Block, rechts davon ab `New Seasons`
+      linker Kante `[Export]` `[Import]` `[Delete]` `[Roster lesen]`. Nichts schwebt über
+      den Rand hinaus
+- [ ] Mit aktivem orangem „→ Roster lesen"-Hinweis: der Kader-Zähler stößt **nicht** mit
+      `[Export]` zusammen (beide teilen sich Zeile 2, links/rechts) — falls doch, Bescheid geben
+
 - [ ] **[New Season]** → Popup, Name vorbelegt mit `Season JJJJ-MM` → Anlegen; die neue Season
       ist danach ausgewählt
 - [ ] Läuft eine Season, heißt der Knopf **[Close Season]** und beendet sie; die Ansicht bleibt
       auf derselben Season stehen und zeigt sie als `(beendet)`
-- [ ] Season-Dropdown zeigt alle Seasons, neueste zuerst, beendete mit `(beendet)`
+- [ ] Season-Dropdown zeigt alle Seasons, neueste zuerst, beendete mit `(beendet)`;
+      die **laufende** Season ist orange hervorgehoben — seit der Dropdown nur auswählt,
+      wäre sonst nicht erkennbar, in welche gerade aufgezeichnet wird
 - [ ] Eine **beendete** Season auswählen zeigt ihre Matrix — **ohne** Rückfrage und ohne sie
       zu öffnen (früher kam sofort „Wieder aufnehmen?")
 - [ ] **[Resume]** ist nur bei einer ausgewählten, beendeten Season aktiv → fragt
       „Wieder aufnehmen?" und beendet dabei die laufende
-- [ ] Bei einer beendeten Season ist **[Roster lesen]** ausgegraut — der Kader-Schnappschuss
-      gehört zur laufenden Season
+- [ ] Bei einer **beendeten** Season ohne Kader baut sich die Liste **aus den Sessions** —
+      alle, die im Zeitraum geraidet haben, als ein Block ohne Kader/Gast-Trennung
+- [ ] Der orange Hinweis „→ Roster lesen" erscheint dort **nicht** mehr (kein Mangel)
+- [ ] **[Roster lesen]** funktioniert trotzdem auch bei einer beendeten Season — der Kader landet
+      in genau der ausgewählten. Ohne das hätte eine nachgetragene alte Season gar keinen.
+      Der Roster ist dann zwangsläufig der von heute.
 - [ ] **Startdatum** links neben [Neue Season] ist klickbar → Popup „TT.MM.JJJJ",
       vorbelegt mit dem ältesten vorhandenen Raid
 - [ ] Unsinniges Datum (z. B. `32.13.2026`) → Print „Datum bitte als TT.MM.JJJJ angeben.",
       nichts ändert sich
+- [ ] **Enddatum** rechts daneben: bei der laufenden Season steht dort `bis offen` —
+      das ist der Normalfall, ein Enddatum ist **nicht** nötig
+- [ ] Klick darauf setzt ein Enddatum; die Season gilt danach als beendet und der Dropdown
+      zeigt `(beendet)`
+- [ ] Ein Raid **am** Enddatum zählt noch dazu (das Ende liegt auf 23:59:59)
+- [ ] Ende **vor** dem Start wird abgewiesen: „Enddatum konnte nicht gesetzt werden…"
+- [ ] Nachtrag-Fall: alte Season anlegen, Startdatum aufs Vorjahr, Enddatum aufs Ende jener
+      Season → sie sammelt keine jüngeren Raids mehr ein
 - [ ] **[Rename]** → Popup mit dem aktuellen Namen vorbelegt und markiert; OK oder Enter
       übernimmt, der Dropdown zeigt den neuen Namen sofort
 - [ ] Leerer Name (oder nur Leerzeichen) wird abgewiesen, der alte bleibt stehen
@@ -80,16 +102,17 @@ wieder aufzunehmen.
 
 ---
 
-## 3 — Rang-Dropdown („Kader:")
+## 3 — Rang-Dropdown
 
-- [ ] Dropdown hat **zwei Abschnitte**: oben „Ab Rang (und höher)", darunter „Einzeln an/aus"
-- [ ] Klick auf einen Rang oben setzt diesen Rang **und alles darüber** (GM/Offiziere stehen
-      über Raider und müssen mit drin sein)
-- [ ] Der Dropdown-Text zeigt danach den **niedrigsten** aktiven Rang
-- [ ] „Einzeln an/aus": Häkchen togglet einen einzelnen Rang, Menü bleibt offen
+Kein „Kader:"-Label mehr davor — die Zeile beginnt direkt mit dem Dropdown, linksbündig zur
+Season-Zeile darüber. Die „Ab Rang (und höher)"-Kurzform ist entfallen, nur noch Einzelauswahl.
+
+- [ ] Dropdown hat **nur noch einen Abschnitt**: „Einzeln an/aus" — kein zweiter Titel darüber
+- [ ] Häkchen togglet einen einzelnen Rang, Menü bleibt offen (Mehrfachauswahl in einem Zug)
 - [ ] Nach jeder Filteränderung erscheint rechts vom Zähler der orange Hinweis
       **„→ Roster lesen"** — und der Kader ändert sich **noch nicht** (gewollt)
 - [ ] Nach frischem Login steht kurz „lädt…" im Dropdown, bis die Rang-Namen da sind
+- [ ] Dropdown und Zähler-Zeile sind **linksbündig** unter der Season-Zeile ausgerichtet
 
 ---
 
@@ -118,6 +141,12 @@ wieder aufzunehmen.
 - [ ] Klassenfarben stimmen — **auch bei aus der Gilde Ausgetretenen** (kommen aus
       `db.players[name].class`, nicht aus dem Gildenroster)
 - [ ] Grüne Zelle = anwesend, dunkle Zelle = abwesend; `Att.%` passt zur Zeile
+- [ ] **BIS-Stern**: Item mit Prio 1 vergeben → in der Zeile des Gewinners erscheint ein
+      kleine **Krone** in der Zelle (dieselbe wie beim Raidleiter), in der **Bossspalte** und in der **Abend-Spalte**
+- [ ] Item mit Prio 2 (OS) erzeugt **keinen** Stern
+- [ ] Der Stern wird nicht gespeichert, sondern beim Zeichnen aus dem Loot-Log abgeleitet:
+      ein **nachträglich** vergebenes Item erscheint sofort, ohne dass der Kill angefasst wird
+- [ ] Beim Blättern bleiben keine Sterne in wiederverwendeten Zeilen stehen
 - [ ] **Trial-Checkbox** togglet und überlebt einen `/reload`
       (noch ohne Loot-Wirkung, das ist Phase 2)
 - [ ] Trial-Spieler hat in Bosskills, die er **als Trial** bestritten hat, **türkise** statt
@@ -194,7 +223,34 @@ Eine Spalte ist ein **Raid-Tag**, nicht eine Session. Tagesgrenze ist der Raid-R
 - [ ] Tooltip einer Bossspalte zeigt das Datum des **Kills**, nicht das des Abends —
       bei einer über Mitternacht laufenden Session also den Folgetag
 
-## 9 — Einträge löschen (Testleichen aufräumen)
+## 9 — Export & Import (Raids nachtragen)
+
+Export liefert eine CSV mit **einer Zeile je Teilnehmer und Bosskill**. Der Import ordnet über
+das **Datum** zu — nicht über die ausgewählte Season.
+
+- [ ] **[Export]** öffnet das Textfenster; die erste Spalte sagt den Zeilentyp:
+      `Season,<Name>,<Start>,<Ende>,<Gilde>`, dann `Rank,<Index>`, `Roster,<Name>,<Klasse>`
+      und `Kill,<Datum>,<Zeit>,<Instanz>,<Diff>,<Boss>,<Spieler>,<BIS>`
+- [ ] Die Season-Stammdaten stehen wirklich drin — ohne sie ließe sich die Season anderswo
+      nicht wiederherstellen; „Mark All" + Strg+C kopiert alles
+- [ ] Ein BIS-Gewinn steht als `x` in der letzten Spalte
+- [ ] **[Import]** öffnet dasselbe Fenster leer mit einem [Import]-Knopf
+- [ ] Export in eine **frische DB** (oder zu einem Gildenkollegen) einspielen → die Season
+      wird angelegt, mit Fenster, Rang-Filter und Kader; die **laufende** Season bleibt offen
+- [ ] Exportierten Text unverändert wieder einfügen → Chat meldet `0 Bosskills`, alles
+      übersprungen; die Matrix ändert sich nicht
+- [ ] Eine Zeile duplizieren, Datum auf einen neuen Tag setzen, importieren → neue Spalte
+      erscheint, der Spieler bekommt seine Zelle
+- [ ] `x` in der BIS-Spalte einer nachgetragenen Zeile → Krone erscheint, obwohl die
+      importierte Session **keinen** Loot-Log hat
+- [ ] Kaputte Zeilen (Datum, Zeit oder Spieler fehlt) werden gezählt und gemeldet, nicht
+      importiert
+- [ ] Importierte Abende tauchen auch im **Raid-Tab** auf, als Session `Import <Datum>`
+      ohne Loot
+- [ ] Liegt das Datum außerhalb jedes Season-Fensters, erscheint der Abend nirgends —
+      Startdatum der Season entsprechend zurücksetzen
+
+## 10 — Einträge löschen (Testleichen aufräumen)
 
 Löschen läuft zweistufig über **zwei verschiedene Tasten**: Rechtsklick auf den Spaltenkopf fragt
 (`Sure?` in Rot), ein **Linksklick** innerhalb von 4 s führt aus. Zwei gleiche Klicks ließen sich
@@ -218,13 +274,13 @@ versehentlich durchziehen, ein Tastenwechsel nicht. Nichts davon fasst den **Loo
 - [ ] Linksklick funktioniert unverändert zum Auf- und Zuklappen
 - [ ] Tooltip nennt den Rechtsklick, wo er möglich ist
 
-## 10 — Blättern & Leerzustände
+## 11 — Blättern & Leerzustände
 
 - [ ] Bei mehr Abenden als Spalten passen: `<` / `>` erscheinen mit Anzeige `1–8/14`
 - [ ] `<` ist auf der ersten Seite ausgegraut, `>` auf der letzten
 - [ ] Fenster **schmaler ziehen** → weniger Spalten, Blättern passt sich an
 - [ ] Season wechseln → Blätter-Position springt auf die neuesten Abende zurück
-- [ ] Leerzustand **kein Rang gewählt**: „Kein Rang für den Kader gewählt."
+- [ ] Leerzustand nur noch, wenn wirklich niemand da ist: „Niemand in dieser Season."
 - [ ] Leerzustand **Season ohne Raids**: „Noch keine Raid-Abende in dieser Season. / Liegen die
       Raids davor? Dann das Startdatum der Season zurücksetzen."
 

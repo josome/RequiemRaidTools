@@ -47,6 +47,10 @@ in Phase 1c einen eigenen Selektor.
 | `testRenameSeason_TrimsWhitespace` | Führende/abschließende Leerzeichen werden entfernt. |
 | `testRenameSeason_RejectsEmptyName` | Leer, nur Leerzeichen oder `nil` → `false`, Name bleibt unverändert. |
 | `testRenameSeason_UnknownIdIsNoOp` | Unbekannte Season-ID → `false`. |
+| `testSetSeasonEnd_SetsEndAndClosesSeason` | `SetSeasonEnd` setzt `endedAt` auf einen gewählten Zeitpunkt und schließt die Season (wie `EndSeason`). |
+| `testSetSeasonEnd_RejectsEndBeforeStart` | Ende vor Start → `false`; das Fenster bliebe sonst leer. |
+| `testSetSeasonEnd_RejectsUnknownOrInvalid` | Unbekannte ID, `nil`, `0`, Nicht-Zahlen → `false`. |
+| `testSetSeasonEnd_CanCorrectAnExistingEnd` | Ein von `EndSeason` gestempeltes Ende lässt sich nachträglich korrigieren. |
 | `testSetSeasonStart_MovesWindowBack` | `SetSeasonStart` verschiebt `startedAt`; `endedAt` bleibt unangetastet. |
 | `testSetSeasonStart_RejectsUnknownOrInvalid` | Unbekannte ID, `nil`, `0` und Nicht-Zahlen → `false`. |
 | `testSetSeasonStart_RejectsStartAfterEnd` | Ein Start nach dem Season-Ende wird abgewiesen. |

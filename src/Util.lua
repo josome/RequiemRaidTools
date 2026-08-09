@@ -221,6 +221,58 @@ function GL.NormalizeName(name)
     return name
 end
 
+--- Zerlegt eine CSV-Zeile in ihre Felder. Versteht dieselbe Quoting-Regel, die GL.ExportCSV
+--- beim Schreiben anwendet: ein Feld darf in Anführungszeichen stehen, innenliegende
+--- Anführungszeichen sind verdoppelt.
+--- Gegenstück zum Schreiben — ohne das gäbe es keinen Weg zurück, denn einen JSON-Parser
+--- hat das Addon nicht.
+--- @param line string
+--- @return table  Array der Felder (kann leere Strings enthalten)
+function GL.ParseCSVLine(line)
+    local fields = {}
+    line = tostring(line or "")
+    local i, len = 1, #line
+    while i <= len + 1 do
+        local field
+        if line:sub(i, i) == '"' then
+            -- Quoted: bis zum schließenden Anführungszeichen, "" bleibt ein Zeichen
+            local buf, j = {}, i + 1
+            while j <= len do
+                local c = line:sub(j, j)
+                if c == '"' then
+                    if line:sub(j + 1, j + 1) == '"' then
+                        table.insert(buf, '"'); j = j + 2
+                    else
+                        j = j + 1; break
+                    end
+                else
+                    table.insert(buf, c); j = j + 1
+                end
+            end
+            field = table.concat(buf)
+            i = j
+        else
+            local nextComma = line:find(",", i, true)
+            if nextComma then
+                field = line:sub(i, nextComma - 1)
+                i = nextComma
+            else
+                field = line:sub(i)
+                i = len + 1
+            end
+        end
+        table.insert(fields, field)
+        if line:sub(i, i) == "," then
+            i = i + 1
+            -- Komma am Zeilenende bedeutet ein letztes leeres Feld
+            if i > len then table.insert(fields, ""); break end
+        else
+            break
+        end
+    end
+    return fields
+end
+
 --- Vergleichsschlüssel für Spielernamen: Realm ohne Leerzeichen, alles kleingeschrieben.
 ---
 --- Nötig, weil derselbe Spieler in zwei Schreibweisen in der DB landen kann. `GetRealmName()`

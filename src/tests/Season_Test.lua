@@ -302,6 +302,50 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
     end
 
     -- ========================================================
+    -- SetSeasonEnd — Fenster nach hinten begrenzen
+    -- ========================================================
+    function Tests:testSetSeasonEnd_SetsEndAndClosesSeason()
+        WithTestDB(FreshDB(), function()
+            local id = GL.CreateSeason("S")
+            GL.SetSeasonStart(id, 1000)
+            IsTrue(GL.SetSeasonEnd(id, 5000))
+            AreEqual(5000, GuildLootDB.seasons[id].endedAt)
+            -- ein Enddatum schließt die Season, wie GL.EndSeason auch
+            AreEqual(nil, GuildLootDB.activeSeasonId)
+        end)
+    end
+
+    function Tests:testSetSeasonEnd_RejectsEndBeforeStart()
+        WithTestDB(FreshDB(), function()
+            local id = GL.CreateSeason("S")
+            GL.SetSeasonStart(id, 5000)
+            -- das Fenster bliebe sonst leer
+            IsFalse(GL.SetSeasonEnd(id, 1000))
+            AreEqual(nil, GuildLootDB.seasons[id].endedAt)
+        end)
+    end
+
+    function Tests:testSetSeasonEnd_RejectsUnknownOrInvalid()
+        WithTestDB(FreshDB(), function()
+            local id = GL.CreateSeason("S")
+            IsFalse(GL.SetSeasonEnd("nope", 5000))
+            IsFalse(GL.SetSeasonEnd(id, nil))
+            IsFalse(GL.SetSeasonEnd(id, 0))
+            IsFalse(GL.SetSeasonEnd(id, "morgen"))
+        end)
+    end
+
+    function Tests:testSetSeasonEnd_CanCorrectAnExistingEnd()
+        WithTestDB(FreshDB(), function()
+            local id = GL.CreateSeason("S")
+            GL.SetSeasonStart(id, 1000)
+            GL.EndSeason(id)                       -- stempelt time()
+            IsTrue(GL.SetSeasonEnd(id, 5000))      -- nachträglich korrigieren
+            AreEqual(5000, GuildLootDB.seasons[id].endedAt)
+        end)
+    end
+
+    -- ========================================================
     -- SetSeasonStart — Zeitfenster nachträglich verschieben
     -- ========================================================
     function Tests:testSetSeasonStart_MovesWindowBack()

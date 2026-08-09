@@ -115,6 +115,64 @@ function GL.DeleteSeason(id)
     return true
 end
 
+--- Legt eine Season aus Importdaten an, OHNE die laufende zu beenden und ohne die neue
+--- zu aktivieren.
+---
+--- Bewusst neben GL.CreateSeason statt darin: das Anlegen über den Knopf soll die laufende
+--- Season beenden und die neue öffnen — beim Nachtragen einer alten Season wäre genau das
+--- falsch. Zwei Zwecke, zwei Funktionen.
+---
+--- @param name       string
+--- @param startedAt  number
+--- @param endedAt    number|nil
+--- @param rankFilter table|nil  { [rankIndex] = true }
+--- @param roster     table|nil  Array von { name, class }
+--- @param guild      string|nil Gilde, aus der der Kader stammt
+--- Writes: db.seasons[id]
+--- @return string|nil  die neue ID
+function GL.CreateSeasonFromImport(name, startedAt, endedAt, rankFilter, roster, guild)
+    local db = GuildLootDB
+    if not db then return nil end
+    db.seasons = db.seasons or {}
+    startedAt = tonumber(startedAt) or time()
+
+    local id, n = GenerateSeasonID(name, startedAt), 0
+    while db.seasons[id] do
+        n = n + 1
+        id = GenerateSeasonID((name or "") .. "#" .. n, startedAt)
+    end
+
+    local filter = {}
+    for k, v in pairs(rankFilter or {}) do
+        local idx = tonumber(k)
+        if v and idx then filter[idx] = true end
+    end
+
+    db.seasons[id] = {
+        id          = id,
+        name        = name or "",
+        startedAt   = startedAt,
+        endedAt     = tonumber(endedAt),
+        rankFilter  = filter,
+        roster      = roster,
+        rosterGuild = guild,
+    }
+    return id
+end
+
+--- Sucht eine Season über ihren Namen (Groß-/Kleinschreibung egal).
+--- Der Import erkennt daran, ob er eine Season anlegen muss oder nur Raids ergänzt.
+--- @return table|nil
+function GL.FindSeasonByName(name)
+    local db = GuildLootDB
+    if not (db and db.seasons and name) then return nil end
+    local needle = tostring(name):lower()
+    for _, s in pairs(db.seasons) do
+        if tostring(s.name or ""):lower() == needle then return s end
+    end
+    return nil
+end
+
 --- Benennt eine Season um. Die ID bleibt unangetastet — sie wird zwar aus dem Namen
 --- erzeugt, ist danach aber der Schlüssel in db.seasons und die Referenz in
 --- db.activeSeasonId; sie mitzuändern würde beides brechen.
@@ -146,6 +204,26 @@ function GL.SetSeasonStart(id, timestamp)
     if not timestamp or timestamp <= 0 then return false end
     if season.endedAt and timestamp > season.endedAt then return false end
     season.startedAt = timestamp
+    return true
+end
+
+--- Setzt das Enddatum einer Season auf einen bestimmten Zeitpunkt.
+---
+--- GL.EndSeason stempelt immer time() — für eine nachgetragene alte Season ist das falsch:
+--- ihr Fenster liefe bis heute und würde alle jüngeren Raids einsammeln. Diese Funktion ist
+--- das Gegenstück zu GL.SetSeasonStart und schließt die Season dabei ab, wie EndSeason auch.
+--- Ein Ende vor dem Start wird abgewiesen; das Fenster bliebe sonst leer.
+--- Returns true bei Erfolg, false wenn ID oder Zeitstempel unbrauchbar.
+--- Writes: db.seasons[id].endedAt, ggf. db.activeSeasonId
+function GL.SetSeasonEnd(id, timestamp)
+    local db = GuildLootDB
+    local season = db and db.seasons and db.seasons[id]
+    if not season then return false end
+    timestamp = tonumber(timestamp)
+    if not timestamp or timestamp <= 0 then return false end
+    if timestamp < (season.startedAt or 0) then return false end
+    season.endedAt = timestamp
+    if db.activeSeasonId == id then db.activeSeasonId = nil end
     return true
 end
 

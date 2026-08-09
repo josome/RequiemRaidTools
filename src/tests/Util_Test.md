@@ -185,6 +185,24 @@ function Tests:testNeueFunktion()
 end
 ```
 
+## `GL.ParseCSVLine(line)`
+
+Zerlegt eine CSV-Zeile in ihre Felder und versteht dabei genau die Quoting-Regel, die
+`GL.ExportCSV` beim Schreiben anwendet: ein Feld darf in Anführungszeichen stehen,
+innenliegende Anführungszeichen sind verdoppelt.
+
+Gegenstück zum Schreiben — ohne das gäbe es keinen Weg zurück in die DB, denn einen
+JSON-Parser hat das Addon nicht (nur den Serialisierer `GL.ExportJSON`). Genutzt vom
+Attendance-Import.
+
+| Test | Prüft |
+|------|-------|
+| `testParseCSVLine_PlainFields` | Einfache Felder ohne Sonderzeichen |
+| `testParseCSVLine_QuotedFieldWithComma` | Komma innerhalb eines maskierten Felds trennt nicht |
+| `testParseCSVLine_DoubledQuotesInsideField` | `""` wird zu einem Anführungszeichen |
+| `testParseCSVLine_EmptyFields` | Leeres Feld in der Mitte und am Zeilenende (die BIS-Spalte ohne Marker) |
+| `testParseCSVLine_EmptyAndNil` | Leerer String und `nil` liefern ein Feld, keinen Fehler |
+
 ## `GL.NormalizeName(name)`
 
 Bringt einen Namen auf `Name-Realm` mit **genau einem** Realm. Nackte Namen bekommen den eigenen

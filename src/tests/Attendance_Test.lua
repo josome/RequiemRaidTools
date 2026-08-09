@@ -84,6 +84,8 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
                 label     = s.label or ("Session " .. i),
                 startedAt = s.startedAt,
                 raidMeta  = meta,
+                -- Quelle der BIS-Sterne; Einträge wie in Loot_Assign geschrieben
+                lootLog   = s.lootLog or {},
             }
         end
         return {
@@ -294,6 +296,101 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
             AreEqual(100, row.pct)
             IsTrue(row.present[result.nights[1].id])
             IsTrue(row.trialAt["r1#1"])
+        end)
+    end
+
+    -- ========================================================
+    -- BIS-Gewinne (bisAt) — aus dem lootLog abgeleitet, nicht gespeichert
+    -- ========================================================
+
+    --- Season mit einem Abend, zwei Bosskills, und dem übergebenen lootLog.
+    local function BisDB(lootLog, kills)
+        return AttendanceDB({}, {
+            { startedAt = TS(3), lootLog = lootLog, raids = {
+                { id = "r1", participants = { "Alice-R" }, kills = kills or {
+                    { boss = "Ulgrax", ts = TS(3, 21), participants = { "Alice-R" } },
+                    { boss = "Sikran", ts = TS(3, 22), participants = { "Alice-R" } },
+                } },
+            } },
+        })
+    end
+
+    function Tests:testComputeAttendance_BisMarksKillAndNight()
+        WithDB(BisDB({
+            { player = "Alice-R", winnerPrio = 1, boss = "Sikran",
+              raidID = "r1", timestamp = TS(3, 22) },
+        }), function()
+            MockRoster({ { name = "Alice-R", group = "roster" } })
+            local result = GL.ComputeAttendance("s1")
+            local row    = result.rows[1]
+            IsTrue(row.bisAt["r1#2"])                      -- der betroffene Kill
+            IsTrue(row.bisAt[result.nights[1].id])         -- und der Abend
+            AreEqual(nil, row.bisAt["r1#1"])               -- der andere Boss nicht
+        end)
+    end
+
+    function Tests:testComputeAttendance_NonBisPrioIsIgnored()
+        WithDB(BisDB({
+            { player = "Alice-R", winnerPrio = 2, boss = "Sikran",
+              raidID = "r1", timestamp = TS(3, 22) },
+        }), function()
+            MockRoster({ { name = "Alice-R", group = "roster" } })
+            local row = GL.ComputeAttendance("s1").rows[1]
+            AreEqual(nil, row.bisAt["r1#2"])
+        end)
+    end
+
+    function Tests:testComputeAttendance_BisPrioAsStringCounts()
+        -- Über Comm kommt winnerPrio als String an (Loot.OnCommAssign)
+        WithDB(BisDB({
+            { player = "Alice-R", winnerPrio = "1", boss = "Sikran",
+              raidID = "r1", timestamp = TS(3, 22) },
+        }), function()
+            MockRoster({ { name = "Alice-R", group = "roster" } })
+            IsTrue(GL.ComputeAttendance("s1").rows[1].bisAt["r1#2"])
+        end)
+    end
+
+    function Tests:testComputeAttendance_BisWithUnknownBossOrRaidMissesAll()
+        WithDB(BisDB({
+            { player = "Alice-R", winnerPrio = 1, boss = "Fremd",  raidID = "r1" },
+            { player = "Alice-R", winnerPrio = 1, boss = "Sikran", raidID = "r9" },
+        }), function()
+            MockRoster({ { name = "Alice-R", group = "roster" } })
+            local row = GL.ComputeAttendance("s1").rows[1]
+            AreEqual(nil, row.bisAt["r1#1"])
+            AreEqual(nil, row.bisAt["r1#2"])
+        end)
+    end
+
+    function Tests:testComputeAttendance_BisPicksKillBeforeTimestamp()
+        -- derselbe Boss zweimal im selben raidID → der Kill VOR dem Loot gewinnt
+        WithDB(BisDB({
+            { player = "Alice-R", winnerPrio = 1, boss = "Ulgrax",
+              raidID = "r1", timestamp = TS(3, 23) },
+        }, {
+            { boss = "Ulgrax", ts = TS(3, 21), participants = { "Alice-R" } },
+            { boss = "Ulgrax", ts = TS(3, 22), participants = { "Alice-R" } },
+            { boss = "Ulgrax", ts = TS(4, 10), participants = { "Alice-R" } },
+        }), function()
+            MockRoster({ { name = "Alice-R", group = "roster" } })
+            local row = GL.ComputeAttendance("s1").rows[1]
+            AreEqual(nil, row.bisAt["r1#1"])
+            IsTrue(row.bisAt["r1#2"])          -- letzter Kill vor dem Zeitstempel
+            AreEqual(nil, row.bisAt["r1#3"])   -- der danach nicht
+        end)
+    end
+
+    function Tests:testComputeAttendance_BisMatchesDespiteRealmSpacing()
+        WithDB(BisDB({
+            { player = "Alice-DerMithrilorden", winnerPrio = 1, boss = "Sikran",
+              raidID = "r1", timestamp = TS(3, 22) },
+        }, {
+            { boss = "Sikran", ts = TS(3, 22),
+              participants = { "Alice-DerMithrilorden" } },
+        }), function()
+            MockRoster({ { name = "Alice-Der Mithrilorden", group = "roster" } })
+            IsTrue(GL.ComputeAttendance("s1").rows[1].bisAt["r1#1"])
         end)
     end
 
@@ -878,6 +975,395 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
         WithDB(AttendanceDB({}, {}), function()
             MockRoster({ { name = "Fremd-R", group = "guest" } })
             IsFalse(RowByName(GL.ComputeAttendance("s1"), "Fremd-R").trial)
+        end)
+    end
+
+    -- ========================================================
+    -- CSV-Export / -Import (Phase 1d/1e)
+    -- ========================================================
+
+    --- Season mit einem Abend, zwei Bosskills, zwei Teilnehmern; Alice mit BIS bei Boss 2.
+    local function ExportDB()
+        return AttendanceDB({}, {
+            { startedAt = TS(3), lootLog = {
+                { player = "Alice-R", winnerPrio = 1, boss = "Sikran",
+                  raidID = "r1", timestamp = TS(3, 22) },
+            }, raids = {
+                { id = "r1", participants = { "Alice-R", "Bob-R" }, kills = {
+                    { boss = "Ulgrax", ts = TS(3, 21),
+                      participants = { "Alice-R", "Bob-R" } },
+                    { boss = "Sikran", ts = TS(3, 22),
+                      participants = { "Alice-R" } },
+                } },
+            } },
+        })
+    end
+
+    local function Lines(text)
+        local out = {}
+        for line in text:gmatch("[^\n]+") do table.insert(out, line) end
+        return out
+    end
+
+    function Tests:testExportSeasonCSV_HeaderAndOneRowPerParticipantAndKill()
+        WithDB(ExportDB(), function()
+            MockRoster({
+                { name = "Alice-R", group = "roster" },
+                { name = "Bob-R",   group = "roster" },
+            })
+            local lines = Lines(GL.ExportSeasonCSV("s1"))
+            AreEqual("Type,Date,Time,Instance,Difficulty,Boss,Player,BIS,Trial", lines[1])
+            -- Kopfzeile + Season-Zeile + Ulgrax (zwei Teilnehmer) + Sikran (einer)
+            AreEqual(5, #lines)
+            Exists(lines[2]:find("^Season,"))
+        end)
+    end
+
+    function Tests:testExportSeasonCSV_MarksBisColumn()
+        WithDB(ExportDB(), function()
+            MockRoster({
+                { name = "Alice-R", group = "roster" },
+                { name = "Bob-R",   group = "roster" },
+            })
+            local csv = GL.ExportSeasonCSV("s1")
+            -- Alice bei Sikran mit x, Bob bei Ulgrax ohne
+            -- Spalten am Zeilenende: BIS,Trial
+            Exists(csv:find("Sikran,Alice%-R,x,"))
+            Exists(csv:find("Ulgrax,Bob%-R,,"))
+        end)
+    end
+
+    function Tests:testExportSeasonCSV_CarriesSeasonRankAndRoster()
+        WithDB(AttendanceDB({
+            name = "Season 2025-11", startedAt = TS(1), endedAt = TS(9),
+            rankFilter = { [1] = true, [2] = true },
+            roster = { { name = "Alice-R", class = "MAGE" } },
+            rosterGuild = "Requiem",
+        }, {}), function()
+            MockRoster({})
+            local csv = GL.ExportSeasonCSV("s1")
+            -- ohne diese Zeilen ließe sich die Season anderswo nicht wiederherstellen
+            Exists(csv:find("Season,Season 2025%-11,"))
+            Exists(csv:find("Requiem"))
+            Exists(csv:find("\nRank,1\n"))
+            Exists(csv:find("\nRank,2\n"))
+            Exists(csv:find("Roster,Alice%-R,MAGE"))
+        end)
+    end
+
+    function Tests:testImportAttendanceCSV_ActivatesSeasonWhenNothingWasRunning()
+        -- Weitergabe-Fall: leere DB, CSV-Season hatte kein Enddatum (war offen) →
+        -- nichts zu beenden, also wird sie direkt nutzbar
+        WithDB({ seasons = {}, raidContainers = {}, players = {} }, function()
+            GL.ImportAttendanceCSV(table.concat({
+                "Type,Date,Time,Instance,Difficulty,Boss,Player,BIS,Trial",
+                "Season,Offene Season,2025-11-01,,Requiem",
+                "Kill,2025-11-05,20:14,Nerub-ar,H,Ulgrax,Alice-R,,",
+            }, "\n"))
+            local season = GL.FindSeasonByName("Offene Season")
+            Exists(season)
+            AreEqual(nil, season.endedAt)
+            AreEqual(season.id, GuildLootDB.activeSeasonId)
+        end)
+    end
+
+    function Tests:testImportAttendanceCSV_ClosesImportedSeasonWhenAnotherIsRunning()
+        -- Eine Season läuft schon (der Normalfall beim eigenen Nachtragen) → die
+        -- importierte darf NICHT als zweite offene daneben stehen, sonst greift [Resume]
+        -- nicht (das nur auf season.endedAt ~= nil reagiert)
+        WithDB(AttendanceDB({ name = "Laufende Season" }, {}), function()
+            GuildLootDB.activeSeasonId = "s1"   -- s1 läuft bereits
+            GL.ImportAttendanceCSV(table.concat({
+                "Type,Date,Time,Instance,Difficulty,Boss,Player,BIS,Trial",
+                "Season,Alte Season,2025-11-01,,Requiem",
+                "Kill,2025-11-05,20:14,Nerub-ar,H,Ulgrax,Alice-R,,",
+                "Kill,2025-11-06,20:14,Nerub-ar,H,Sikran,Alice-R,,",
+            }, "\n"))
+            local season = GL.FindSeasonByName("Alte Season")
+            Exists(season)
+            Exists(season.endedAt)                     -- jetzt "beendet", nicht offen
+            AreEqual("s1", GuildLootDB.activeSeasonId)  -- die laufende bleibt unangetastet
+            -- Enddatum = spätestes importiertes Kill-Datum (06.11.), nicht "jetzt"
+            AreEqual("2025-11-06", date("%Y-%m-%d", season.endedAt))
+        end)
+    end
+
+    function Tests:testImportAttendanceCSV_KeepsExplicitEndDate()
+        -- War die Season beim Export schon beendet, bleibt IHR Enddatum maßgeblich —
+        -- nicht das aus den Kills abgeleitete
+        WithDB({ seasons = {}, raidContainers = {}, players = {} }, function()
+            GL.ImportAttendanceCSV(table.concat({
+                "Type,Date,Time,Instance,Difficulty,Boss,Player,BIS,Trial",
+                "Season,Beendete Season,2025-11-01,2025-11-10,Requiem",
+                "Kill,2025-11-05,20:14,Nerub-ar,H,Ulgrax,Alice-R,,",
+            }, "\n"))
+            local season = GL.FindSeasonByName("Beendete Season")
+            local y, m, d = date("%Y", season.endedAt), date("%m", season.endedAt),
+                             date("%d", season.endedAt)
+            AreEqual("2025-11-10", y .. "-" .. m .. "-" .. d)
+            AreEqual(nil, GuildLootDB.activeSeasonId)   -- kein automatisches Aktivieren
+        end)
+    end
+
+    function Tests:testImportAttendanceCSV_CreatesSeasonWhenMissing()
+        WithDB({ seasons = {}, raidContainers = {}, players = {} }, function()
+            local stats = GL.ImportAttendanceCSV(table.concat({
+                "Type,Date,Time,Instance,Difficulty,Boss,Player,BIS,Trial",
+                "Season,Season 2025-11,2025-11-01,2025-12-15,Requiem",
+                "Rank,2",
+                "Roster,Alice-R,MAGE",
+                "Kill,2025-11-05,20:14,Nerub-ar,H,Ulgrax,Alice-R,",
+            }, "\n"))
+            IsTrue(stats.seasonCreated)
+
+            local season = GL.FindSeasonByName("Season 2025-11")
+            Exists(season)
+            IsTrue(season.rankFilter[2])
+            AreEqual(1,         #season.roster)
+            AreEqual("Requiem", season.rosterGuild)
+            Exists(season.endedAt)
+            -- die laufende Season darf davon unberührt bleiben
+            AreEqual(nil, GuildLootDB.activeSeasonId)
+        end)
+    end
+
+    function Tests:testImportAttendanceCSV_KeepsExistingSeasonUntouched()
+        WithDB(AttendanceDB({ name = "Season 2025-11", startedAt = TS(1) }, {}), function()
+            local stats = GL.ImportAttendanceCSV(table.concat({
+                "Type,Date,Time,Instance,Difficulty,Boss,Player,BIS,Trial",
+                "Season,Season 2025-11,2025-11-01,2025-12-15,Fremdgilde",
+                "Kill,2025-11-05,20:14,Nerub-ar,H,Ulgrax,Alice-R,",
+            }, "\n"))
+            IsTrue(stats.seasonExisted)
+            AreEqual(nil, stats.seasonCreated)
+            -- Stammdaten der vorhandenen Season bleiben, wie sie waren
+            AreEqual(TS(1), GuildLootDB.seasons["s1"].startedAt)
+            AreEqual(nil,   GuildLootDB.seasons["s1"].rosterGuild)
+        end)
+    end
+
+    function Tests:testImportAttendanceCSV_CreatesSessionAndKills()
+        WithDB(AttendanceDB({}, {}), function()
+            local stats = GL.ImportAttendanceCSV(table.concat({
+                "Type,Date,Time,Instance,Difficulty,Boss,Player,BIS,Trial",
+                "Kill,2025-11-05,20:14,Nerub-ar,H,Ulgrax,Alice-R,",
+                "Kill,2025-11-05,20:14,Nerub-ar,H,Ulgrax,Bob-R,x",
+                "Kill,2025-11-05,20:40,Nerub-ar,H,Sikran,Alice-R,",
+            }, "\n"))
+            AreEqual(2, stats.kills)
+            AreEqual(3, stats.rows)
+            AreEqual(0, stats.bad)
+
+            local s = GuildLootDB.raidContainers[1]
+            AreEqual("import",        s.source)
+            AreEqual("import-2025-11-05", s.id)
+            local meta = select(2, next(s.raidMeta))
+            AreEqual(2, #meta.kills)
+            -- Abend-Liste als Vereinigung beider Kills
+            AreEqual(2, #meta.participants)
+        end)
+    end
+
+    function Tests:testImportAttendanceCSV_IsIdempotent()
+        WithDB(AttendanceDB({}, {}), function()
+            local csv = table.concat({
+                "Type,Date,Time,Instance,Difficulty,Boss,Player,BIS,Trial",
+                "Kill,2025-11-05,20:14,Nerub-ar,H,Ulgrax,Alice-R,",
+            }, "\n")
+            GL.ImportAttendanceCSV(csv)
+            local stats = GL.ImportAttendanceCSV(csv)   -- zweiter Durchlauf
+            AreEqual(0, stats.kills)
+            AreEqual(1, stats.skipped)
+            AreEqual(1, #GuildLootDB.raidContainers)
+            local meta = select(2, next(GuildLootDB.raidContainers[1].raidMeta))
+            AreEqual(1, #meta.kills)
+        end)
+    end
+
+    function Tests:testImportAttendanceCSV_LeavesRecordedSessionsAlone()
+        WithDB(AttendanceDB({}, {
+            { startedAt = TS(3), raids = {
+                { id = "r1", participants = { "Alice-R" }, kills = {
+                    { boss = "Ulgrax", ts = TS(3, 21), participants = { "Alice-R" } },
+                } },
+            } },
+        }), function()
+            GL.ImportAttendanceCSV(table.concat({
+                "Type,Date,Time,Instance,Difficulty,Boss,Player,BIS,Trial",
+                "Kill,2025-11-05,20:14,Nerub-ar,H,Ulgrax,Bob-R,",
+            }, "\n"))
+            -- die aufgezeichnete Session bleibt unangetastet, die importierte kommt dazu
+            AreEqual(2, #GuildLootDB.raidContainers)
+            local recorded
+            for _, s in ipairs(GuildLootDB.raidContainers) do
+                if s.id == "c1" then recorded = s end
+            end
+            Exists(recorded)
+            AreEqual(nil, recorded.source)
+            AreEqual(1, #recorded.raidMeta["r1"].kills)
+        end)
+    end
+
+    function Tests:testRoundtrip_ExportDeleteSeasonImport()
+        WithDB(ExportDB(), function()
+            MockRoster({
+                { name = "Alice-R", group = "roster" },
+                { name = "Bob-R",   group = "roster" },
+            })
+            GuildLootDB.seasons["s1"].name = "Season Test"
+            local csv = GL.ExportSeasonCSV("s1")
+
+            -- Season löschen — die Raid-Sessions bleiben dabei bewusst stehen
+            GL.DeleteSeason("s1")
+            AreEqual(1, #GuildLootDB.raidContainers)
+
+            local stats = GL.ImportAttendanceCSV(csv)
+            IsTrue(stats.seasonCreated)
+            -- die Kills liegen noch in der Originalsession → nichts darf doppelt entstehen
+            AreEqual(0, stats.kills)
+            AreEqual(3, stats.rows)      -- drei Teilnehmer-Zeilen
+            AreEqual(2, stats.skipped)   -- aber nur zwei Bosskills
+            AreEqual(1, #GuildLootDB.raidContainers)
+
+            -- und die Matrix sieht aus wie vorher
+            local season = GL.FindSeasonByName("Season Test")
+            Exists(season)
+            local result = GL.ComputeAttendance(season.id)
+            AreEqual(1, #result.nights)
+            AreEqual(2, #result.nights[1].kills)
+        end)
+    end
+
+    function Tests:testRoundtrip_ImportOnAClientWithoutTheRaids()
+        -- Der Weitergabe-Fall: jemand bekommt den Export und hat weder Season noch Sessions.
+        local csv
+        WithDB(ExportDB(), function()
+            MockRoster({
+                { name = "Alice-R", group = "roster" },
+                { name = "Bob-R",   group = "roster" },
+            })
+            GuildLootDB.seasons["s1"].name = "Season Transfer"
+            csv = GL.ExportSeasonCSV("s1")
+        end)
+
+        WithDB({ seasons = {}, raidContainers = {}, players = {} }, function()
+            local stats = GL.ImportAttendanceCSV(csv)
+            IsTrue(stats.seasonCreated)
+            AreEqual(2, stats.kills)          -- beide Bosse kommen an
+            AreEqual(0, stats.skipped)
+
+            local season = GL.FindSeasonByName("Season Transfer")
+            Exists(season)
+            MockRoster({
+                { name = "Alice-R", group = "roster" },
+                { name = "Bob-R",   group = "roster" },
+            })
+            local result = GL.ComputeAttendance(season.id)
+            AreEqual(1, #result.nights)
+            AreEqual(2, #result.nights[1].kills)
+
+            local alice = RowByName(result, "Alice-R")
+            local bob   = RowByName(result, "Bob-R")
+            AreEqual(100, alice.pct)
+            AreEqual(100, bob.pct)
+            -- der BIS-Stern überlebt, obwohl die importierte Session keinen lootLog hat
+            IsTrue(alice.bisAt[result.nights[1].id])
+            AreEqual(nil, bob.bisAt[result.nights[1].id])
+        end)
+    end
+
+    function Tests:testRoundtrip_TrialSurvivesExportImport()
+        WithDB(AttendanceDB({ name = "Season Trial" }, {
+            { startedAt = TS(3), raids = {
+                { id = "r1", participants = { "Neu-R" }, kills = {
+                    { boss = "Ulgrax", ts = TS(3, 21), participants = { "Neu-R" },
+                      trials = { ["Neu-R"] = true } },
+                } },
+            } },
+        }), function()
+            MockRoster({ { name = "Neu-R", group = "roster" } })
+            local csv = GL.ExportSeasonCSV("s1")
+            Exists(csv:find("Neu%-R,,x"))       -- BIS leer, Trial gesetzt
+
+            -- in eine leere DB einspielen
+            GuildLootDB.seasons        = {}
+            GuildLootDB.raidContainers = {}
+            GL.ImportAttendanceCSV(csv)
+
+            local season = GL.FindSeasonByName("Season Trial")
+            local result = GL.ComputeAttendance(season.id)
+            IsTrue(result.rows[1].trialAt[result.nights[1].kills[1].id])
+        end)
+    end
+
+    function Tests:testImportAttendanceCSV_MatchesRealKillDespiteSeconds()
+        -- Ein aufgezeichneter Kill hat echte Sekunden, die CSV kennt nur HH:MM (Sekunden
+        -- immer :00 beim Reimport). Ein exakter Vergleich hätte NIE getroffen und jeden
+        -- Import gegen echte Daten dupliziert — genau der Fall aus der Praxis.
+        WithDB(AttendanceDB({}, {
+            { startedAt = TS(3, 22, 35), raids = {
+                { id = "r1", participants = { "Alice-R" }, kills = {
+                    -- 47 Sekunden, wie ein echter ENCOUNTER_END-Zeitstempel
+                    { boss = "Ulgrax", ts = TS(3, 22, 35) + 47,
+                      participants = { "Alice-R" } },
+                } },
+            } },
+        }), function()
+            local stats = GL.ImportAttendanceCSV(table.concat({
+                "Type,Date,Time,Instance,Difficulty,Boss,Player,BIS,Trial",
+                "Kill,2026-08-03,22:35,Nerub-ar,H,Ulgrax,Alice-R,,",
+            }, "\n"))
+            AreEqual(0, stats.kills)
+            AreEqual(1, stats.skipped)
+            AreEqual(1, #GuildLootDB.raidContainers)   -- keine Import-Session entstanden
+        end)
+    end
+
+    function Tests:testImportAttendanceCSV_CollapsesDuplicateRows()
+        -- Eine CSV aus einer bereits doppelt befüllten DB enthält jede Zeile zweimal.
+        -- Ohne Zusammenfassen stünde der Spieler zweimal in der Teilnehmerliste und ein
+        -- erneuter Export reichte die Dublette weiter.
+        WithDB({ seasons = {}, raidContainers = {}, players = {} }, function()
+            GL.ImportAttendanceCSV(table.concat({
+                "Type,Date,Time,Instance,Difficulty,Boss,Player,BIS,Trial",
+                "Kill,2025-11-05,20:14,Nerub-ar,H,Ulgrax,Alice-R,,",
+                "Kill,2025-11-05,20:14,Nerub-ar,H,Ulgrax,Alice-R,,",
+                "Kill,2025-11-05,20:14,Nerub-ar,H,Ulgrax,Bob-R,,",
+            }, "\n"))
+            local meta = select(2, next(GuildLootDB.raidContainers[1].raidMeta))
+            AreEqual(1, #meta.kills)
+            AreEqual(2, #meta.kills[1].participants)   -- Alice einmal, nicht zweimal
+        end)
+    end
+
+    function Tests:testImportAttendanceCSV_CountsBadLines()
+        WithDB(AttendanceDB({}, {}), function()
+            local stats = GL.ImportAttendanceCSV(table.concat({
+                "Type,Date,Time,Instance,Difficulty,Boss,Player,BIS,Trial",
+                "Kill,kein-datum,20:14,Nerub-ar,H,Ulgrax,Alice-R,",
+                "Kill,2025-11-05,keine-zeit,Nerub-ar,H,Ulgrax,Alice-R,",
+                "Kill,2025-11-05,20:14,Nerub-ar,H,Ulgrax,,",   -- ohne Spieler
+            }, "\n"))
+            AreEqual(3, stats.bad)
+            AreEqual(0, stats.kills)
+        end)
+    end
+
+    function Tests:testImportedBisShowsWithoutLootLog()
+        WithDB(AttendanceDB({}, {}), function()
+            GL.ImportAttendanceCSV(table.concat({
+                "Type,Date,Time,Instance,Difficulty,Boss,Player,BIS,Trial",
+                "Kill,2025-11-05,20:14,Nerub-ar,H,Ulgrax,Alice-R,x",
+            }, "\n"))
+            -- Season-Fenster über den Importtag legen
+            GuildLootDB.seasons["s1"].startedAt = 0
+            GuildLootDB.seasons["s1"].endedAt   = nil
+            MockRoster({ { name = "Alice-R", group = "roster" } })
+
+            local result = GL.ComputeAttendance("s1")
+            local row    = result.rows[1]
+            -- die importierte Session hat keinen lootLog — der Stern kommt aus kill.bis
+            IsTrue(row.bisAt[result.nights[1].id])
         end)
     end
 end)

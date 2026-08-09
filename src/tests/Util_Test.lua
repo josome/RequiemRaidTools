@@ -517,6 +517,46 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
     end
 
     -- --------------------------------------------------------
+    -- ParseCSVLine — Gegenstück zum Quoting in GL.ExportCSV
+    -- --------------------------------------------------------
+
+    function Tests:testParseCSVLine_PlainFields()
+        local f = GL.ParseCSVLine("2025-11-05,20:14,Nerub-ar Palace,H,Ulgrax,Alice-Malfurion,x")
+        AreEqual(7, #f)
+        AreEqual("2025-11-05",      f[1])
+        AreEqual("Nerub-ar Palace", f[3])
+        AreEqual("x",               f[7])
+    end
+
+    function Tests:testParseCSVLine_QuotedFieldWithComma()
+        local f = GL.ParseCSVLine('a,"b,c",d')
+        AreEqual(3,     #f)
+        AreEqual("b,c", f[2])
+    end
+
+    function Tests:testParseCSVLine_DoubledQuotesInsideField()
+        -- ExportCSV verdoppelt innenliegende Anführungszeichen
+        local f = GL.ParseCSVLine('a,"sagt ""hallo""",b')
+        AreEqual('sagt "hallo"', f[2])
+        AreEqual("b",            f[3])
+    end
+
+    function Tests:testParseCSVLine_EmptyFields()
+        local f = GL.ParseCSVLine("a,,b")
+        AreEqual(3,  #f)
+        AreEqual("", f[2])
+        -- Komma am Zeilenende = letztes Feld leer (die BIS-Spalte ohne Marker)
+        local g = GL.ParseCSVLine("a,b,")
+        AreEqual(3,  #g)
+        AreEqual("", g[3])
+    end
+
+    function Tests:testParseCSVLine_EmptyAndNil()
+        AreEqual(1,  #GL.ParseCSVLine(""))
+        AreEqual(1,  #GL.ParseCSVLine(nil))
+    end
+
+    -- --------------------------------------------------------
     -- NormalizeName — genau ein Realm, idempotent
     -- --------------------------------------------------------
 

@@ -10,7 +10,7 @@ rechnet nichts selbst. Rückgabe:
 
 ```
 { season, nights = { { id, label, startedAt, kills = { { id, name, ts, difficulty } } } },
-          rows   = { { name, class, group, present, trialAt, attended, total, pct, trial } } }
+          rows   = { { name, class, group, present, trialAt, bisAt, attended, total, pct, trial } } }
 ```
 
 ## Setup
@@ -19,7 +19,8 @@ rechnet nichts selbst. Rückgabe:
 - `WithDB(db, fn)` — swappt `GuildLootDB`, ruft `fn`, restauriert DB + Mocks.
 - `TS(day, hour, min)` — Zeitstempel im August 2026, für Fixtures mit echten Tagesabständen.
 - `AttendanceDB(seasonFields, sessions, players)` — DB mit Season `s1` und Raid-Sessions
-  (`{ startedAt, label, raids = { { id, participants } } }`); `raids` landet als `raidMeta`.
+  (`{ startedAt, label, raids = { { id, participants } }, lootLog }`); `raids` landet als
+  `raidMeta`, `lootLog` ist die Quelle der BIS-Sterne.
   Ein Raid darf zusätzlich `kills = { { boss, ts, participants } }` tragen — die Boss-Ebene aus
   `GL.RecordKillAttendance`. Ohne `kills` greift der Fallback für Altdaten.
 - `MockRoster(rows)` — mockt `GL.GetSeasonRoster`, damit das Aggregat ohne Gilden-API testbar ist.
@@ -76,6 +77,30 @@ Season-Fenster; erst die Kills darin werden nach ihrem eigenen Zeitstempel auf T
 
 | `testComputeAttendance_PresenceMatchesDespiteRealmSpacing` | Präsenz wird über `GL.NameKey` nachgeschlagen: Kader aus dem Gildenroster (Realm mit Leerzeichen) und Kill-Teilnehmer aus der Raid-API (ohne) müssen dieselbe Zeile treffen — sonst bliebe sie trotz Teilnahme auf 0 %. |
 
+### BIS-Gewinne (`bisAt`)
+
+`row.bisAt[key]` markiert die Spalten, in denen die Person Loot mit Prio **BIS** (`1`) gewonnen
+hat — im Tab eine kleine Krone in der Zelle (Textur der Raidleitung). Gesetzt wird sowohl die Bosskill- als auch
+die Abend-Spalte.
+
+**Abgeleitet, nicht gespeichert.** Der Kill-Eintrag entsteht beim Boss, der Roll kommt später —
+ein am Kill gespeicherter Marker müsste nachträglich editiert werden. Stattdessen liest
+`CollectNights` bei jedem Aufruf den `lootLog` der Session und ordnet die Einträge über
+`raidID` + `boss` den Kills zu; kam derselbe Boss im selben `raidID` mehrfach vor, gewinnt der
+letzte Kill **vor** dem Loot-Zeitstempel. Nachträglich vergebener Loot wirkt dadurch sofort.
+
+`winnerPrio` wird über `tonumber()` verglichen: lokal ist es eine Zahl, über Comm
+(`Loot.OnCommAssign`) kommt es als String — ein `== 1` verfehlte die Observer-Einträge.
+
+| Test | Prüft |
+|------|-------|
+| `testComputeAttendance_BisMarksKillAndNight` | Setzt Kill- **und** Abend-Spalte; der andere Boss bleibt frei. |
+| `testComputeAttendance_NonBisPrioIsIgnored` | Prio 2 erzeugt keinen Stern. |
+| `testComputeAttendance_BisPrioAsStringCounts` | `winnerPrio = "1"` zählt ebenfalls (Observer-Pfad). |
+| `testComputeAttendance_BisWithUnknownBossOrRaidMissesAll` | Fremder Bossname oder fremde `raidID` trifft keine Spalte. |
+| `testComputeAttendance_BisPicksKillBeforeTimestamp` | Derselbe Boss dreimal → der letzte Kill vor dem Loot-Zeitstempel bekommt den Stern. |
+| `testComputeAttendance_BisMatchesDespiteRealmSpacing` | Abweichende Realm-Schreibweise zwischen Loot und Kader trifft dieselbe Zeile (`GL.NameKey`). |
+
 ### Trial-Stand zum Zeitpunkt des Kills (`trialAt`)
 
 Die Trial-Rolle endet nach drei Raids. `row.trialAt[key]` hält deshalb fest, ob jemand **damals**
@@ -93,6 +118,60 @@ damals ist für Altdaten schlicht nicht bekannt, und er lässt sich aus dem Heut
 | `testComputeAttendance_TrialAtIgnoresLaterPromotion` | Beförderung ändert ältere Kills nicht; `row.trial` (aktuelles Flag) bleibt davon getrennt. |
 | `testComputeAttendance_TrialAtNightIsTrueIfAnyKillWasTrial` | Abend-Ebene ist Trial, wenn bei mindestens einem Kill Trial. |
 | `testComputeAttendance_TrialAtEmptyForUnrecordedKills` | Altdaten ohne `trials` → kein Eintrag; das aktuelle Flag bleibt davon getrennt und färbt nichts ein. |
+
+### CSV-Export / -Import (Phase 1d/1e)
+
+`GL.ExportSeasonCSV(seasonId)` exportiert die **komplette Season**. Die erste Spalte sagt, was
+die Zeile ist — so trägt eine flache Datei Stammdaten und Kills zugleich:
+
+```
+Type,Date,Time,Instance,Difficulty,Boss,Player,BIS,Trial
+Season,Season 2025-11,2025-11-01,2025-12-15,Requiem
+Rank,2
+Roster,Alice-Malfurion,MAGE
+Kill,2025-11-05,20:14,Nerub-ar Palace,H,Ulgrax,Alice-Malfurion,x,
+```
+
+Jede Zelle atomar — in einer Tabellenkalkulation filter- und sortierbar, und Nachtragen heißt
+Zeilen kopieren. Quoting wie `GL.ExportCSV`, gelesen von `GL.ParseCSVLine`
+([Util_Test.md](Util_Test.md)); einen JSON-Parser hat das Addon nicht.
+
+Fehlte die Season, hält `GL.CreateSeasonFromImport` die Invariante „höchstens eine offene
+Season" (`Core_Season.lua`) ein: hatte die CSV kein Enddatum (die Season war beim Export noch
+offen) UND läuft bereits eine andere, bekommt die importierte trotzdem eins — sonst stünde sie
+weder aktiv noch beendet da, und `[Resume]` (das nur auf `endedAt ~= nil` reagiert) griffe ins
+Leere. Lief vorher nichts, wird sie stattdessen direkt aktiv.
+
+Die Raids ordnet `GL.ImportAttendanceCSV(text)` über das **Datum**
+zu — eine importierte Session landet in der Season, deren Fenster den Tag abdeckt. Sie erzeugt je
+Raid-Tag eine Session mit `source = "import"` und **ergänzt nur** — ein Kill mit gleicher
+`raidID`, gleichem Boss und gleichem Zeitstempel wird übersprungen, selbst aufgezeichnete
+Sessions werden nie angefasst.
+
+Die **BIS-Spalte** reist mit, weil der Stern sonst verloren ginge: er wird aus dem `lootLog`
+abgeleitet, und der gehört zur Session, nicht zur Season. Beim Import landet er als `kill.bis`;
+`CollectNights` **vereinigt** abgeleiteten und gespeicherten Stand, damit importierte Abende
+(ohne `lootLog`) und selbst geraidete (ohne `kill.bis`) sich nicht gegenseitig verdrängen.
+
+| Test | Prüft |
+|------|-------|
+| `testExportSeasonCSV_HeaderAndOneRowPerParticipantAndKill` | Kopfzeile plus je Teilnehmer und Kill eine Zeile. |
+| `testExportSeasonCSV_MarksBisColumn` | BIS-Gewinn erzeugt `x`, sonst bleibt die Spalte leer. |
+| `testExportSeasonCSV_CarriesSeasonRankAndRoster` | Name, Fenster, Gilde, Rang-Filter und Kader stehen in der Datei — ohne sie ließe sich die Season anderswo nicht wiederherstellen. |
+| `testImportAttendanceCSV_CreatesSeasonWhenMissing` | Fehlt die Season, wird sie samt Rängen und Kader angelegt. |
+| `testImportAttendanceCSV_ActivatesSeasonWhenNothingWasRunning` | Weitergabe-Fall: lief vorher nichts, wird die importierte Season (ohne CSV-Enddatum) direkt aktiv — nichts zu beenden. |
+| `testImportAttendanceCSV_ClosesImportedSeasonWhenAnotherIsRunning` | Läuft schon eine Season, bekommt die importierte ein Enddatum (spätestes Kill-Datum) statt als zweite offene danebenzustehen — sonst greift `[Resume]` nicht, das nur auf `endedAt ~= nil` reagiert. |
+| `testImportAttendanceCSV_KeepsExplicitEndDate` | War die Season beim Export schon beendet, bleibt ihr eigenes Enddatum maßgeblich. |
+| `testImportAttendanceCSV_KeepsExistingSeasonUntouched` | Existiert sie bereits, bleiben ihre Stammdaten unangetastet. |
+| `testImportAttendanceCSV_MatchesRealKillDespiteSeconds` | Der Dublettencheck vergleicht auf Minutengenauigkeit: ein aufgezeichneter Kill mit echten Sekunden wird trotzdem erkannt, statt gegen den CSV-Zeitstempel (immer `:00`) zu verfehlen und dupliziert zu werden. |
+| `testImportAttendanceCSV_CreatesSessionAndKills` | Legt Session mit `source="import"` und stabiler ID an; Abend-Liste ist die Vereinigung der Kills. |
+| `testImportAttendanceCSV_IsIdempotent` | Zweiter Import derselben Daten legt nichts doppelt an. |
+| `testImportAttendanceCSV_LeavesRecordedSessionsAlone` | Aufgezeichnete Sessions bleiben unangetastet. |
+| `testImportAttendanceCSV_CountsBadLines` | Kaputtes Datum, kaputte Zeit oder fehlender Spieler → als fehlerhaft gezählt, nichts angelegt. |
+| `testImportedBisShowsWithoutLootLog` | Importiertes `x` erzeugt den Stern, obwohl die Session keinen `lootLog` hat. |
+| `testRoundtrip_ExportDeleteSeasonImport` | Export → Season löschen → Import: die Season kommt zurück, die Kills werden **nicht** verdoppelt (die Raids überleben das Löschen der Season) und keine leere Import-Session bleibt übrig. |
+| `testRoundtrip_ImportOnAClientWithoutTheRaids` | Weitergabe-Fall: auf einer DB ohne Season und ohne Sessions kommt alles an — Abende, Teilnehmer, `Att.%` und der BIS-Stern. |
+| `testRoundtrip_TrialSurvivesExportImport` | Der Trial-Stand reist als eigene Spalte mit und ist nach dem Import wieder gesetzt. |
 
 ### Spaltenliste (`GL.BuildAttendanceColumns`)
 
