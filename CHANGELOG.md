@@ -1,5 +1,21 @@
 # Changelog
 
+## v1.0.4.0-beta
+
+**New Features**
+- New Attendance tab: tracks who showed up to which raid night and boss kill, with a season-based roster and an attendance-percentage matrix.
+- Seasons: create, rename, close/resume, and set a start/end window; a season without a fresh guild-roster snapshot builds its roster straight from recorded attendance.
+- Per-boss attendance: a raid night expands into individual boss-kill columns showing who was present (and who was on trial) at each kill.
+- BIS crown marker: cells show a crown where a player won a Best-in-Slot roll, pulled from the loot log.
+- CSV export/import for a season's attendance — back up your data or backfill raids from before you started using the addon.
+- Guild-roster reading with switch protection, so a season's roster snapshot doesn't silently mix data from the wrong guild.
+
+**Bug Fixes**
+- Fixed a crash (and stray leftover crown markers) caused by an internal array gap when collapsing an expanded raid night in the Attendance tab.
+
+**Internal**
+- ~450 new unit tests covering attendance aggregation, CSV round-trip, and roster name matching.
+
 ## v1.0.2.7
 
 **Internal**
