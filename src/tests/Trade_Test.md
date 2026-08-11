@@ -1,8 +1,8 @@
-# Trade Testdokumentation
+﻿# Trade Testdokumentation
 
 **Datei:** `src/tests/Trade_Test.lua`
-**Framework:** [WoWUnit](https://www.curseforge.com/wow/addons/wowunit) (läuft in-game) + busted (`spec/reqrt_spec.lua`)
-**Suite-Name im WoWUnit-Fenster:** `ReqRT.Trade`
+**Framework:** busted (`spec/reqrt_spec.lua`)
+**Suite-Name:** `ReqRT.Trade`
 
 ---
 
@@ -10,9 +10,6 @@
 
 | Bedingung | Warum |
 |-----------|-------|
-| WoWUnit installiert | Test-Framework |
-| `/reqrt devmode` aktiv | Tests registrieren sich nicht ohne devMode |
-| `/reload` nach devMode-Toggle | GuildLootDB korrekt initialisiert |
 
 ---
 

@@ -1,7 +1,7 @@
-# Season_Test — Dokumentation
+﻿# Season_Test — Dokumentation
 
 Unit-Tests für die Season-Verwaltung in [`src/core/Core_Season.lua`](../core/Core_Season.lua).
-Suite-Name: `ReqRT.Season`. Läuft in-game via WoWUnit (devMode) und standalone über busted
+Suite-Name: `ReqRT.Season`. Läuft über busted
 ([`spec/reqrt_spec.lua`](../../spec/reqrt_spec.lua)).
 
 ## Setup

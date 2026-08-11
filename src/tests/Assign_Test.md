@@ -1,8 +1,8 @@
-# Assign Testdokumentation
+﻿# Assign Testdokumentation
 
 **Datei:** `src/tests/Assign_Test.lua`  
-**Framework:** [WoWUnit](https://www.curseforge.com/wow/addons/wowunit) (läuft in-game, kein externer Lua-Runner)  
-**Suite-Name im WoWUnit-Fenster:** `ReqRT.Assign`
+**Framework:** busted (`spec/reqrt_spec.lua`)
+**Suite-Name:** `ReqRT.Assign`
 
 ---
 
@@ -25,9 +25,6 @@
 
 | Bedingung | Warum |
 |-----------|-------|
-| WoWUnit installiert | Test-Framework; ohne es gibt `if not WoWUnit then return end` die Datei sofort frei |
-| `/reqrt devmode` aktiv | Schützt Produktiv-Nutzer die WoWUnit installiert haben; Tests registrieren sich gar nicht wenn devMode aus ist |
-| `/reload` nach devMode-Toggle | Damit der Addon-State sauber initialisiert ist und `GuildLootDB` korrekt geladen wurde |
 | Keine aktive Raid Session | Tests isolieren GuildLootDB intern — eine aktive Session beim Reload führt zu Konflikten |
 
 ---

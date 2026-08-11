@@ -1,8 +1,8 @@
-# Attendance_Test — Dokumentation
+﻿# Attendance_Test — Dokumentation
 
 Unit-Tests für das Attendance-Aggregat in
 [`src/core/Core_Attendance.lua`](../core/Core_Attendance.lua). Suite-Name: `ReqRT.Attendance`.
-Läuft in-game via WoWUnit (devMode) und standalone über busted
+Läuft über busted
 ([`spec/reqrt_spec.lua`](../../spec/reqrt_spec.lua)).
 
 `GL.ComputeAttendance(seasonId)` ist die **einzige Datenquelle des Attendance-Tabs** — die UI

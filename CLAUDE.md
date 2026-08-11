@@ -32,8 +32,9 @@
 - COMM-Protokoll: https://github.com/josome/RequiemRaidTools/wiki/COMM-Protokoll (`COMM-Protokoll.md`)
 
 ## Tests
-- Unit-Tests laufen via WoWUnit automatisch beim `/reload` im Spiel — vorausgesetzt `devMode` ist aktiv (`GuildLootDB.settings.devMode = true`).
-- `/reqrt test` ist ein Entwickler-Hilfscommand (fügt ein Fake-Loot-Item ein) und hat mit dem WoWUnit-Testrunner nichts zu tun.
+- Unit-Tests laufen über `busted` (`busted spec/reqrt_spec.lua`) — maßgeblich für Grün/Rot, nicht in-game.
+- WoWUnit wird nicht mehr genutzt (nicht gepflegt, In-Game-Fehlschläge schwer auf eine Ursache zurückzuführen). `src/tests/*_Test.lua` läuft ausschließlich über `spec/reqrt_spec.lua`.
+- `/reqrt test` ist ein Entwickler-Hilfscommand (fügt ein Fake-Loot-Item ein) und hat mit dem Testrunner nichts zu tun.
 - Jede Test-Lua-Datei (`src/tests/Foo_Test.lua`) hat eine gleichnamige Dokumentations-Datei (`src/tests/Foo_Test.md`). Bei jeder Änderung an einer `*_Test.lua` **muss** die zugehörige `.md` synchron aktualisiert werden (neue Tests dokumentieren, entfernte streichen).
 
 ## Projekt-Konventionen

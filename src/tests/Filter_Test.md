@@ -1,8 +1,8 @@
-# Filter Testdokumentation
+﻿# Filter Testdokumentation
 
 **Datei:** `src/tests/Filter_Test.lua`  
-**Framework:** [WoWUnit](https://www.curseforge.com/wow/addons/wowunit) (läuft in-game, kein externer Lua-Runner)  
-**Suite-Name im WoWUnit-Fenster:** `ReqRT.Filter`
+**Framework:** busted (`spec/reqrt_spec.lua`)
+**Suite-Name:** `ReqRT.Filter`
 
 ---
 
@@ -21,9 +21,6 @@
 
 | Bedingung | Warum |
 |-----------|-------|
-| WoWUnit installiert | Test-Framework; ohne es gibt `if not WoWUnit then return end` die Datei sofort frei |
-| `/reqrt devmode` aktiv | Schützt Produktiv-Nutzer; Tests registrieren sich gar nicht wenn devMode aus ist |
-| `/reload` nach devMode-Toggle | Damit `GuildLootDB` korrekt initialisiert ist |
 
 ---
 

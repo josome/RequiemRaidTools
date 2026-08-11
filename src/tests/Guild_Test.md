@@ -1,7 +1,7 @@
-# Guild_Test — Dokumentation
+﻿# Guild_Test — Dokumentation
 
 Unit-Tests für die Gildenroster-Anbindung in [`src/core/Core_Guild.lua`](../core/Core_Guild.lua).
-Suite-Name: `ReqRT.Guild`. Läuft in-game via WoWUnit (devMode) und standalone über busted
+Suite-Name: `ReqRT.Guild`. Läuft über busted
 ([`spec/reqrt_spec.lua`](../../spec/reqrt_spec.lua)).
 
 ## Setup

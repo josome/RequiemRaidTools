@@ -1,8 +1,8 @@
-# Pool Testdokumentation
+﻿# Pool Testdokumentation
 
 **Datei:** `src/tests/Pool_Test.lua`
-**Framework:** [WoWUnit](https://www.curseforge.com/wow/addons/wowunit) in-game und busted standalone (`spec/reqrt_spec.lua`)
-**Suite-Name im WoWUnit-Fenster:** `ReqRT.Pool`
+**Framework:** busted (`spec/reqrt_spec.lua`)
+**Suite-Name:** `ReqRT.Pool`
 
 ---
 

@@ -10,6 +10,7 @@ externals:
 ignore:
   - test
   - tests
+  - src/tests
   - spec
   - docs
   - analyzer

@@ -187,7 +187,7 @@ SlashCmdList["REQUIEMRAIDTOOLS"] = function(input)
     elseif cmd == "devmode" then
         local s = GuildLootDB.settings
         s.devMode = not s.devMode
-        GL.Print("Dev Mode: " .. (s.devMode and "|cff00ff00ON|r (WoWUnit-Tests aktiv nach /reload)|r" or "|cffff4444OFF|r"))
+        GL.Print("Dev Mode: " .. (s.devMode and "|cff00ff00ON|r" or "|cffff4444OFF|r"))
 
     elseif cmd == "cleanup" then
         local history = GuildLootDB.raidHistory or {}

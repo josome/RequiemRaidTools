@@ -1,8 +1,8 @@
-# Util Testdokumentation
+﻿# Util Testdokumentation
 
 **Datei:** `src/tests/Util_Test.lua`
-**Framework:** [WoWUnit](https://www.curseforge.com/wow/addons/wowunit) in-game und busted standalone (`spec/reqrt_spec.lua`)
-**Suite-Name im WoWUnit-Fenster:** `ReqRT.Util`
+**Framework:** busted (`spec/reqrt_spec.lua`)
+**Suite-Name:** `ReqRT.Util`
 
 ---
 
@@ -25,9 +25,6 @@
 
 | Bedingung | Warum |
 |-----------|-------|
-| WoWUnit installiert (in-game) **oder** busted (CI) | Test-Framework |
-| `/reqrt devmode` aktiv (in-game) | Schützt Produktiv-Nutzer |
-| `/reload` nach devMode-Toggle (in-game) | Saubere DB-Initialisierung |
 
 ---
 

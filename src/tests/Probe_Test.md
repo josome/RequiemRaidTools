@@ -1,16 +1,16 @@
-# Probe_Test — Smoke-Test
+﻿# Probe_Test — Smoke-Test
 
 **Suite:** `ReqRT.Probe`
 
 ## Zweck
 
-Stellt sicher dass WoWUnit korrekt geladen ist und die Assertion-Helfer grundsätzlich funktionieren. Schlägt dieser Test fehl, liegt das Problem bei WoWUnit selbst, nicht beim Addon-Code.
+Stellt sicher dass der Testrunner korrekt geladen ist und die Assertion-Helfer grundsätzlich funktionieren. Schlägt dieser Test fehl, liegt das Problem am Test-Setup (Shim/Loader), nicht beim Addon-Code.
 
 ## Testfälle
 
 | Test | Was geprüft wird |
 |------|-----------------|
-| `testSmokeGreen` | `AreEqual(1,1)` und `IsTrue(true)` — WoWUnit läuft |
+| `testSmokeGreen` | `AreEqual(1,1)` und `IsTrue(true)` — Testrunner läuft |
 
 ## Infrastruktur
 

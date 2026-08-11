@@ -1,8 +1,8 @@
-# Loot Testdokumentation
+﻿# Loot Testdokumentation
 
 **Datei:** `src/tests/Loot_Test.lua`
-**Framework:** [WoWUnit](https://www.curseforge.com/wow/addons/wowunit) in-game und busted standalone (`spec/reqrt_spec.lua`)
-**Suite-Name im WoWUnit-Fenster:** `ReqRT.Loot`
+**Framework:** busted (`spec/reqrt_spec.lua`)
+**Suite-Name:** `ReqRT.Loot`
 
 ---
 
@@ -27,9 +27,6 @@
 
 | Bedingung | Warum |
 |-----------|-------|
-| WoWUnit installiert (in-game) **oder** busted (CI) | Test-Framework |
-| `/reqrt devmode` aktiv (in-game) | Schützt Produktiv-Nutzer |
-| `/reload` nach devMode-Toggle (in-game) | DB-Initialisierung |
 
 ---
 

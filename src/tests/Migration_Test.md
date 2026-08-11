@@ -1,8 +1,8 @@
-# Migration Testdokumentation
+﻿# Migration Testdokumentation
 
 **Datei:** `src/tests/Migration_Test.lua`
-**Framework:** [WoWUnit](https://www.curseforge.com/wow/addons/wowunit) in-game und busted standalone (`spec/reqrt_spec.lua`)
-**Suite-Name im WoWUnit-Fenster:** `ReqRT.Migration`
+**Framework:** busted (`spec/reqrt_spec.lua`)
+**Suite-Name:** `ReqRT.Migration`
 
 ---
 
@@ -25,9 +25,6 @@
 
 | Bedingung | Warum |
 |-----------|-------|
-| WoWUnit installiert (in-game) **oder** busted (CI) | Test-Framework |
-| `/reqrt devmode` aktiv (in-game) | Schützt Produktiv-Nutzer |
-| `/reload` nach devMode-Toggle (in-game) | DB-Initialisierung |
 
 ---
 

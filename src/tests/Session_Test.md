@@ -1,8 +1,8 @@
-# Session Testdokumentation
+﻿# Session Testdokumentation
 
 **Datei:** `src/tests/Session_Test.lua`  
-**Framework:** [WoWUnit](https://www.curseforge.com/wow/addons/wowunit) (läuft in-game, kein externer Lua-Runner)  
-**Suite-Name im WoWUnit-Fenster:** `ReqRT.Session`
+**Framework:** busted (`spec/reqrt_spec.lua`)
+**Suite-Name:** `ReqRT.Session`
 
 ---
 
@@ -10,9 +10,6 @@
 
 | Bedingung | Warum |
 |-----------|-------|
-| WoWUnit installiert | Test-Framework |
-| `/reqrt devmode` aktiv | Tests registrieren sich nicht ohne devMode |
-| `/reload` nach devMode-Toggle | GuildLootDB muss korrekt initialisiert sein |
 
 ---
 

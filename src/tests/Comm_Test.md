@@ -1,8 +1,8 @@
-# Comm-Layer Testdokumentation
+﻿# Comm-Layer Testdokumentation
 
 **Datei:** `src/tests/Comm_Test.lua`  
-**Framework:** [WoWUnit](https://www.curseforge.com/wow/addons/wowunit) (läuft in-game, kein externer Lua-Runner)  
-**Suite-Name im WoWUnit-Fenster:** `ReqRT.Comm`
+**Framework:** busted (`spec/reqrt_spec.lua`)
+**Suite-Name:** `ReqRT.Comm`
 
 ---
 
@@ -37,9 +37,6 @@
 
 | Bedingung | Warum |
 |-----------|-------|
-| WoWUnit installiert | Test-Framework; ohne es gibt `if not WoWUnit then return end` die Datei sofort frei |
-| `/reqrt devmode` aktiv | Schützt Produktiv-Nutzer die WoWUnit installiert haben; Tests überspringen sich selbst wenn devMode aus ist |
-| `/reload` nach devMode-Toggle | Damit der Addon-State sauber initialisiert ist |
 | Keine aktive Raid Session | Eine aktive Session beim Reload kann zu Konflikten mit den Assign- und Session-Tests führen |
 
 ---
@@ -69,7 +66,7 @@ SendXxx()  →  [C_ChatInfo.SendAddonMessage stubbt]  →  msg (string)
 
 ### `Mock(tbl, key, fn)` / `MockRestore()`
 
-Minimales eigenes Mock-System (WoWUnit's `Replace`-API passt nicht zum Lebenszyklus dieser Tests).
+Minimales eigenes Mock-System (passt besser zum Lebenszyklus dieser Tests als eine generische Replace-API).
 
 ```lua
 Mock(GuildLoot.Loot, "OnCommAssign", function(...) args = {...} end)
