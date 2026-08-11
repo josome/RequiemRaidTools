@@ -163,6 +163,13 @@ function ClearCursor()          end
 function ClickTradeButton()     end
 function SendChatMessage()      end
 
+-- StaticPopup: WoW legt diese Tabelle selbst an, Addons hängen nur Schlüssel hinein.
+-- Der Stub muss sie deshalb bereitstellen — der Addon-Code darf sie NICHT selbst zuweisen,
+-- das würde das Global mit Addon-Taint stempeln (siehe Kommentar in UI_Common.lua).
+StaticPopupDialogs = {}
+function StaticPopup_Show()  end
+function StaticPopup_Hide()  end
+
 -- Gilden-API (Tests mocken darüber; Defaults = keine Gilde)
 function IsInGuild()               return false end
 function GetNumGuildMembers()      return 0 end

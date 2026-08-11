@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.0.4.3-beta
+
+**Bug Fixes**
+- Fixed the addon interfering with protected game functions. Symptoms included pressing ESC failing to clear your target or open the game menu, and repeated "action blocked by RequiemRaidTools" errors that kept appearing for the rest of the session. There were two independent causes, both now fixed: all dropdown menus used a legacy Blizzard menu system that contaminated shared game state as soon as the addon window was built, and a leftover safety line claimed ownership of Blizzard's shared popup-dialog table. Both took effect on every login, whether or not you interacted with the addon.
+
+**Internal**
+- Removed the WoWUnit dependency. Unit tests run exclusively through busted; test files are no longer shipped in the release package.
+- Added an automated source check that fails the build if either taint pattern reappears.
+
 ## v1.0.4.0-beta
 
 **New Features**
