@@ -80,6 +80,60 @@ function UI.CreateBackdropFrame(backdropKey, name, parent)
 end
 
 -- ============================================================
+-- Dropdowns
+-- ============================================================
+
+--- Erzeugt ein Dropdown auf Basis von Blizzards Menu-System.
+---
+--- Bewusst NICHT UIDropDownMenuTemplate: dessen UIDropDownMenu_Initialize schreibt
+--- auf den globalen UIDROPDOWNMENU_MENU_LEVEL und stempelt ihn mit dem Addon-Taint.
+--- Der Taint wandert von dort in PlayerChoiceFrame und blockiert am Ende ClearTarget()
+--- bei jedem ESC-Druck — nachgewiesen im taint.log, siehe CHANGELOG zu 1.0.4.2-beta.
+---
+--- @param parent    Frame
+--- @param width     number
+--- @param generator fun(rootDescription)  baut die Menüeinträge auf
+--- @return Frame    DropdownButton (Text via :OverrideText(), Menü via :GenerateMenu())
+function UI.CreateDropdown(parent, width, generator)
+    local dd = CreateFrame("DropdownButton", nil, parent, "WowStyle1DropdownTemplate")
+    dd:SetWidth(width)
+    dd:SetupMenu(function(_, rootDescription) generator(rootDescription) end)
+    return dd
+end
+
+--- Dropdown für eine feste Werteliste mit Einfachauswahl.
+--- Setzt die Beschriftung selbst — beim Aufbau und nach jeder Auswahl.
+--- @param parent   Frame
+--- @param width    number
+--- @param entries  table  Liste aus { value=..., label=... }
+--- @param getValue fun():any        liefert den aktuell gespeicherten Wert
+--- @param onSelect fun(value:any)   speichert den gewählten Wert
+--- @return Frame
+function UI.CreateOptionDropdown(parent, width, entries, getValue, onSelect)
+    local dd
+    local function labelFor(value)
+        for _, e in ipairs(entries) do
+            if e.value == value then return e.label end
+        end
+        return nil
+    end
+
+    dd = UI.CreateDropdown(parent, width, function(root)
+        for _, e in ipairs(entries) do
+            root:CreateRadio(e.label,
+                function() return getValue() == e.value end,
+                function()
+                    onSelect(e.value)
+                    dd:OverrideText(e.label)
+                end)
+        end
+    end)
+
+    dd:OverrideText(labelFor(getValue()) or "")
+    return dd
+end
+
+-- ============================================================
 -- Frame-Pool
 -- ============================================================
 
@@ -128,8 +182,12 @@ end
 -- Ein einziger StaticPopup-Eintrag für alle Umbenennungen. Ohne das schreibt jeder Aufrufer
 -- seinen eigenen Dialog und dupliziert die Logik dabei zweimal — einmal in OnAccept und
 -- nochmal in EditBoxOnEnterPressed, weil WoW beide getrennt aufruft.
-StaticPopupDialogs = StaticPopupDialogs or {}
-
+--
+-- ACHTUNG: Hier NIE `StaticPopupDialogs = StaticPopupDialogs or {}` schreiben. Das setzt die
+-- globale Variable und stempelt sie mit unserem Addon-Taint; Blizzard_PlayerChoice liest sie
+-- beim Nachladen, vererbt den Taint an PlayerChoiceFrame und ab da scheitert jedes ESC an
+-- ClearTarget(). Einzelne Schlüssel zu setzen ist dagegen unbedenklich. Blizzard definiert
+-- die Tabelle ohnehin immer — die Absicherung war wirkungslos.
 local RENAME_DIALOG = "REQRT_RENAME"
 -- Was gerade umbenannt wird; von UI.ShowRenameDialog vor dem Öffnen gesetzt.
 local renameState = nil

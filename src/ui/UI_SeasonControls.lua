@@ -225,26 +225,18 @@ end
 --- Baut die Season-Bedienung in den übergebenen Kopfzeilen-Container (zwei Zeilen).
 function UI.BuildSeasonControls(header)
     -- ── Zeile 1: Season + Startdatum + Neue Season ────────────
-    local seasonDD = CreateFrame("Frame", "ReqRTSeasonDD_active", header, "UIDropDownMenuTemplate")
-    UIDropDownMenu_SetWidth(seasonDD, 150)
-    seasonDD:SetPoint("TOPLEFT", header, "TOPLEFT", -14, 0)
-    UIDropDownMenu_Initialize(seasonDD, function()
-        local seasons = SeasonsNewestFirst()
-        for _, season in ipairs(seasons) do
-            local info = UIDropDownMenu_CreateInfo()
-            info.text = SeasonLabel(season)
-            info.notCheckable = true
-            info.func = function()
-                CloseDropDownMenus()
+    local seasonDD = UI.CreateDropdown(header, 170, function(root)
+        for _, season in ipairs(SeasonsNewestFirst()) do
+            root:CreateButton(SeasonLabel(season), function()
                 -- Auswählen heißt ansehen, nicht öffnen: eine beendete Season lässt sich
                 -- damit betrachten, ohne sie wieder aufnehmen zu müssen. Das Wiederaufnehmen
                 -- liegt auf [Resume].
                 UI.SetSelectedSeason(season.id)
                 UI.RefreshAttendanceTab()
-            end
-            UIDropDownMenu_AddButton(info)
+            end)
         end
     end)
+    seasonDD:SetPoint("TOPLEFT", header, "TOPLEFT", 0, 0)
 
     -- Startdatum: klickbar, weil eine frisch angelegte Season sonst alle vorhandenen
     -- Raids ausschließt und die Matrix leer bliebe
@@ -445,44 +437,40 @@ function UI.BuildSeasonControls(header)
     -- endet deutlich vor x≈336, wo Export beginnt).
     --
     -- Verankert an DEMSELBEN Referenzpunkt wie exportBtn (seasonBtn:BOTTOMLEFT), nicht an
-    -- einem festen Y-Wert relativ zu header: seasonDD (UIDropDownMenuTemplate) ist höher
-    -- als die 22-px-Buttons, und Zeile 1 zentriert sich vertikal an seasonDD — ein fixer
-    -- Header-Offset hinkt dieser Verschiebung hinterher und lag sichtbar zu hoch.
+    -- einem festen Y-Wert relativ zu header: seasonDD ist höher als die 22-px-Buttons, und
+    -- Zeile 1 zentriert sich vertikal an seasonDD — ein fixer Header-Offset hinkt dieser
+    -- Verschiebung hinterher und lag sichtbar zu hoch.
     --
     -- Kein "Kader:"-Label mehr davor — die Zeile beginnt direkt mit dem Dropdown, linksbündig
-    -- zur Season-Zeile darüber (seasonDD). X-Offset wird zur Laufzeit aus der tatsächlichen
-    -- Differenz der beiden Frame-Kanten gemessen statt aus der Button-Breitenkette
-    -- zurückgerechnet: UIDropDownMenu_SetWidth setzt nur die sichtbare Breite des inneren
-    -- Widgets, nicht die tatsächliche Frame-Breite, mit der SetPoint-Ketten rechnen — eine
-    -- Handrechnung darüber (frühere Version) traf die echte Kante nicht zuverlässig.
-    local rankDD = CreateFrame("Frame", "ReqRTSeasonDD_ranks", header, "UIDropDownMenuTemplate")
-    UIDropDownMenu_SetWidth(rankDD, 130)
-    local dx = (seasonDD:GetLeft() or 0) - (seasonBtn:GetLeft() or 0)
-    rankDD:SetPoint("TOPLEFT", seasonBtn, "BOTTOMLEFT", dx, -4)
-    UIDropDownMenu_Initialize(rankDD, function()
+    -- zur Season-Zeile darüber (seasonDD).
+    local rankDD = UI.CreateDropdown(header, 150, function(root)
         local names  = GL.GetGuildRankNames()
         local sorted = SortedRankIndices(names)
         local season = UI.GetSelectedSeason()
 
+        -- Den Filter bei jedem Callback frisch lesen statt ihn in die Closure zu binden:
+        -- season.rankFilter kann beim Menüaufbau noch nil sein, ein einmal gefangenes
+        -- Fallback-{} würde die Häkchen dauerhaft falsch anzeigen.
+        local function isChecked(i)
+            local s = UI.GetSelectedSeason()
+            return (s and s.rankFilter and s.rankFilter[i]) and true or false
+        end
+
         -- Nur noch Einzelauswahl je Rang — die "Ab Rang (und höher)"-Kurzform ist entfallen.
-        local title = UIDropDownMenu_CreateInfo()
-        title.text, title.isTitle, title.notCheckable = "Einzeln an/aus", true, true
-        UIDropDownMenu_AddButton(title)
-        local filter = (season and season.rankFilter) or {}
+        root:CreateTitle("Einzeln an/aus")
         for _, i in ipairs(sorted) do
-            local info = UIDropDownMenu_CreateInfo()
-            info.text             = names[i]
-            info.checked          = filter[i] and true or false
-            info.keepShownOnClick = true
-            info.func = function(_, _, _, checked)
-                if season then
-                    GL.SetSeasonRankFilter(season.id, i, checked)
-                    UI.RefreshSeasonControls()
-                end
-            end
-            UIDropDownMenu_AddButton(info)
+            root:CreateCheckbox(names[i],
+                function() return isChecked(i) end,
+                function()
+                    if season then
+                        GL.SetSeasonRankFilter(season.id, i, not isChecked(i))
+                        UI.RefreshSeasonControls()
+                    end
+                end)
         end
     end)
+    local dx = (seasonDD:GetLeft() or 0) - (seasonBtn:GetLeft() or 0)
+    rankDD:SetPoint("TOPLEFT", seasonBtn, "BOTTOMLEFT", dx, -4)
 
     local countLbl = header:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     countLbl:SetPoint("LEFT", rankDD, "RIGHT", -6, 0)
@@ -512,7 +500,7 @@ function UI.RefreshSeasonControls(data)
     if not S then return end
     local season = UI.GetSelectedSeason()
 
-    UIDropDownMenu_SetText(S.seasonDD, SeasonLabel(season))
+    S.seasonDD:OverrideText(SeasonLabel(season))
     S.delBtn:SetEnabled(season ~= nil)
     S.renameBtn:SetEnabled(season ~= nil)
     S.exportBtn:SetEnabled(season ~= nil)
@@ -540,14 +528,14 @@ function UI.RefreshSeasonControls(data)
     local names  = GL.GetGuildRankNames()
     local filter = (season and season.rankFilter) or {}
     if not next(names) then
-        UIDropDownMenu_SetText(S.rankDD, "|cff888888lädt…|r")
+        S.rankDD:OverrideText("|cff888888lädt…|r")
     else
         -- niedrigster aktiver Rang = die Schwelle, die der Nutzer gesetzt hat
         local lowest = nil
         for i in pairs(filter) do
             if lowest == nil or i > lowest then lowest = i end
         end
-        UIDropDownMenu_SetText(S.rankDD,
+        S.rankDD:OverrideText(
             lowest and (names[lowest] or ("Rang " .. lowest)) or "– kein Rang –")
     end
     -- Ohne übergebenes Aggregat direkt aus dem Roster zählen — das liest inzwischen nur

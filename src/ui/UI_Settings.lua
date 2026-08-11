@@ -59,29 +59,14 @@ function UI.BuildSettingsPanel(parent)
     local qualLbl = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     qualLbl:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
     qualLbl:SetText("Min. Quality:")
-    local qualDD = CreateFrame("Frame", "GuildLootSettingsDD_minQuality", panel, "UIDropDownMenuTemplate")
-    UIDropDownMenu_SetWidth(qualDD, 80)
-    qualDD:SetPoint("LEFT", qualLbl, "RIGHT", -8, 0)
-    local qualOpts   = { 3, 4, 5 }
-    local qualLabels = { "|cff0070ddRare|r", "|cffa335eeEpic|r", "|cffff8000Legendary|r" }
-    local function qualLabel(v)
-        for i, q in ipairs(qualOpts) do if q == v then return qualLabels[i] end end
-        return tostring(v)
-    end
-    UIDropDownMenu_SetText(qualDD, qualLabel(GuildLootDB.settings.minQuality or 4))
-    UIDropDownMenu_Initialize(qualDD, function()
-        for i, v in ipairs(qualOpts) do
-            local info = UIDropDownMenu_CreateInfo()
-            info.text = qualLabels[i]
-            info.notCheckable = true
-            info.func = function()
-                GuildLootDB.settings.minQuality = v
-                UIDropDownMenu_SetText(qualDD, qualLabels[i])
-                CloseDropDownMenus()
-            end
-            UIDropDownMenu_AddButton(info)
-        end
-    end)
+    local qualDD = UI.CreateOptionDropdown(panel, 100, {
+        { value = 3, label = "|cff0070ddRare|r" },
+        { value = 4, label = "|cffa335eeEpic|r" },
+        { value = 5, label = "|cffff8000Legendary|r" },
+    },
+    function() return GuildLootDB.settings.minQuality or 4 end,
+    function(v) GuildLootDB.settings.minQuality = v end)
+    qualDD:SetPoint("LEFT", qualLbl, "RIGHT", 4, 0)
     y = y - 30
 
     MakeCheck("Hide non-equippable items", "filterNonEquip")
@@ -124,46 +109,28 @@ function UI.BuildSettingsPanel(parent)
     timerLbl:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
     timerLbl:SetText("|cff888888Prio Phase:|r")
 
-    local ddPrio = CreateFrame("Frame", "GuildLootSettingsDD_prioSeconds", panel, "UIDropDownMenuTemplate")
-    UIDropDownMenu_SetWidth(ddPrio, 80)
-    UIDropDownMenu_SetText(ddPrio, (GuildLootDB.settings.prioSeconds or 15) .. "s")
-    ddPrio:SetPoint("LEFT", timerLbl, "RIGHT", -8, 0)
-    UIDropDownMenu_Initialize(ddPrio, function()
-        for _, s in ipairs({10,15,20,30,45,60}) do
-            local info = UIDropDownMenu_CreateInfo()
-            info.text = s .. "s"
-            info.notCheckable = true
-            info.func = function()
-                GuildLootDB.settings.prioSeconds = s
-                UIDropDownMenu_SetText(ddPrio, s .. "s")
-                CloseDropDownMenus()
-            end
-            UIDropDownMenu_AddButton(info)
-        end
-    end)
+    local prioEntries = {}
+    for _, s in ipairs({10,15,20,30,45,60}) do
+        table.insert(prioEntries, { value = s, label = s .. "s" })
+    end
+    local ddPrio = UI.CreateOptionDropdown(panel, 90, prioEntries,
+        function() return GuildLootDB.settings.prioSeconds or 15 end,
+        function(v) GuildLootDB.settings.prioSeconds = v end)
+    ddPrio:SetPoint("LEFT", timerLbl, "RIGHT", 4, 0)
     y = y - 28
 
     local rollLbl = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     rollLbl:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
     rollLbl:SetText("|cff888888Roll Phase:|r")
 
-    local ddRoll = CreateFrame("Frame", "GuildLootSettingsDD_rollSeconds", panel, "UIDropDownMenuTemplate")
-    UIDropDownMenu_SetWidth(ddRoll, 80)
-    UIDropDownMenu_SetText(ddRoll, (GuildLootDB.settings.rollSeconds or 15) .. "s")
-    ddRoll:SetPoint("LEFT", rollLbl, "RIGHT", -8, 0)
-    UIDropDownMenu_Initialize(ddRoll, function()
-        for _, s in ipairs({10,15,20,30}) do
-            local info = UIDropDownMenu_CreateInfo()
-            info.text = s .. "s"
-            info.notCheckable = true
-            info.func = function()
-                GuildLootDB.settings.rollSeconds = s
-                UIDropDownMenu_SetText(ddRoll, s .. "s")
-                CloseDropDownMenus()
-            end
-            UIDropDownMenu_AddButton(info)
-        end
-    end)
+    local rollEntries = {}
+    for _, s in ipairs({10,15,20,30}) do
+        table.insert(rollEntries, { value = s, label = s .. "s" })
+    end
+    local ddRoll = UI.CreateOptionDropdown(panel, 90, rollEntries,
+        function() return GuildLootDB.settings.rollSeconds or 15 end,
+        function(v) GuildLootDB.settings.rollSeconds = v end)
+    ddRoll:SetPoint("LEFT", rollLbl, "RIGHT", 4, 0)
     y = y - 28
 
     -- ── Sektion 3: Allgemein ──────────────────────────────────
@@ -174,30 +141,19 @@ function UI.BuildSettingsPanel(parent)
     chatLbl:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
     chatLbl:SetText("|cff888888Chat Channel:|r")
 
-    local chatOpts   = { "AUTO",        "RAID",       "INSTANCE_CHAT",   "PARTY",        "OFF" }
-    local chatLabels = { "Automatic",   "Raid Chat",  "Instance Chat",   "Group Chat",   "Off" }
-    local function getChatLabel(v)
-        for i, c in ipairs(chatOpts) do if c == v then return chatLabels[i] end end
-        return "Automatic"
-    end
-    local ddChat = CreateFrame("Frame", "GuildLootSettingsDD_chatChannel", panel, "UIDropDownMenuTemplate")
-    UIDropDownMenu_SetWidth(ddChat, 100)
-    ddChat:SetPoint("LEFT", chatLbl, "RIGHT", -8, 0)
-    UIDropDownMenu_SetText(ddChat, getChatLabel(GuildLootDB.settings.chatChannel or "AUTO"))
-    UIDropDownMenu_Initialize(ddChat, function()
-        for i, v in ipairs(chatOpts) do
-            local info = UIDropDownMenu_CreateInfo()
-            info.text = chatLabels[i]
-            info.notCheckable = true
-            info.func = function()
-                GuildLootDB.settings.chatChannel = v
-                GuildLootDB.settings.postToChat = (v ~= "OFF")
-                UIDropDownMenu_SetText(ddChat, chatLabels[i])
-                CloseDropDownMenus()
-            end
-            UIDropDownMenu_AddButton(info)
-        end
+    local ddChat = UI.CreateOptionDropdown(panel, 120, {
+        { value = "AUTO",          label = "Automatic" },
+        { value = "RAID",          label = "Raid Chat" },
+        { value = "INSTANCE_CHAT", label = "Instance Chat" },
+        { value = "PARTY",         label = "Group Chat" },
+        { value = "OFF",           label = "Off" },
+    },
+    function() return GuildLootDB.settings.chatChannel or "AUTO" end,
+    function(v)
+        GuildLootDB.settings.chatChannel = v
+        GuildLootDB.settings.postToChat = (v ~= "OFF")
     end)
+    ddChat:SetPoint("LEFT", chatLbl, "RIGHT", 4, 0)
     y = y - 30
 
     MakeCheck("Announce item start as raid warning", "raidWarnItem")
@@ -210,23 +166,13 @@ function UI.BuildSettingsPanel(parent)
     expFmtLbl:SetPoint("TOPLEFT", panel, "TOPLEFT", 12, y)
     expFmtLbl:SetText("|cff888888Export Format:|r")
 
-    local ddExpFmt = CreateFrame("Frame", "GuildLootSettingsDD_exportFormat", panel, "UIDropDownMenuTemplate")
-    UIDropDownMenu_SetWidth(ddExpFmt, 80)
-    ddExpFmt:SetPoint("LEFT", expFmtLbl, "RIGHT", -8, 0)
-    UIDropDownMenu_SetText(ddExpFmt, GuildLootDB.settings.exportFormat or "JSON")
-    UIDropDownMenu_Initialize(ddExpFmt, function()
-        for _, v in ipairs({ "JSON", "CSV" }) do
-            local info = UIDropDownMenu_CreateInfo()
-            info.text = v
-            info.notCheckable = true
-            info.func = function()
-                GuildLootDB.settings.exportFormat = v
-                UIDropDownMenu_SetText(ddExpFmt, v)
-                CloseDropDownMenus()
-            end
-            UIDropDownMenu_AddButton(info)
-        end
-    end)
+    local ddExpFmt = UI.CreateOptionDropdown(panel, 90, {
+        { value = "JSON", label = "JSON" },
+        { value = "CSV",  label = "CSV" },
+    },
+    function() return GuildLootDB.settings.exportFormat or "JSON" end,
+    function(v) GuildLootDB.settings.exportFormat = v end)
+    ddExpFmt:SetPoint("LEFT", expFmtLbl, "RIGHT", 4, 0)
     y = y - 30
 
     -- ── Sektion 4: Priorities ─────────────────────────────────
