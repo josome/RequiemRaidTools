@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.0.5.0
+
+First stable release of the 1.0.4.x beta line. Everything below from v1.0.4.0-beta and v1.0.4.3-beta is now in the stable channel — the new Attendance tab with season-based roster and per-boss tracking, and the fix for the addon interfering with protected game functions (ESC not clearing your target, repeated "action blocked" errors).
+
+No functional changes since v1.0.4.3-beta.
+
 ## v1.0.4.3-beta
 
 **Bug Fixes**
