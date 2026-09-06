@@ -15,6 +15,8 @@
   - [testTocFilesAreFound](#testtocfilesarefound)
   - [testNoWritesToForeignGlobals](#testnowritestoforeignglobals)
   - [testNoLegacyDropdownApi](#testnolegacydropdownapi)
+  - [testNoHandWrittenFrameMoving](#testnohandwrittenframemoving)
+  - [testNoDuplicateAnchorNormalization](#testnoduplicateanchornormalization)
 - [Was diese Tests nicht abdecken](#was-diese-tests-nicht-abdecken)
 - [Wenn ein Test rot wird](#wenn-ein-test-rot-wird)
 
@@ -31,7 +33,16 @@
 
 ## Testziel
 
-Verhindern, dass die zwei Muster zurückkehren, die nachweislich Taint erzeugt haben. Beide
+Verhindern, dass bekannte Fehlermuster zurückkehren. Zwei Gruppen:
+
+1. **Taint** (`testNoWritesToForeignGlobals`, `testNoLegacyDropdownApi`) — siehe unten.
+2. **Fenster-Position** (`testNoHandWrittenFrameMoving`, `testNoDuplicateAnchorNormalization`) —
+   drei Bugs beim Verschieben und Skalieren, von denen zwei nach ihrer Behebung bei einem
+   späteren Umbau wieder verlorengingen. Details bei den jeweiligen Testfällen.
+
+### Taint
+
+Beide
 hatten dieselbe Wirkung: Ein Blizzard-Global trägt den Addon-Stempel, `Blizzard_PlayerChoice`
 liest es beim Nachladen, `PlayerChoiceFrame` bleibt für die restliche Session markiert — und
 jedes ESC scheitert an `ClearTarget()`.
@@ -93,6 +104,48 @@ Addons verwendet; nur die Zuweisung des Globals selbst ist das Problem.
 Meldet jedes Vorkommen von `UIDropDownMenu` in ausgelieferten Dateien. Ersatz ist
 `UI.CreateDropdown` bzw. `UI.CreateOptionDropdown` aus `src/ui/UI_Common.lua`.
 
+### testNoHandWrittenFrameMoving
+
+Meldet jeden Aufruf von `StartMoving` außerhalb von `src/ui/UI_Common.lua` und
+`src/ui/UI_DockTab.lua`.
+
+Hintergrund ist dieselbe Sorte Rückfall wie bei den Taint-Regeln: Beim Hauptfenster war
+`RegisterForDrag` auf dem Frame selbst mit `StartSizing` auf demselben Frame kollidiert
+(`a843d6b`) — Verschieben und Größenänderung blockierten sich gegenseitig. Die Lösung, ein
+eigener Mover-Streifen über der Titelzeile, steckt seitdem in `UI.RegisterMovableFrame`. Wer
+Bewegung wieder von Hand verdrahtet, umgeht sie.
+
+Ausgenommen sind:
+
+| Datei | Grund |
+|---|---|
+| `src/ui/UI_Common.lua` | enthält den gemeinsamen Code selbst |
+| `src/ui/UI_DockTab.lua` | klebt am Bildschirmrand und merkt sich nur seine Y-Position — bewusst ein eigener, viel einfacherer Weg |
+
+**Geprüft wird allein `StartMoving`**, nicht `RegisterForDrag`. Ohne `StartMoving` bewegt sich
+kein Fenster, und `RegisterForDrag` wäre der falsche Marker: `src/ui/UI_DropPanel.lua` benutzt
+es, um per `OnReceiveDrag` ein Item entgegenzunehmen — mit Fensterposition hat das nichts zu
+tun. Die erste, breitere Fassung dieser Regel hat genau darauf angeschlagen.
+
+### testNoDuplicateAnchorNormalization
+
+Meldet jedes `SetPoint("TOPLEFT", UIParent, "TOPLEFT", …)` außerhalb von
+`src/ui/UI_Common.lua`.
+
+Das Umankern eines Fensters auf genau einen TOPLEFT-Anker muss immer derselben Reihenfolge
+folgen — Größe merken, `ClearAllPoints`, `SetPoint`, Größe zurücksetzen. Fehlt der letzte
+Schritt, geht beim Umankern die Größe verloren, weil `ClearAllPoints` die von `StartSizing`
+gesetzten Anker mitnimmt. Genau das ist zweimal passiert:
+
+| Vorfall | Muster |
+|---|---|
+| `b589c9d` | CENTER-Anker ließ das Fenster nach `StopMovingOrSizing()` springen |
+| `7f8caaa` | Umankern ohne anschließendes `SetSize` verlor die neue Größe |
+
+Beide Fixes gingen später beim Umbau auf den Mover-Streifen wieder verloren. Deshalb steht das
+Umankern jetzt nur noch an einer Stelle, in `UI.NormalizeFrameAnchor`, und diese Regel hält es
+dort.
+
 ---
 
 ## Was diese Tests nicht abdecken
@@ -117,3 +170,10 @@ Die Fehlermeldung nennt Datei, Zeilennummer und Inhalt jedes Verstoßes.
 - **Legacy-Dropdown:** Auf `UI.CreateDropdown` / `UI.CreateOptionDropdown` umstellen. Muster
   siehe `src/ui/UI_Settings.lua` (Einfachauswahl) und `src/ui/UI_SeasonControls.lua`
   (Mehrfachauswahl mit Checkboxen).
+- **Handgeschriebenes `StartMoving`:** Auf `UI.RegisterMovableFrame(frame, key, opts)`
+  umstellen. Der Rückgabewert ist der Mover-Streifen; die Knöpfe der Titelzeile anschließend
+  mit `UI.RaiseAboveMover(mover, …)` darüber heben, sonst nehmen sie keine Klicks mehr an.
+  Muster siehe `src/ui/UI_PlayerPopup.lua`.
+- **Dupliziertes Umankern:** `UI.NormalizeFrameAnchor(frame)` rufen statt `ClearAllPoints` +
+  `SetPoint` selbst zu schreiben. Wird nur die Position gebraucht, tut es
+  `UI.SaveFramePosition` / `UI.RestoreFramePosition`.

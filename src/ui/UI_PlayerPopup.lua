@@ -104,11 +104,10 @@ local function BuildPopup()
     popup:SetSize(340, 380)
     popup:SetPoint("CENTER", UIParent, "CENTER", 0, 80)
     popup:SetFrameStrata("HIGH")
-    popup:SetMovable(true)
-    popup:EnableMouse(true)
-    popup:RegisterForDrag("LeftButton")
-    popup:SetScript("OnDragStart", popup.StartMoving)
-    popup:SetScript("OnDragStop",  popup.StopMovingOrSizing)
+    -- Verschieben und Position merken: gemeinsamer Code in UI_Common.lua.
+    -- Griff ist nur noch die Titelzeile, nicht mehr die ganze Fläche — darunter
+    -- liegen Prio-Buttons, Roll und die Filter-Checkboxen.
+    local mover = UI.RegisterMovableFrame(popup, "playerPopup")
     popup:SetBackdrop(UI.BACKDROPS.DIALOG)
     popup:SetBackdropColor(0, 0, 0, 0.9)
     popup:Hide()
@@ -194,6 +193,10 @@ local function BuildPopup()
         GameTooltip:Show()
     end)
     enableCheck:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    -- Alle vier sitzen bei y-Offset -2 bis -5 und damit im Mover-Streifen; ohne das
+    -- Anheben nehmen sie keine Klicks mehr an.
+    UI.RaiseAboveMover(mover, closeBtn, helpBtn, soundCheck, enableCheck)
 
     -- ── Gemeinsames Widget (yStart=-28: unterhalb der Titelzeile) ─
     widget = UI.BuildLootAnnounceWidget(popup, -28)
