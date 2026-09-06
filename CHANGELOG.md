@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.0.5.2
+
+**Bug Fixes**
+- The loot announce popup and the export window now remember where you put them. Both used to reappear in the centre of the screen after every `/reload` and every login.
+- The loot popup no longer drifts sideways when it switches between the narrow filter view and the wide item view. It now grows to the right and keeps its top-left corner where you left it.
+- Fixed the main window jumping to a different position after being resized. Dragging it after a resize moved it somewhere unexpected.
+
+**Changes**
+- All windows are now moved by their title bar. Previously the loot popup and the export window could be dragged from anywhere on their surface, so a misclick on the background nudged them out of place.
+
+**Internal**
+- Main window, loot popup and export window now share one positioning mechanism instead of three separate implementations. Positions are stored per window and survive a client restart.
+- 18 new unit tests (473 total) and two source checks that keep the move wiring and the anchor handling in one place, so the three position bugs fixed over the past releases cannot quietly return.
+
 ## v1.0.5.0
 
 First stable release of the 1.0.4.x beta line. Everything below from v1.0.4.0-beta and v1.0.4.3-beta is now in the stable channel — the new Attendance tab with season-based roster and per-boss tracking, and the fix for the addon interfering with protected game functions (ESC not clearing your target, repeated "action blocked" errors).
