@@ -43,7 +43,8 @@ local DB_DEFAULTS = {
         minQuality     = 4,
         prioSeconds    = 15,
         rollSeconds    = 15,
-        framePos     = nil,
+        -- [key] = { x, y, w, h } je verschiebbarem Fenster; gepflegt von UI_Common.lua
+        framePositions = {},
         minimized    = true,
         minimapAngle = 45,
         lastTab      = nil,
@@ -191,6 +192,25 @@ local function MigrateRaidFormat()
     end
 end
 
+--- Überführt die alten Einzelfelder des Hauptfensters in settings.framePositions.
+--- Alle verschiebbaren Fenster teilen sich diese Tabelle; framePos/frameSize kannten
+--- nur das Hauptfenster.
+--- Reads:  db.settings.framePos, db.settings.frameSize
+--- Writes: db.settings.framePositions.main, db.settings.framePos, db.settings.frameSize
+function GL.MigrateFramePositions()
+    local s = GuildLootDB and GuildLootDB.settings
+    if not s then return end
+    s.framePositions = s.framePositions or {}
+    local old = s.framePos
+    -- Einen bereits migrierten Eintrag nicht überschreiben
+    if old and not s.framePositions.main then
+        local size = s.frameSize or {}
+        s.framePositions.main = { x = old.x, y = old.y, w = size.w, h = size.h }
+    end
+    s.framePos  = nil
+    s.frameSize = nil
+end
+
 --- Initialisiert GuildLootDB mit Defaults falls Felder fehlen. Einmalig beim Login.
 --- Writes: db.players, db.raidContainers, db.activeContainerIdx,
 ---         db.unassignedRaids, db.currentRaid, db.settings, db.raidHistory
@@ -207,6 +227,7 @@ function GL.InitDB()
     end
     MigrateCurrentRaidLegacy()
     MigrateRaidFormat()
+    GL.MigrateFramePositions()
     -- Transient: nie aus SavedVariables übernehmen
     GuildLootDB.settings.isMasterLooter = false
     GuildLootDB.settings.dungeonMode    = nil

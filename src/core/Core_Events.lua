@@ -97,7 +97,7 @@ end
 
 local function OnEventPlayerLogout()
     GuildLootDB.lastLogout = time()
-    if GL.UI and GL.UI.SavePosition then GL.UI.SavePosition() end
+    if GL.UI and GL.UI.SaveAllFramePositions then GL.UI.SaveAllFramePositions() end
 end
 
 local function OnEventPlayerEnteringWorld()

@@ -118,11 +118,10 @@ function UI.ShowExportPopup(raidData, textOverride)
         exportPopup:SetSize(600, 400)
         exportPopup:SetPoint("CENTER")
         exportPopup:SetFrameStrata("DIALOG")
-        exportPopup:SetMovable(true)
-        exportPopup:EnableMouse(true)
-        exportPopup:RegisterForDrag("LeftButton")
-        exportPopup:SetScript("OnDragStart", exportPopup.StartMoving)
-        exportPopup:SetScript("OnDragStop",  exportPopup.StopMovingOrSizing)
+        -- Verschieben und Position merken: gemeinsamer Code in UI_Common.lua.
+        -- Der CloseButton kommt aus dem Template und läge sonst unter dem Streifen.
+        local mover = UI.RegisterMovableFrame(exportPopup, "exportPopup")
+        UI.RaiseAboveMover(mover, exportPopup.CloseButton)
 
         local title = exportPopup:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         title:SetPoint("TOP", exportPopup, "TOP", 0, -8)

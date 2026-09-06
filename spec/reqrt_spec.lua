@@ -22,6 +22,7 @@ dofile("src/tests/Migration_Test.lua")
 dofile("src/tests/Loot_Test.lua")
 dofile("src/tests/Export_Test.lua")
 dofile("src/tests/Pool_Test.lua")
+dofile("src/tests/Frame_Test.lua")
 dofile("src/tests/Lint_Test.lua")
 
 -- ADDON_LOADED feuern → alle _loader-Frames registrieren ihre Suites bei WoWUnit

@@ -63,13 +63,14 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
     end
 
     --- Sammelt Regelverstöße über alle ausgelieferten Dateien.
-    --- @param check fun(line:string):boolean  true = Verstoß
+    --- @param check   fun(line:string):boolean  true = Verstoß
+    --- @param exempt  table|nil  Pfade, die die Regel bewusst verletzen dürfen
     --- @return table Liste aus "pfad:zeile: inhalt"
-    local function Scan(check)
+    local function Scan(check, exempt)
         local hits = {}
         local files = ShippedFiles() or {}
         for _, path in ipairs(files) do
-            local lines = ReadLines(path)
+            local lines = (not (exempt and exempt[path])) and ReadLines(path) or nil
             if lines then
                 for n, line in ipairs(lines) do
                     -- Kommentare sind nie ein Verstoß
@@ -113,5 +114,46 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
         end)
         AreEqual(0, #hits,
             "Legacy-Dropdown-API verwenden (taintet UIDROPDOWNMENU_*): " .. table.concat(hits, " | "))
+    end
+
+    -- ============================================================
+    -- Fenster-Position: die Regeln aus b589c9d / 7f8caaa / a843d6b festhalten
+    -- ============================================================
+
+    -- Der gemeinsame Positions-Code lebt in UI_Common.lua. Das Dock-Tab klebt am
+    -- Bildschirmrand und merkt sich nur seine Y-Position — es hat bewusst seinen
+    -- eigenen, viel einfacheren Weg.
+    local MOVE_EXEMPT = {
+        ["src/ui/UI_Common.lua"]  = true,
+        ["src/ui/UI_DockTab.lua"] = true,
+    }
+
+    --- Regel A: Verschieben läuft über UI.RegisterMovableFrame, nicht von Hand.
+    --- RegisterForDrag und StartSizing auf demselben Frame blockieren sich gegenseitig
+    --- (a843d6b) — deshalb baut der Helper einen eigenen Mover-Streifen, und niemand
+    --- sonst verdrahtet Bewegung selbst.
+    ---
+    --- Geprüft wird allein StartMoving: ohne diesen Aufruf bewegt sich kein Fenster.
+    --- RegisterForDrag wäre der falsche Marker — UI_DropPanel.lua nutzt es, um per
+    --- OnReceiveDrag ein Item entgegenzunehmen, was mit Fensterposition nichts zu tun hat.
+    function Tests:testNoHandWrittenFrameMoving()
+        local hits = Scan(function(line)
+            return line:match("StartMoving%s*%(") ~= nil
+        end, MOVE_EXEMPT)
+        AreEqual(0, #hits,
+            "Fenster von Hand verschiebbar gemacht statt UI.RegisterMovableFrame: "
+            .. table.concat(hits, " | "))
+    end
+
+    --- Regel B: Umankern auf TOPLEFT/UIParent passiert nur in UI.NormalizeFrameAnchor.
+    --- Kopiert jemand die Zeile in einen Resize-Handler, fehlt dort früher oder später
+    --- wieder das SetSize danach — genau so ging 7f8caaa verloren.
+    function Tests:testNoDuplicateAnchorNormalization()
+        local hits = Scan(function(line)
+            return line:match('SetPoint%s*%(%s*"TOPLEFT"%s*,%s*UIParent%s*,%s*"TOPLEFT"') ~= nil
+        end, { ["src/ui/UI_Common.lua"] = true })
+        AreEqual(0, #hits,
+            "Anker-Normalisierung dupliziert statt UI.NormalizeFrameAnchor zu rufen: "
+            .. table.concat(hits, " | "))
     end
 end)

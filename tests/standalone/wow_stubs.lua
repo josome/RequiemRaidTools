@@ -47,7 +47,10 @@ end
 -- ── CreateFrame ───────────────────────────────────────────────────────────────
 
 function CreateFrame(frameType, name, parent, template)
-    local f = { _scripts = {}, _type = frameType }
+    -- _shown = true wie in WoW: ein frisch erzeugtes Frame ist sichtbar, bis es
+    -- jemand versteckt. Genau daran hing ein Bug in der Fenster-Positionierung
+    -- (OnHide-Hook feuerte mitten im Konstruktor) — der Stub muss das nachbilden.
+    local f = { _scripts = {}, _type = frameType, _shown = true }
     function f:RegisterEvent(e)       _registerEvent(e, self)  end
     function f:UnregisterAllEvents()  _unregisterAll(self)      end
     function f:UnregisterEvent(e)
@@ -58,12 +61,35 @@ function CreateFrame(frameType, name, parent, template)
     end
     function f:SetScript(t, fn)  self._scripts[t] = fn   end
     function f:GetScript(t)      return self._scripts[t]  end
-    function f:Hide()            self._shown = false       end
-    function f:Show()            self._shown = true        end
+    -- Show/Hide lösen OnShow/OnHide aus, aber nur beim echten Wechsel — wie in WoW.
+    -- Ohne das bliebe jeder Fehler unsichtbar, der in einem dieser Skripte steckt.
+    function f:Hide()
+        if self._shown == false then return end
+        self._shown = false
+        local fn = self._scripts["OnHide"]
+        if fn then fn(self) end
+    end
+    function f:Show()
+        if self._shown then return end
+        self._shown = true
+        local fn = self._scripts["OnShow"]
+        if fn then fn(self) end
+    end
     function f:IsShown()         return self._shown or false end
     function f:SetParent()       end
-    function f:SetSize()         end
     function f:SetPoint()        end
+    -- Geometrie: nur so viel, dass die Positions-Helfer aus UI_Common.lua laufen.
+    -- Anker werden nicht ausgewertet — Tests setzen die Ecke direkt über _left/_top.
+    function f:SetSize(w, h)     self._w, self._h = w, h end
+    function f:GetSize()         return self._w or 0, self._h or 0 end
+    function f:GetWidth()        return self._w or 0 end
+    function f:GetHeight()       return self._h or 0 end
+    function f:GetTop()          return self._top end
+    function f:ClearAllPoints()  end
+    function f:SetMovable()      end
+    function f:EnableMouse()     end
+    function f:SetClampedToScreen() end
+    function f:GetEffectiveScale()  return 1 end
     function f:SetWidth()        end
     function f:SetHeight()       end
     function f:SetAlpha()        end
@@ -94,7 +120,7 @@ function CreateFrame(frameType, name, parent, template)
     function f:SetItemByID()     end
     function f:NumLines()        return 0 end
     function f:AddLine()         end
-    function f:GetLeft()         return nil end
+    function f:GetLeft()         return self._left end
     function f:RegisterForClicks() end
     function f:HookScript(t, fn)
         local prev = self._scripts[t]
@@ -198,6 +224,11 @@ end
 TradeFrameRecipientNameText = CreateFrame("Frame")
 
 WorldFrame = CreateFrame("Frame")
+
+-- Bildschirm 1600x900, Ursprung links unten — wie UIParent in WoW.
+UIParent = CreateFrame("Frame")
+UIParent:SetSize(1600, 900)
+UIParent._left, UIParent._top = 0, 900
 
 -- ── GuildLootDB Initialzustand ────────────────────────────────────────────────
 -- devMode=true damit die Test-Guards in *_Test.lua passieren.

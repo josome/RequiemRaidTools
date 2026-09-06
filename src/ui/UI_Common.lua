@@ -176,6 +176,219 @@ function UI.CreateFramePool(createFn, resetFn)
 end
 
 -- ============================================================
+-- Fenster-Position
+-- ============================================================
+
+-- Alle frei verschiebbaren Fenster teilen sich diesen Code. Ausnahme ist bewusst
+-- das Dock-Tab (src/ui/UI_DockTab.lua): es klebt am Bildschirmrand und merkt sich
+-- nur seine Y-Position.
+--
+-- Zwei Regeln stecken hier drin, beide aus Bugs entstanden, die schon behoben und
+-- danach wieder verlorengegangen sind:
+--
+--   Regel A — Verschoben wird immer über einen eigenen Mover-Streifen mit
+--   OnMouseDown/OnMouseUp, nie per RegisterForDrag auf dem Fenster selbst.
+--   RegisterForDrag und StartSizing auf demselben Frame blockieren sich gegenseitig
+--   (Commit a843d6b). Der Streifen liegt über der Titelzeile und verschluckt die
+--   Knöpfe darin — die müssen mit UI.RaiseAboveMover angehoben werden.
+--
+--   Regel B — Umankern heißt IMMER: Größe merken, ClearAllPoints, SetPoint TOPLEFT,
+--   Größe zurücksetzen. Ein CENTER-Anker lässt das Fenster nach StopMovingOrSizing()
+--   springen (b589c9d), und ClearAllPoints wirft die von StartSizing gesetzten Anker
+--   weg, wodurch die Größe verlorengeht (7f8caaa). Deshalb steht das Umankern nur an
+--   einer Stelle: UI.NormalizeFrameAnchor.
+--
+-- Der TOPLEFT-Anker löst nebenbei das Popup-Problem: ein Fenster, das per SetWidth
+-- schmaler oder breiter wird, wächst damit nach rechts statt symmetrisch — die linke
+-- obere Ecke bleibt stehen, wo der Benutzer sie hingezogen hat.
+
+-- key → Frame, für UI.SaveAllFramePositions beim Ausloggen.
+local movableFrames = {}
+-- key → opts aus UI.RegisterMovableFrame (size, minW, minH)
+local movableOpts = {}
+
+--- Liefert GuildLootDB.settings.framePositions, legt die Tabelle bei Bedarf an.
+local function PositionStore()
+    local s = GuildLootDB and GuildLootDB.settings
+    if not s then return nil end
+    s.framePositions = s.framePositions or {}
+    return s.framePositions
+end
+
+--- Hält gespeicherte Offsets innerhalb des Bildschirms.
+---
+--- Reine Rechenfunktion ohne Frame-Zugriff — damit unter busted testbar. Sie ist der
+--- Grund, warum eine Position auch einen Auflösungs- oder UI-Scale-Wechsel übersteht:
+--- ohne sie läge ein Fenster nach dem Wechsel auf einen kleineren Bildschirm außerhalb
+--- und wäre nicht mehr greifbar.
+---
+--- @param x       number  TOPLEFT-Offset nach rechts (≥ 0)
+--- @param y       number  TOPLEFT-Offset nach unten (≤ 0)
+--- @param frameW  number
+--- @param frameH  number
+--- @param screenW number  UIParent-Breite
+--- @param screenH number  UIParent-Höhe
+--- @return number|nil x, number|nil y  geklemmte Offsets, nil bei fehlenden Eingaben
+function UI.ClampFrameOffsets(x, y, frameW, frameH, screenW, screenH)
+    if not (x and y and frameW and frameH and screenW and screenH) then return nil end
+    local maxX =  math.max(0, screenW - frameW)
+    local minY = -math.max(0, screenH - frameH)
+    if     x < 0    then x = 0
+    elseif x > maxX then x = maxX end
+    if     y > 0    then y = 0
+    elseif y < minY then y = minY end
+    return x, y
+end
+
+--- Regel B: bringt frame auf genau einen Anker TOPLEFT → UIParent TOPLEFT.
+---
+--- Muss nach jedem StopMovingOrSizing() laufen. Die Skalierung wird mitgerechnet,
+--- damit ein Fenster mit abweichendem Scale nicht bei jedem Speichern wegdriftet.
+---
+--- @param frame Frame
+--- @return number|nil x, number|nil y  nil wenn frame noch nie gezeichnet wurde
+function UI.NormalizeFrameAnchor(frame)
+    if not frame or not frame.GetLeft then return nil end
+    local left = frame:GetLeft()
+    if not left then return nil end
+
+    -- Größe VOR ClearAllPoints sichern: das Verwerfen der Anker, die StartSizing
+    -- gesetzt hat, nimmt sonst die neue Größe mit (7f8caaa).
+    local w, h  = frame:GetSize()
+    local ratio = frame:GetEffectiveScale() / UIParent:GetEffectiveScale()
+    local x = left            * ratio - UIParent:GetLeft()
+    local y = frame:GetTop()  * ratio - UIParent:GetTop()
+
+    frame:ClearAllPoints()
+    frame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", x, y)
+    frame:SetSize(w, h)
+    return x, y
+end
+
+--- Schreibt Position (und bei size=true die Größe) von frame in die SavedVariables.
+--- Ankert dabei über UI.NormalizeFrameAnchor um.
+--- @param frame Frame
+--- @param key   string  Schlüssel unter settings.framePositions
+function UI.SaveFramePosition(frame, key)
+    if not (frame and key) then return end
+    -- Ein verstecktes Fenster steht dort, wo sein Aufbau-Code es hingesetzt hat, nicht
+    -- dort, wo der Benutzer es zuletzt hatte. Es zu sichern hieße, die gespeicherte
+    -- Position durch den Default zu ersetzen — beim angedockten Hauptfenster wäre das
+    -- bei jedem Ausloggen der Fall.
+    -- Ein verstecktes Fenster steht dort, wo sein Aufbau-Code es hingesetzt hat, nicht
+    -- dort, wo der Benutzer es zuletzt hatte. Es zu sichern hieße, die gespeicherte
+    -- Position durch den Default zu ersetzen — beim angedockten Hauptfenster wäre das
+    -- bei jedem Ausloggen der Fall.
+    if frame.IsShown and not frame:IsShown() then return end
+    local x, y = UI.NormalizeFrameAnchor(frame)
+    if not x then return end
+    local store = PositionStore()
+    if not store then return end
+
+    local entry = { x = x, y = y }
+    local opts  = movableOpts[key]
+    if opts and opts.size then
+        entry.w, entry.h = frame:GetSize()
+    end
+    store[key] = entry
+end
+
+--- Stellt die gespeicherte Position (und ggf. Größe) von frame wieder her.
+---
+--- Ist nichts gespeichert, wird der vom Aufrufer gesetzte Default-Anker einmalig in
+--- die TOPLEFT-Form überführt — damit ist auch das allererste Öffnen gegen spätere
+--- Größenwechsel immun.
+--- @param frame Frame
+--- @param key   string
+function UI.RestoreFramePosition(frame, key)
+    if not (frame and key) then return end
+    local store = PositionStore()
+    local pos   = store and store[key]
+    if not pos then
+        UI.NormalizeFrameAnchor(frame)
+        return
+    end
+
+    local opts = movableOpts[key]
+    if opts and opts.size and pos.w and pos.h then
+        frame:SetSize(math.max(pos.w, opts.minW or 1), math.max(pos.h, opts.minH or 1))
+    end
+
+    local w, h = frame:GetSize()
+    local x, y = UI.ClampFrameOffsets(pos.x, pos.y, w, h, UIParent:GetWidth(), UIParent:GetHeight())
+    if not x then return end
+    frame:ClearAllPoints()
+    frame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", x, y)
+    frame:SetSize(w, h)
+end
+
+--- Macht frame verschiebbar und lässt es seine Position merken.
+---
+--- Baut den Mover-Streifen nach Regel A selbst und gibt ihn zurück; die Knöpfe der
+--- Titelzeile liegen danach unter ihm und müssen per UI.RaiseAboveMover angehoben
+--- werden, sonst nehmen sie keine Klicks mehr an.
+---
+--- @param frame Frame
+--- @param key   string      Schlüssel unter settings.framePositions
+--- @param opts  table|nil   { size=bool, minW=number, minH=number, moverHeight=number }
+--- @return Frame  der Mover-Streifen
+function UI.RegisterMovableFrame(frame, key, opts)
+    if not (frame and key) then return nil end
+    opts = opts or {}
+    movableFrames[key] = frame
+    movableOpts[key]   = opts
+
+    frame:SetMovable(true)
+    frame:EnableMouse(true)
+    frame:SetClampedToScreen(true)
+
+    local mover = CreateFrame("Frame", nil, frame)
+    mover:SetPoint("TOPLEFT",  frame, "TOPLEFT",  0, 0)
+    mover:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, 0)
+    mover:SetHeight(opts.moverHeight or 22)
+    mover:SetFrameLevel(frame:GetFrameLevel() + 1)
+    mover:EnableMouse(true)
+    mover:SetScript("OnMouseDown", function(_, button)
+        if button ~= "LeftButton" then return end
+        frame:StartMoving()
+    end)
+    mover:SetScript("OnMouseUp", function(_, button)
+        if button ~= "LeftButton" then return end
+        frame:StopMovingOrSizing()
+        UI.SaveFramePosition(frame, key)
+    end)
+
+    -- Nur wiederherstellen, nicht beim Verstecken sichern. CreateFrame liefert ein
+    -- sichtbares Frame, das die Aufbau-Funktionen anschließend verstecken — ein
+    -- OnHide-Hook liefe also mitten im Konstruktor, während das Fenster noch auf
+    -- seinem Default-Anker steht, und überschriebe die gespeicherte Position mit dem
+    -- Default. Gesichert wird stattdessen beim Loslassen des Streifens und beim
+    -- Ausloggen; öfter ändert sich eine Position nicht.
+    frame:HookScript("OnShow", function() UI.RestoreFramePosition(frame, key) end)
+
+    return mover
+end
+
+--- Hebt Titelzeilen-Widgets über den Mover-Streifen, damit sie klickbar bleiben.
+--- @param mover Frame  Rückgabewert von UI.RegisterMovableFrame
+--- @param ...   Frame  beliebig viele Widgets in der Titelzeile
+function UI.RaiseAboveMover(mover, ...)
+    if not mover then return end
+    local level = mover:GetFrameLevel() + 1
+    for i = 1, select("#", ...) do
+        local widget = select(i, ...)
+        if widget and widget.SetFrameLevel then widget:SetFrameLevel(level) end
+    end
+end
+
+--- Sichert die Position aller registrierten Fenster. Aufruf bei PLAYER_LOGOUT.
+function UI.SaveAllFramePositions()
+    for key, frame in pairs(movableFrames) do
+        UI.SaveFramePosition(frame, key)
+    end
+end
+
+-- ============================================================
 -- Umbenennen-Dialog
 -- ============================================================
 

@@ -158,30 +158,17 @@ function UI.BuildMainFrame()
     mainFrame = CreateFrame("Frame", "GuildLootMainFrame", UIParent, "BasicFrameTemplateWithInset")
     mainFrame:SetSize(FRAME_W, FRAME_H)
     mainFrame:SetPoint("CENTER")
-    mainFrame:SetMovable(true)
-    mainFrame:EnableMouse(true)
     mainFrame:SetToplevel(true)
 
     mainFrame:SetResizable(true)
     mainFrame:SetResizeBounds(720, 500, 1400, 1000)
 
-    -- Titelzeile als Move-Zone (AceGUI-Muster: kein RegisterForDrag auf dem Hauptframe,
-    -- damit StartMoving und StartSizing nie gleichzeitig auf demselben Frame aktiv sind)
-    local mover = CreateFrame("Frame", nil, mainFrame)
-    mover:SetPoint("TOPLEFT",  mainFrame, "TOPLEFT",  0, 0)
-    mover:SetPoint("TOPRIGHT", mainFrame, "TOPRIGHT", 0, 0)
-    mover:SetHeight(22)
-    mover:SetFrameLevel(mainFrame:GetFrameLevel() + 1)
-    mover:EnableMouse(true)
-    mover:SetScript("OnMouseDown", function(self, button)
-        if button ~= "LeftButton" then return end
-        mainFrame:StartMoving()
-    end)
-    mover:SetScript("OnMouseUp", function(self, button)
-        if button ~= "LeftButton" then return end
-        mainFrame:StopMovingOrSizing()
-        if UI.SavePosition then UI.SavePosition() end
-    end)
+    -- Verschieben, Position und Größe: gemeinsamer Code in UI_Common.lua.
+    -- Der Mover-Streifen über der Titelzeile kommt von dort — Knöpfe in der Titelzeile
+    -- müssen darüber gehoben werden (UI.RaiseAboveMover weiter unten).
+    local mover = UI.RegisterMovableFrame(mainFrame, "main", {
+        size = true, minW = 720, minH = 500,
+    })
 
     -- Resize-Grip (untere rechte Ecke)
     local resizeGrip = CreateFrame("Button", nil, mainFrame)
@@ -210,9 +197,11 @@ function UI.BuildMainFrame()
         if resizeStartW and resizeStartH and math.abs(w - resizeStartW) < 2 and math.abs(h - resizeStartH) < 2 then
             mainFrame:SetSize(resizeStartW, resizeStartH)
         end
-        if UI.SavePosition then UI.SavePosition() end
+        -- Ankert über UI.NormalizeFrameAnchor um: ohne das bleibt der Zwei-Punkt-Anker
+        -- stehen, den StartSizing hinterlassen hat, und das Fenster springt beim
+        -- nächsten Verschieben (b589c9d/7f8caaa).
+        UI.SavePosition()
     end)
-
 
 
     -- Titelzeile
@@ -301,9 +290,9 @@ function UI.BuildMainFrame()
         GL.Print("Master Looter: " .. (GuildLootDB.settings.isMasterLooter and "|cff00ff00ON|r" or "|cffff4444OFF|r"))
         if UI.RefreshLootTab then UI.RefreshLootTab() end
     end)
-    -- mover liegt auf GetFrameLevel()+1 → interaktive Buttons darüber heben
-    mlCheck:SetFrameLevel(mover:GetFrameLevel() + 1)
-    settingsBtn:SetFrameLevel(mover:GetFrameLevel() + 1)
+    -- Der Mover-Streifen liegt über der Titelzeile und würde diese Knöpfe sonst
+    -- verschlucken. minBtn hebt sich weiter unten selbst noch eine Stufe höher.
+    UI.RaiseAboveMover(mover, mlCheck, settingsBtn, mainFrame.CloseButton)
     UI.mlCheck = mlCheck
 
     -- Addon-Icon (ersetzt den «-Andocken-Button, ragt oben links aus dem Frame)
@@ -640,15 +629,14 @@ end
 -- Position speichern / wiederherstellen
 -- ============================================================
 
+--- Position und Größe des Hauptfensters sichern.
+--- Bleibt als eigene Funktion bestehen, weil UI.Dock() und der Resize-Grip sie rufen.
 function UI.SavePosition()
     if not mainFrame then return end
-    local x = mainFrame:GetLeft()
-    local y = mainFrame:GetTop() - UIParent:GetTop()
-    local w, h = mainFrame:GetSize()
-    GuildLootDB.settings.framePos  = { x = x, y = y }
-    GuildLootDB.settings.frameSize = { w = w, h = h }
+    UI.SaveFramePosition(mainFrame, "main")
 end
 
+--- Angedockt: Dock-Tab statt Hauptfenster. Sonst: gespeicherte Position wiederherstellen.
 function UI.LoadPosition()
     if not mainFrame then return end
     if GuildLootDB.settings.minimized then
@@ -658,17 +646,6 @@ function UI.LoadPosition()
         UI.RefreshDockTab()
         if GL.IsValidZone() then UI.dockTab:Show() end
     else
-        -- Position wiederherstellen
-        local sz = GuildLootDB.settings.frameSize
-        if sz then
-            local w = math.max(sz.w or FRAME_W, 720)
-            local h = math.max(sz.h or FRAME_H, 500)
-            mainFrame:SetSize(w, h)
-        end
-        local pos = GuildLootDB.settings.framePos
-        if pos then
-            mainFrame:ClearAllPoints()
-            mainFrame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", pos.x or 0, pos.y or 0)
-        end
+        UI.RestoreFramePosition(mainFrame, "main")
     end
 end
