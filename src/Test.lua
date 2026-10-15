@@ -18,7 +18,7 @@ function GL.Test.AddPendingItem()
         for slot = 1, C_Container.GetContainerNumSlots(bag) do
             local link = C_Container.GetContainerItemLink(bag, slot)
             if link then
-                local name, _, rarity, _, _, _, _, _, equipLoc = GetItemInfo(link)
+                local name, _, rarity, _, _, _, _, _, equipLoc = GL.GetItemInfo(link)
                 local isEquip = equipLoc and equipLoc ~= "" and equipLoc ~= "INVTYPE_NON_EQUIP_IGNORE"
                 if rarity and rarity >= 4 and isEquip then
                     table.insert(epicItems, { link = link, name = name, equipLoc = equipLoc })
@@ -34,7 +34,7 @@ function GL.Test.AddPendingItem()
 
     local chosen = epicItems[math.random(#epicItems)]
     local itemID = tonumber(chosen.link:match("item:(%d+)"))
-    local _, _, rarity = GetItemInfo(chosen.link)
+    local _, _, rarity = GL.GetItemInfo(chosen.link)
     local item = {
         link    = chosen.link,
         name    = chosen.name or "?",
@@ -69,7 +69,7 @@ function GL.Test.SimulatePrio()
         for slot = 1, C_Container.GetContainerNumSlots(bag) do
             local link = C_Container.GetContainerItemLink(bag, slot)
             if link then
-                local name, _, rarity, _, _, _, _, _, equipLoc = GetItemInfo(link)
+                local name, _, rarity, _, _, _, _, _, equipLoc = GL.GetItemInfo(link)
                 local isEquip = equipLoc and equipLoc ~= "" and equipLoc ~= "INVTYPE_NON_EQUIP_IGNORE"
                 if rarity and rarity >= 4 and isEquip then
                     chosen = { link = link, name = name, equipLoc = equipLoc, quality = rarity }
@@ -86,7 +86,7 @@ function GL.Test.SimulatePrio()
     end
 
     local itemID  = tonumber(chosen.link:match("item:(%d+)"))
-    local _, _, _, _, _, _, _, _, equipLoc = GetItemInfo(chosen.link)
+    local _, _, _, _, _, _, _, _, equipLoc = GL.GetItemInfo(chosen.link)
     local category = GL.GetItemCategory(itemID, equipLoc or chosen.equipLoc, chosen.quality)
 
     GL.Loot.ClearCurrentItem()
@@ -140,7 +140,7 @@ function GL.Test.SimulateRoll()
             for slot = 1, C_Container.GetContainerNumSlots(bag) do
                 local link = C_Container.GetContainerItemLink(bag, slot)
                 if link then
-                    local name, _, rarity, _, _, _, _, _, equipLoc = GetItemInfo(link)
+                    local name, _, rarity, _, _, _, _, _, equipLoc = GL.GetItemInfo(link)
                     local isEquip = equipLoc and equipLoc ~= "" and equipLoc ~= "INVTYPE_NON_EQUIP_IGNORE"
                     if rarity and rarity >= 4 and isEquip then
                         chosen = { link = link, name = name, equipLoc = equipLoc, quality = rarity }
@@ -157,7 +157,7 @@ function GL.Test.SimulateRoll()
         end
 
         local itemID   = tonumber(chosen.link:match("item:(%d+)"))
-        local _, _, _, _, _, _, _, _, equipLoc = GetItemInfo(chosen.link)
+        local _, _, _, _, _, _, _, _, equipLoc = GL.GetItemInfo(chosen.link)
         local category = GL.GetItemCategory(itemID, equipLoc or chosen.equipLoc, chosen.quality)
 
         -- Prio-Timer stoppen bevor currentItem überschrieben wird
@@ -225,7 +225,7 @@ function GL.Test.AddLootEntry()
         for slot = 1, C_Container.GetContainerNumSlots(bag) do
             local link = C_Container.GetContainerItemLink(bag, slot)
             if link then
-                local name, _, rarity, _, _, _, _, _, equipLoc = GetItemInfo(link)
+                local name, _, rarity, _, _, _, _, _, equipLoc = GL.GetItemInfo(link)
                 local isEquip = equipLoc and equipLoc ~= "" and equipLoc ~= "INVTYPE_NON_EQUIP_IGNORE"
                 if rarity and rarity >= 4 and isEquip then
                     chosen = { link = link, name = name, equipLoc = equipLoc, quality = rarity }
@@ -242,7 +242,7 @@ function GL.Test.AddLootEntry()
     end
 
     local itemID   = tonumber(chosen.link:match("item:(%d+)"))
-    local _, _, _, _, _, _, _, _, equipLoc = GetItemInfo(chosen.link)
+    local _, _, _, _, _, _, _, _, equipLoc = GL.GetItemInfo(chosen.link)
     local category = GL.GetItemCategory(itemID, equipLoc or chosen.equipLoc, chosen.quality)
     local diff     = GL.DetectDifficulty() or GuildLootDB.currentRaid.difficulty or "N"
 
@@ -297,7 +297,7 @@ function GL.Test.SimulatePending(count)
         for slot = 1, C_Container.GetContainerNumSlots(bag) do
             local link = C_Container.GetContainerItemLink(bag, slot)
             if link then
-                local name, _, rarity, _, _, _, _, _, equipLoc = GetItemInfo(link)
+                local name, _, rarity, _, _, _, _, _, equipLoc = GL.GetItemInfo(link)
                 local isEquip = equipLoc and equipLoc ~= "" and equipLoc ~= "INVTYPE_NON_EQUIP_IGNORE"
                 if rarity and rarity >= 4 and isEquip then
                     chosen = { link = link, name = name, equipLoc = equipLoc, quality = rarity }
@@ -312,7 +312,7 @@ function GL.Test.SimulatePending(count)
         return
     end
     local itemID   = tonumber(chosen.link:match("item:(%d+)"))
-    local _, _, _, _, _, _, _, _, equipLoc = GetItemInfo(chosen.link)
+    local _, _, _, _, _, _, _, _, equipLoc = GL.GetItemInfo(chosen.link)
     local category = GL.GetItemCategory(itemID, equipLoc or chosen.equipLoc, chosen.quality)
     local realm = GetRealmName() or "Realm"
     local pl = GuildLootDB.currentRaid.pendingLoot
@@ -362,7 +362,7 @@ function GL.Test.SimulateMultiRoll(count)
         for slot = 1, C_Container.GetContainerNumSlots(bag) do
             local link = C_Container.GetContainerItemLink(bag, slot)
             if link then
-                local name, _, rarity, _, _, _, _, _, equipLoc = GetItemInfo(link)
+                local name, _, rarity, _, _, _, _, _, equipLoc = GL.GetItemInfo(link)
                 local isEquip = equipLoc and equipLoc ~= "" and equipLoc ~= "INVTYPE_NON_EQUIP_IGNORE"
                 if rarity and rarity >= 4 and isEquip then
                     chosen = { link = link, name = name, equipLoc = equipLoc, quality = rarity }
@@ -379,7 +379,7 @@ function GL.Test.SimulateMultiRoll(count)
     end
 
     local itemID   = tonumber(chosen.link:match("item:(%d+)"))
-    local _, _, _, _, _, _, _, _, equipLoc = GetItemInfo(chosen.link)
+    local _, _, _, _, _, _, _, _, equipLoc = GL.GetItemInfo(chosen.link)
     local category = GL.GetItemCategory(itemID, equipLoc or chosen.equipLoc, chosen.quality)
 
     -- pendingLoot mit `count` Kopien füllen

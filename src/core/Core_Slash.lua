@@ -55,7 +55,7 @@ SlashCmdList["REQUIEMRAIDTOOLS"] = function(input)
             for slot = 1, C_Container.GetContainerNumSlots(bag) do
                 local info = C_Container.GetContainerItemInfo(bag, slot)
                 if info and info.hyperlink then
-                    local _, _, _, _, _, _, subType, _, equipLoc = GetItemInfo(info.hyperlink)
+                    local _, _, _, _, _, _, subType, _, equipLoc = GL.GetItemInfo(info.hyperlink)
                     if equipLoc and equipLoc ~= "" and equipLoc ~= "INVTYPE_BAG" then
                         simLink = info.hyperlink
                         simCat  = GL.CategorizeItem and GL.CategorizeItem(info.hyperlink, equipLoc, subType) or "other"

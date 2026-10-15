@@ -220,7 +220,7 @@ function UI.BuildLootAnnounceWidget(parent, yStart)
     --- Item anzeigen: Icon, Name, Prio-Buttons auffrischen.
     function w:SetItem(link)
         w._link = link
-        local texture = select(10, GetItemInfo(link))
+        local texture = select(10, GL.GetItemInfo(link))
         icon:SetTexture(texture or "Interface\\Icons\\INV_Misc_QuestionMark")
         iconBtn:Show()
         nameFS:SetText(GL.ColoredItemName(link))

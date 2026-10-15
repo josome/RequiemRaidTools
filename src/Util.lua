@@ -5,6 +5,29 @@ GuildLoot = GuildLoot or {}
 local GL = GuildLoot
 
 -- ============================================================
+-- WoW-API-Kompatibilität
+-- ============================================================
+-- Patch 12.1.5 hat die globalen Item-Funktionen entfernt (seit 11.0 deprecated).
+-- Alle Aufrufe laufen über diese Wrapper: C_Item zuerst, globale Funktion als Fallback.
+-- Auflösung bei jedem Aufruf (nicht beim Laden), damit Test-Mocks auf _G greifen.
+
+function GL.GetItemInfo(item)
+    if C_Item and C_Item.GetItemInfo then return C_Item.GetItemInfo(item) end
+    if _G.GetItemInfo then return _G.GetItemInfo(item) end
+end
+
+function GL.IsUsableItem(item)
+    if C_Item and C_Item.IsUsableItem then return C_Item.IsUsableItem(item) end
+    if _G.IsUsableItem then return _G.IsUsableItem(item) end
+end
+
+function GL.GetItemQualityColor(quality)
+    if C_Item and C_Item.GetItemQualityColor then return C_Item.GetItemQualityColor(quality) end
+    if _G.GetItemQualityColor then return _G.GetItemQualityColor(quality) end
+    return 1, 1, 1
+end
+
+-- ============================================================
 -- Datum / Kalenderwoche
 -- ============================================================
 
@@ -80,7 +103,7 @@ function GL.GetItemCategory(itemID, itemEquipLoc, quality)
     -- 2. Nicht-ausrüstbare Token (kein Equip-Slot, Epic+)
     if (itemEquipLoc == "" or itemEquipLoc == "INVTYPE_NON_EQUIP_IGNORE" or itemEquipLoc == "INVTYPE_NON_EQUIP") and quality >= 4 then
         -- 2a. Omni-Settoken: Name enthält "curio" (EN) oder "kuriosit" (DE), case-insensitive
-        local itemName = GetItemInfo(itemID)
+        local itemName = GL.GetItemInfo(itemID)
         if itemName then
             local ln = itemName:lower()
             if ln:find("curio") or ln:find("kuriosit") then
@@ -351,7 +374,7 @@ function GL.PopupFilterMatches(link, category, skipUsableCheck)
     -- Waffen: usable → immer zeigen; nicht-usable → nonUsableWeapon-Filter
     if category == "weapons" then
         if not skipUsableCheck then
-            local isUsable = IsUsableItem(link)
+            local isUsable = GL.IsUsableItem(link)
             if isUsable ~= false then return true end   -- usable oder noch nicht gecacht → zeigen
         end
         return f.nonUsableWeapon ~= false               -- nicht-usable → Filter prüfen
@@ -365,7 +388,7 @@ function GL.PopupFilterMatches(link, category, skipUsableCheck)
     --   • Legacy-Items (z.B. Shadowlands in Midnight) sind auf fremden Clients oft nicht gecacht →
     --     GetItemInfo liefert nil, IsUsableItem liefert false → fälschlicherweise blockiert.
     --   • Die Checkbox-Filter (cloth/leather/mail/plate/other) sind die korrekte Steuerung.
-    local _, _, _, _, _, _, itemSubType, _, itemEquipLoc = GetItemInfo(link)
+    local _, _, _, _, _, _, itemSubType, _, itemEquipLoc = GL.GetItemInfo(link)
     local slotKey = EQUIPLOC_FILTER[itemEquipLoc]
     if slotKey then return f[slotKey] ~= false end
 
@@ -642,9 +665,9 @@ end
 function GL.ColoredItemName(link)
     if not link then return "?" end
     local name = link:match("|h%[(.-)%]|h") or link:match("^%[(.-)%]$") or link
-    local _, _, quality = GetItemInfo(link)
+    local _, _, quality = GL.GetItemInfo(link)
     if quality then
-        local r, g, b = GetItemQualityColor(quality)
+        local r, g, b = GL.GetItemQualityColor(quality)
         return string.format("|cff%02x%02x%02x", r * 255, g * 255, b * 255) .. name .. "|r"
     end
     return "|cffA335EE" .. name .. "|r"

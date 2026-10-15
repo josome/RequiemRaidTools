@@ -31,7 +31,7 @@ end
 
 -- Farbcode aus Item-Qualität (0–6), Fallback Epic-Lila
 local function ItemQualityHex(quality)
-    local r, g, b = GetItemQualityColor(quality or 4)
+    local r, g, b = GL.GetItemQualityColor(quality or 4)
     if r then
         return string.format("|cff%02x%02x%02x", r * 255, g * 255, b * 255)
     end

@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.0.5.4
+
+**Bug Fixes**
+- Fixed the addon for WoW patch 12.1.5. The patch removed several item functions the addon relied on, so no loot appeared in the loot list — neither from boss kills nor when adding an item manually. Item names, icons, quality colours and the usable-weapon filter work again.
+
+**Internal**
+- All item lookups now go through the current `C_Item` API, with a fallback for older clients.
+- Added interface version 120105 to the TOC.
+- New source check that fails the build if one of the removed item functions is called directly again (474 tests total).
+
 ## v1.0.5.2
 
 **Bug Fixes**

@@ -156,4 +156,29 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
             "Anker-Normalisierung dupliziert statt UI.NormalizeFrameAnchor zu rufen: "
             .. table.concat(hits, " | "))
     end
+
+    -- ============================================================
+    -- Entfernte WoW-API: Patch 12.1.5 hat die globalen Item-Funktionen gestrichen
+    -- ============================================================
+
+    -- Ein direkter Aufruf wirft im Spiel "attempt to call a nil value" — in 12.1.5
+    -- brach daran Loot-Erkennung und manuelles Hinzufügen. Ersatz: die Wrapper in
+    -- Util.lua (GL.GetItemInfo usw.), die C_Item nutzen.
+    local REMOVED_ITEM_API = { "GetItemInfo", "IsUsableItem", "GetItemQualityColor" }
+
+    --- Regel: kein Aufruf als nacktes Global. Erlaubt bleibt alles mit Präfix
+    --- (GL.GetItemInfo, C_Item.GetItemInfo, _G.GetItemInfo) — die Zeichenklasse vor
+    --- dem Namen schließt Punkt, Doppelpunkt und Bezeichnerzeichen aus.
+    function Tests:testNoRemovedGlobalItemApi()
+        local hits = Scan(function(line)
+            local padded = " " .. line
+            for _, fn in ipairs(REMOVED_ITEM_API) do
+                if padded:match("[^%w_%.:]" .. fn .. "%s*%(") then return true end
+            end
+            return false
+        end)
+        AreEqual(0, #hits,
+            "Entfernte globale Item-API direkt aufgerufen (GL.-Wrapper nutzen): "
+            .. table.concat(hits, " | "))
+    end
 end)

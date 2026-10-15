@@ -17,6 +17,7 @@
   - [testNoLegacyDropdownApi](#testnolegacydropdownapi)
   - [testNoHandWrittenFrameMoving](#testnohandwrittenframemoving)
   - [testNoDuplicateAnchorNormalization](#testnoduplicateanchornormalization)
+  - [testNoRemovedGlobalItemApi](#testnoremovedglobalitemapi)
 - [Was diese Tests nicht abdecken](#was-diese-tests-nicht-abdecken)
 - [Wenn ein Test rot wird](#wenn-ein-test-rot-wird)
 
@@ -33,12 +34,14 @@
 
 ## Testziel
 
-Verhindern, dass bekannte Fehlermuster zurückkehren. Zwei Gruppen:
+Verhindern, dass bekannte Fehlermuster zurückkehren. Drei Gruppen:
 
 1. **Taint** (`testNoWritesToForeignGlobals`, `testNoLegacyDropdownApi`) — siehe unten.
 2. **Fenster-Position** (`testNoHandWrittenFrameMoving`, `testNoDuplicateAnchorNormalization`) —
    drei Bugs beim Verschieben und Skalieren, von denen zwei nach ihrer Behebung bei einem
    späteren Umbau wieder verlorengingen. Details bei den jeweiligen Testfällen.
+3. **Entfernte WoW-API** (`testNoRemovedGlobalItemApi`) — Patch 12.1.5 hat die globalen
+   Item-Funktionen gestrichen; direkte Aufrufe legten Loot-Erkennung und manuelles Hinzufügen lahm.
 
 ### Taint
 
@@ -146,6 +149,21 @@ Beide Fixes gingen später beim Umbau auf den Mover-Streifen wieder verloren. De
 Umankern jetzt nur noch an einer Stelle, in `UI.NormalizeFrameAnchor`, und diese Regel hält es
 dort.
 
+### testNoRemovedGlobalItemApi
+
+Meldet jeden Aufruf von `GetItemInfo(`, `IsUsableItem(` oder `GetItemQualityColor(` als nacktes
+Global. Mit Präfix bleibt alles erlaubt: `GL.GetItemInfo`, `C_Item.GetItemInfo`, `_G.GetItemInfo`
+— geprüft wird mit `[^%w_%.:]` vor dem Funktionsnamen; die Zeile wird dafür vorn mit einem
+Leerzeichen aufgefüllt, damit auch ein Aufruf am Zeilenanfang erkannt wird.
+
+| Vorfall | Muster |
+|---|---|
+| Patch 12.1.5 (v1.0.5.4) | `GetItemInfo`, `IsUsableItem`, `GetItemQualityColor` sind im Spiel `nil` — „attempt to call a nil value“ bei Loot-Erkennung und manuellem Hinzufügen |
+
+Ersatz sind die Wrapper in `src/Util.lua` (Abschnitt „WoW-API-Kompatibilität“): `C_Item` zuerst,
+globale Funktion als Fallback. Die Auflösung passiert bei jedem Aufruf, damit die Test-Mocks auf
+`_G.GetItemInfo` weiter greifen.
+
 ---
 
 ## Was diese Tests nicht abdecken
@@ -177,3 +195,6 @@ Die Fehlermeldung nennt Datei, Zeilennummer und Inhalt jedes Verstoßes.
 - **Dupliziertes Umankern:** `UI.NormalizeFrameAnchor(frame)` rufen statt `ClearAllPoints` +
   `SetPoint` selbst zu schreiben. Wird nur die Position gebraucht, tut es
   `UI.SaveFramePosition` / `UI.RestoreFramePosition`.
+- **Entfernte Item-API:** `GL.GetItemInfo` / `GL.IsUsableItem` / `GL.GetItemQualityColor` rufen.
+  Entfernt Blizzard weitere Funktionen, gehört ein neuer Wrapper nach `src/Util.lua` und der
+  Name in `REMOVED_ITEM_API`.

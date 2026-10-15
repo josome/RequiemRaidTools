@@ -92,7 +92,7 @@ function Loot.ReleaseItem(itemLink)
     end
 
     -- Item-Infos laden
-    local name, link, quality, iLevel, _, _, _, _, equipLoc, _, _, _, _ = GetItemInfo(itemLink)
+    local name, link, quality, iLevel, _, _, _, _, equipLoc, _, _, _, _ = GL.GetItemInfo(itemLink)
     if not name then
         -- Deferred: warten auf GET_ITEM_INFO_RECEIVED
         pendingActivation = itemLink
@@ -122,7 +122,7 @@ function Loot.OnItemInfoReceived(itemID)
     if pendingActivation then
         local storedID = tonumber(pendingActivation:match("item:(%d+)"))
         if storedID == itemID then
-            local name, link, quality, iLevel, _, _, _, _, equipLoc = GetItemInfo(pendingActivation)
+            local name, link, quality, iLevel, _, _, _, _, equipLoc = GL.GetItemInfo(pendingActivation)
             if name then
                 local savedLink = pendingActivation
                 pendingActivation = nil
@@ -136,7 +136,7 @@ function Loot.OnItemInfoReceived(itemID)
     for i = #Loot._deferredPendingItems, 1, -1 do
         local di = Loot._deferredPendingItems[i]
         if di.itemID == itemID then
-            local name, _, quality, _, _, _, _, _, equipLoc = GetItemInfo(di.link)
+            local name, _, quality, _, _, _, _, _, equipLoc = GL.GetItemInfo(di.link)
             if equipLoc ~= nil then
                 if di.manual then
                     local category = GL.GetItemCategory(di.itemID, equipLoc, quality or 0)
@@ -448,7 +448,7 @@ function Loot.OnCommItemActivate(link, category)
     -- → Filter kann Rüstungstyp nicht erkennen. Deshalb: wenn nicht gecacht, auf
     -- GET_ITEM_INFO_RECEIVED warten und dann erneut prüfen.
     if GL.UI and GL.UI.ShowPlayerPopup then
-        local _, _, _, _, _, _, itemSubType = GetItemInfo(link)
+        local _, _, _, _, _, _, itemSubType = GL.GetItemInfo(link)
         if itemSubType ~= nil then
             -- Item-Daten sofort verfügbar → Filter direkt auswerten
             if GL.PopupFilterMatches and GL.PopupFilterMatches(link, category) then
@@ -459,7 +459,7 @@ function Loot.OnCommItemActivate(link, category)
         else
             -- Noch nicht gecacht → Laden anstoßen, beide zurückhalten
             pendingObserverActivation = { link = link, category = category }
-            GetItemInfo(link)  -- löst asynchrones Laden aus
+            GL.GetItemInfo(link)  -- löst asynchrones Laden aus
         end
     end
 end

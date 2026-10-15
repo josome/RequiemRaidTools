@@ -122,7 +122,7 @@ function Loot.AddItemManually(link)
     local idx = db.activeContainerIdx
     local sid = (idx and db.raidContainers and db.raidContainers[idx])
                 and db.raidContainers[idx].id or ""
-    local name, _, quality, _, _, _, _, _, equipLoc = GetItemInfo(link)
+    local name, _, quality, _, _, _, _, _, equipLoc = GL.GetItemInfo(link)
     if not name then
         -- Item-Info noch nicht gecacht → deferred
         table.insert(Loot._deferredPendingItems, { link = link, itemID = itemID, quality = 0, name = "?", manual = true,
@@ -143,7 +143,7 @@ end
 -- Prüft ob ein Item Warbound ist (nicht tradebar → uninteressant für Loot-Verteilung)
 -- Enum.ItemBind: 8 = ToBnetAccount, 9 = ToBnetAccountUntilEquipped (warcraft.wiki.gg/wiki/Enum.ItemBind)
 local function IsWarboundItem(itemID)
-    local _, _, _, _, _, _, _, _, _, _, _, _, _, bindType = GetItemInfo(itemID)
+    local _, _, _, _, _, _, _, _, _, _, _, _, _, bindType = GL.GetItemInfo(itemID)
     return bindType == 8 or bindType == 9
 end
 
@@ -220,7 +220,7 @@ function Loot.OnLootOpened()
         local boss = GuildLootDB.currentRaid.lastBoss
         for _, item in ipairs(toAdd) do
             item.boss = boss
-            local _, _, _, _, _, _, _, _, equipLoc = GetItemInfo(item.link)
+            local _, _, _, _, _, _, _, _, equipLoc = GL.GetItemInfo(item.link)
             if equipLoc ~= nil then
                 Loot.TryAddPendingItem(item, equipLoc)
             else
@@ -256,7 +256,7 @@ function Loot.OnLootRollStart(rollID)
     if not quality or quality < minQ then return end
 
     -- equipLoc für Kategorie-Erkennung (GetItemInfo ist gecacht wenn Item bekannt)
-    local _, _, _, _, _, _, _, _, equipLoc = GetItemInfo(link)
+    local _, _, _, _, _, _, _, _, equipLoc = GL.GetItemInfo(link)
     local item = { link = link, name = name or "?", itemID = itemID, quality = quality, boss = GuildLootDB.currentRaid.lastBoss }
 
     if equipLoc ~= nil then

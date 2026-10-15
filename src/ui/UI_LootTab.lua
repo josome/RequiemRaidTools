@@ -452,7 +452,7 @@ function UI.RefreshLootTab()
         local pendingIconTex = pendingIcon:CreateTexture(nil, "ARTWORK")
         pendingIconTex:SetAllPoints()
         pendingIconTex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-        local pIcon = select(10, GetItemInfo(item.link))
+        local pIcon = select(10, GL.GetItemInfo(item.link))
         if pIcon then pendingIconTex:SetTexture(pIcon) end
         pendingIcon:EnableMouse(true)
         pendingIcon:SetScript("OnEnter", function(self)
@@ -514,7 +514,7 @@ function UI.RefreshLootTab()
         resetItemBtn:SetEnabled(isML)
         if trashItemBtn then trashItemBtn:SetShown(true) ; trashItemBtn:SetEnabled(isML) end
         if UI.lootPanel.activeItemIconTex then
-            local icon = select(10, GetItemInfo(ci.link))
+            local icon = select(10, GL.GetItemInfo(ci.link))
             UI.lootPanel.activeItemIconTex:SetTexture(icon or "Interface\\Icons\\INV_Misc_QuestionMark")
         end
     else
@@ -809,7 +809,7 @@ function UI.RefreshSessionLoot()
             row.diffLbl:SetText(ColorDiff(entry.difficulty))
             row.itemLbl:SetText(entry.item or "?")
 
-            local icon = select(10, GetItemInfo(entry.item or ""))
+            local icon = select(10, GL.GetItemInfo(entry.item or ""))
             row.iconTex:SetTexture(icon or nil)
 
             row.iconFrame:SetScript("OnEnter", function(self)
