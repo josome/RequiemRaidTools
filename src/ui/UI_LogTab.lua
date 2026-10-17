@@ -71,7 +71,10 @@ local function ShowPlayerPicker(entry)
         lbl:SetText(name)   -- voller Name inkl. Realm
         local capName = name
         btn:SetScript("OnClick", function()
+            local oldName = entry.player
             entry.player = capName
+            -- Auto-Trade folgt automatisch (Empfänger wird erst beim Handel aufgelöst)
+            if GL.TradeLog then GL.TradeLog.OnReassign(entry, oldName, capName) end
             playerPickerPanel:Hide()
             GL.UI.RefreshLogTab()
         end)
@@ -104,8 +107,42 @@ function UI.BuildLogPanel(parent)
         content:SetWidth(self:GetWidth())
     end)
     panel.content = content
+    panel.scroll  = scroll
+    UI.BuildLogToolbar(panel)
 
     return panel
+end
+
+-- ============================================================
+-- Werkzeugleiste: Zugang zum Auto-Trade-Fenster
+-- ============================================================
+
+local TOOLBAR_H = 26
+
+--- Leiste über der Log-Liste, für alle sichtbar. Die Liste beginnt darunter.
+function UI.BuildLogToolbar(panel)
+    local bar = CreateFrame("Frame", nil, panel)
+    bar:SetPoint("TOPLEFT",  panel, "TOPLEFT",  4, -2)
+    bar:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -4, -2)
+    bar:SetHeight(TOOLBAR_H - 4)
+
+    local tradeBtn = CreateFrame("Button", nil, bar, "UIPanelButtonTemplate")
+    tradeBtn:SetSize(110, 20)
+    tradeBtn:SetPoint("RIGHT", bar, "RIGHT", -22, 0)
+    tradeBtn:SetText("Auto-Trade")
+    tradeBtn:SetScript("OnClick", function()
+        if UI.ToggleTradeDebug then UI.ToggleTradeDebug() end
+    end)
+    tradeBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+        GameTooltip:SetText("Auto-Trade", 1, 1, 1)
+        GameTooltip:AddLine("Status jeder Zuteilung im Auto-Trade, Empfänger umleiten, Handel von Hand vorbereiten, Ereignisprotokoll.", 0.7, 0.7, 0.7, true)
+        GameTooltip:Show()
+    end)
+    tradeBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    panel.scroll:SetPoint("TOPLEFT", panel, "TOPLEFT", 4, -TOOLBAR_H)
+    panel.toolbar = bar
 end
 
 -- ============================================================

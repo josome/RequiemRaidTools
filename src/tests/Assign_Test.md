@@ -15,6 +15,8 @@
   - [testWritesLootLog](#testwriteslootlog)
   - [testRemovesFromPending](#testremovesfrompending)
   - [testWritesPlayerRecord](#testwritesplayerrecord)
+  - [testAssignTracksTrade](#testassigntrackstrade)
+  - [testAssignToSelfNotQueued](#testassigntoselfnotqueued)
   - [testCommAssignObserver](#testcommassignobserver)
 - [Was diese Tests nicht abdecken](#was-diese-tests-nicht-abdecken)
 - [Tests erweitern](#tests-erweitern)
@@ -93,6 +95,27 @@ Der Spieler kommt über den echten Chat-Parser (`OnChatMessage`) in `candidates`
 
 ---
 
+### `testAssignTracksTrade`
+
+**Testet:** Zuteilung durch den ML legt den Auto-Trade-Zustand direkt am lootLog-Eintrag an (`entry.trade`), damit er `/reload` übersteht. `Loot._pendingTrades` ist nur noch ein Spiegel davon.
+
+**Schritte:**
+1. `AssignLootConfirm("Myriella-Malfurion", "H")` aufrufen
+2. Prüfen: `lootLog[1].trade.status == "queued"`
+3. Prüfen: `_pendingTrades[1]` hat itemID, Kurzname `Myriella` und die Referenz auf den lootLog-Eintrag
+
+---
+
+### `testAssignToSelfNotQueued`
+
+**Testet (B5):** Teilt sich der ML selbst zu, kommt das Item nicht in die Auto-Trade-Queue — mit sich selbst kann man nicht handeln, der Eintrag hinge sonst ewig.
+
+**Schritte:**
+1. `AssignLootConfirm("TestPlayer-TestRealm", "H")` (der `UnitName`-Stub liefert `TestPlayer`)
+2. Prüfen: `trade.status == "self"`, `#_pendingTrades == 0`
+
+---
+
 ### `testCommAssignObserver`
 
 **Testet:** Observer-Pfad (Slim-Sync) — `OnCommAssign` persistiert **keinen**
@@ -111,6 +134,7 @@ Der Spieler kommt über den echten Chat-Parser (`OnChatMessage`) in `candidates`
 |---------|-----------------------|
 | Timer-basierter Prio/Roll-Ablauf | Benötigt WoW-Eventloop (`C_Timer.NewTicker`) |
 | Comm-Übertragung des ASSIGN | → Zuständigkeit der `ReqRT.Comm`-Suite |
+| Ablauf des Auto-Trades selbst | → `ReqRT.Trade` und `ReqRT.TradeLog` |
 | UI-Rendering des Log-Tabs | UI-Layer ist nicht Gegenstand der Assign-Tests |
 
 ---

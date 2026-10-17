@@ -1,5 +1,26 @@
 # Changelog
 
+## v1.0.5.9
+
+**New**
+- Auto-Trade window (button "Auto-Trade" in the Log tab, or `/reqrt tradelog`): every item assigned in the current Raid Session with its auto-trade status — waiting, in trade, traded, cancelled, bound, not in bags or expired — plus attempts and the time left in the 2-hour trade window.
+- Fix trades by hand: click the recipient to send an item to someone else (the loot assignment itself stays unchanged), mark an entry as done, put it back into the queue or remove it.
+- Prepare a trade manually: drag an item from your bags onto the window and pick a player. The auto-trader puts it into the next trade with that player — no loot assignment, no effect on priorities.
+- Event log: every auto-trade step is recorded and kept across reloads. Switch the window to "Events" and use "Copy" to share what happened when a trade went wrong. `/reqrt tradetrace clear` empties it.
+
+- The addon now shows its own icon in the game's AddOns list instead of a question mark.
+
+**Bug Fixes**
+- Assigned items no longer drop out of the auto-trade after a `/reload`, disconnect or crash. The queue is now rebuilt from the saved Raid Session.
+- Reassigning loot in the Log tab now also changes who the auto-trader hands the item to. Previously it still went to the original winner.
+- Trades that completed without the game reporting both sides' accept are no longer treated as cancelled, which led to an already traded item being offered again. The "Trade complete" message now counts as well, even when it arrives after the trade window closed.
+- An item that never made it into the trade window (for example a soulbound copy) is no longer marked as handed over when the trade completes; it stays in the queue.
+- Assigning an item to yourself as loot master no longer leaves it stuck in the auto-trade queue forever.
+
+**Internal**
+- Auto-trade state lives on the loot log entry (`entry.trade`); the JSON export now contains it too.
+- 35 new unit tests (509 total).
+
 ## v1.0.5.4
 
 **Bug Fixes**

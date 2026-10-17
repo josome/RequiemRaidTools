@@ -10,30 +10,43 @@
 
 | Bedingung | Warum |
 |-----------|-------|
+| devMode aktiv | Wie alle Suites — ohne devMode registriert sich die Suite nicht |
 
 ---
 
 ## Testziel
 
 Auto-Handel (`Loot_Trade.lua`): `TRADE_SHOW` → automatisches Einlegen der dem
-Handelspartner zugewiesenen Items, `TRADE_ACCEPT_UPDATE` / `TRADE_CLOSED`.
+Handelspartner zugewiesenen Items, `TRADE_ACCEPT_UPDATE`, Trade-Systemmeldungen und
+`TRADE_CLOSED`. Die Queue kommt aus `GL.TradeLog`, also aus gespeicherten
+Session-Einträgen (`entry.trade`), nicht mehr aus einer flüchtigen Liste.
 
 ```
-OnTradeShow → Partnername ermitteln → bis zu 6 Items aus _pendingTrades
-            → _inTradeItems (Staging) → handelbare Bag-Kopie suchen → ClickTradeButton
-OnTradeClosed → Erfolg: Staging leeren | Abbruch: zurück in _pendingTrades
+OnTradeShow → Partnername ermitteln → TradeLog.EntriesFor(partner) (max. 6)
+            → _inTradeItems (Staging, Status "staged") → handelbare Bag-Kopie suchen → ClickTradeButton
+OnTradeAcceptUpdate → Handelsslots festhalten (Snapshot)
+OnTradeUIMessage(ERR_TRADE_COMPLETE) → zweites Erfolgssignal
+OnTradeClosed → (0,5 s später) FinalizeTrade:
+                Erfolg: nur Items im Snapshot → "traded", Rest bleibt offen
+                Abbruch: "aborted", bleiben in der Queue
 ```
 
 ---
 
 ## Teststrategie
 
-- `ResetTradeState()` — leert `_pendingTrades` + `_inTradeItems`, ruft
-  `OnTradeClosed()` (setzt `_tradeAccepted = false`).
-- `MockBasics()` — stubbt `IsMasterLooter`, `Print`, synchrones `C_Timer.After`,
-  `GetTradePlayerItemInfo` (Slot frei), `ClearCursor`, `ClickTradeButton`,
-  leeres `C_Container`.
-- `MockBagWithItem(itemID)` — Bag 0 Slot 1 enthält das Item.
+- `WithSession(fn)` — frische aktive Raid Session + leeres Trade-Protokoll, stellt
+  DB, Mocks und Trade-Zustand danach wieder her.
+- `Queue(session, {{itemID, player}, ...})` — legt Zuteilungen als offene
+  Auto-Trade-Einträge (`trade.status = "queued"`) im lootLog an.
+- `ResetTradeState()` — leert `_pendingTrades`, `_inTradeItems`, `TradeLog._orphans`,
+  ruft `OnTradeClosed()` (setzt `_tradeAccepted = false`).
+- `MockBasics()` — stubbt `IsMasterLooter`, `Print`, **synchrones** `C_Timer.After`
+  (Staging-Verzögerung und Auswertung nach `TRADE_CLOSED` laufen sofort),
+  `GetTradePlayerItemInfo` (Slot frei), `ClearCursor`, `ClickTradeButton`, leeres `C_Container`.
+- `MockBagWithItems(id, ...)` — Bag 0 ab Slot 1 enthält die Items.
+- `MockTradeSlots(id, ...)` — `GetTradePlayerItemLink(i)` liefert das i-te Item.
+- `MockPartner(name)` — `TradeFrameRecipientNameText` liefert den Namen.
 
 ---
 
@@ -41,13 +54,14 @@ OnTradeClosed → Erfolg: Staging leeren | Abbruch: zurück in _pendingTrades
 
 ### `testNameFromTradeFrame`
 Partnername aus `TradeFrameRecipientNameText` (inkl. Cross-Realm-Suffix-Strip
-„Name (*)" → „Name"). Item wandert nach `_inTradeItems`, raus aus `_pendingTrades`.
+„Name (*)" → „Name"). Item wandert nach `_inTradeItems`, raus aus `_pendingTrades`;
+Status `staged`, `attempts == 1`.
 
 ### `testFallbackToUnitName`
 `TradeFrameRecipientNameText` nil → Fallback `UnitName("NPC")`.
 
 ### `testBothSourcesEmpty`
-Beide Namensquellen leer → kein Crash, Item bleibt in `_pendingTrades`.
+Beide Namensquellen leer → kein Crash, Eintrag bleibt `queued`.
 
 ### `testNoMatchingItem`
 Partner ohne passende Zuweisung → Staging leer, Queue unverändert.
@@ -57,10 +71,12 @@ Partner ohne passende Zuweisung → Staging leer, Queue unverändert.
 (WoW-Slot-Limit).
 
 ### `testTradeSuccess`
-`OnTradeAcceptUpdate(1,1)` + `OnTradeClosed` → Staging geleert, endgültig vergeben.
+Staging, `OnTradeAcceptUpdate(1,1)` mit dem Item im Handelsslot, `OnTradeClosed`
+→ Status `traded`, Queue leer.
 
 ### `testTradeCancel`
-`OnTradeClosed` ohne Accept → Items zurück in `_pendingTrades`.
+`OnTradeClosed` ohne Accept und ohne Abschluss-Meldung → Status `aborted`,
+Item wieder in `_pendingTrades`.
 
 ### `testClickTradeButtonCalled`
 `ClickTradeButton` wird pro Item genau einmal aufgerufen.
@@ -73,10 +89,33 @@ Wechsel ab (gebundene Duplikat-Kopie aus dem Vorraid).
 
 ### `testFallbackToFirstMatchWhenNoneTradeable`
 Nur eine (gebundene, kein Timer) Kopie → Fallback nimmt sie trotzdem
-(altes Verhalten, kein Regress).
+(altes Verhalten, kein Regress). Status `bound` macht den Grund in der Trade-Liste sichtbar.
 
 ### `testUnboundItemIsTradeable`
 `isBound == false` → ohne Tooltip-Scan handelbar.
+
+### `testSuccessViaTradeCompleteMessage` (B3)
+`TRADE_ACCEPT_UPDATE(1,1)` bleibt aus, nur die Systemmeldung `ERR_TRADE_COMPLETE`
+kommt → trotzdem `traded`. Vorher wurde so ein Handel als Abbruch gewertet und das
+Item erneut angeboten.
+
+### `testLateTradeCompleteCorrectsAbort` (B3)
+Die Abschluss-Meldung kommt erst **nach** der Auswertung → Status zunächst
+`aborted`, danach nachträglich `traded`.
+
+### `testItemMissingFromTradeSlotsStaysOpen` (B4)
+Handel erfolgreich, aber nur eines von zwei gestagten Items lag im Handelsfenster
+→ nur dieses wird `traded`, das andere bleibt `queued`. Vorher wurden alle gestagten
+Items verworfen, auch wenn `ClickTradeButton` lautlos gescheitert war.
+
+### `testDoubleTradeClosedFinalizesOnce`
+`TRADE_CLOSED` feuert doppelt → genau eine geplante Auswertung.
+
+### `testItemNotInBagsMarkedNotFound`
+Item nicht in den Taschen → Status `notFound`, raus aus dem Staging.
+
+### `testTradeFlowIsTraced`
+Ein kompletter Handel erzeugt Protokolleinträge `show`, `item`, `accept`, `close`.
 
 ---
 
@@ -85,5 +124,6 @@ Nur eine (gebundene, kein Timer) Kopie → Fallback nimmt sie trotzdem
 | Bereich | Warum |
 |---------|-------|
 | Echte Tooltip-Daten | `C_TooltipInfo.GetBagItem` wird gemockt |
-| 2h-Trade-Timer-Ablauf | WoW-Serverlogik, nicht testbar |
-| UI-Rendering | nicht Gegenstand der Trade-Tests |
+| 2h-Trade-Timer-Ablauf (Server) | WoW-Serverlogik; der Client-seitige Ablauf steht in `ReqRT.TradeLog` |
+| Reihenfolge der echten WoW-Events | Ob `ERR_TRADE_COMPLETE` vor oder nach `TRADE_CLOSED` kommt, zeigt erst das Protokoll im Spiel |
+| UI-Rendering | `UI_TradeDebug.lua` wird im busted-Lauf nicht geladen |

@@ -13,6 +13,8 @@ dofile("src/loot/Loot.lua")
 dofile("src/loot/Loot_Roll.lua")
 dofile("src/loot/Loot_Assign.lua")
 dofile("src/loot/Loot_Trade.lua")
+dofile("src/loot/Loot_TradeTrace.lua")
+dofile("src/loot/Loot_TradeLog.lua")
 dofile("src/core/Core_Events.lua")
 dofile("src/core/Core_Slash.lua")
 

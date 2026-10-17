@@ -242,6 +242,23 @@ SlashCmdList["REQUIEMRAIDTOOLS"] = function(input)
             C_Timer.After(10, function() GL._restorePending = false end)
         end
 
+    elseif cmd == "tradelog" then
+        -- Trade-Debug-Fenster: Zuteilungen + Auto-Trade-Status + Ereignisprotokoll
+        if GL.UI and GL.UI.ToggleTradeDebug then
+            GL.UI.ToggleTradeDebug()
+        else
+            GL.Print("UI not loaded.")
+        end
+
+    elseif cmd == "tradetrace" then
+        if arg == "clear" then
+            GL.TradeTrace.Clear()
+            GL.Print("Trade-Protokoll geleert.")
+            if GL.UI and GL.UI.RefreshTradeDebug then GL.UI.RefreshTradeDebug() end
+        else
+            GL.Print("Trade-Protokoll: " .. #(GuildLootDB.tradeTrace or {}) .. " Einträge. Anzeigen: /reqrt tradelog | Leeren: /reqrt tradetrace clear")
+        end
+
     elseif cmd == "dbinfo" then
         local db = GuildLootDB
         GL.Print(string.format("Sessions: %d | activeIdx: %s | unassigned: %d | raidHistory: %d",
@@ -261,6 +278,6 @@ SlashCmdList["REQUIEMRAIDTOOLS"] = function(input)
         end
 
     else
-        GL.Print("Commands: /reqrt | /reqrt start [tier] | /reqrt history [name] | /reqrt reset | /reqrt ml | /reqrt backup | /reqrt restore | /reqrt dbinfo | /reqrt cleanup | /reqrt test")
+        GL.Print("Commands: /reqrt | /reqrt start [tier] | /reqrt history [name] | /reqrt reset | /reqrt ml | /reqrt backup | /reqrt restore | /reqrt dbinfo | /reqrt tradelog | /reqrt cleanup | /reqrt test")
     end
 end

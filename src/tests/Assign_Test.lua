@@ -181,6 +181,52 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
     end
 
     -- --------------------------------------------------------
+    -- testAssignTracksTrade
+    -- Prüft: Zuteilung durch den ML legt den Auto-Trade-Zustand am lootLog-Eintrag an
+    -- (überlebt /reload) und spiegelt ihn in Loot._pendingTrades
+    -- --------------------------------------------------------
+    function Tests:testAssignTracksTrade()
+        WithTestDB(function(session)
+            SetupCurrentItem()
+            MockSideEffects()
+            Loot._pendingTrades = {}
+
+            Loot.AssignLootConfirm("Myriella-Malfurion", "H")
+
+            local e = session.lootLog[1]
+            Exists(e.trade)
+            AreEqual("queued",     e.trade.status)
+            AreEqual(1,            #Loot._pendingTrades)
+            AreEqual(212426,       Loot._pendingTrades[1].itemID)
+            AreEqual("Myriella",   Loot._pendingTrades[1].shortName)
+            AreEqual(e,            Loot._pendingTrades[1].entry)
+
+            Loot._pendingTrades = {}
+            MockRestore()
+        end)
+    end
+
+    -- --------------------------------------------------------
+    -- testAssignToSelfNotQueued
+    -- Prüft (B5): Teilt sich der ML selbst zu, landet nichts in der Auto-Trade-Queue
+    -- (UnitName-Stub liefert "TestPlayer")
+    -- --------------------------------------------------------
+    function Tests:testAssignToSelfNotQueued()
+        WithTestDB(function(session)
+            SetupCurrentItem()
+            MockSideEffects()
+            Loot._pendingTrades = {}
+
+            Loot.AssignLootConfirm("TestPlayer-TestRealm", "H")
+
+            AreEqual("self", session.lootLog[1].trade.status)
+            AreEqual(0,      #Loot._pendingTrades)
+
+            MockRestore()
+        end)
+    end
+
+    -- --------------------------------------------------------
     -- testCommAssignObserver
     -- Prüft (Slim-Sync): Observer-Pfad via OnCommAssign persistiert KEINEN
     -- lootLog-Eintrag mehr — Historie wird nicht mehr observer-seitig geführt.

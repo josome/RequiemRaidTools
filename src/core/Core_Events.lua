@@ -37,6 +37,8 @@ eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 eventFrame:RegisterEvent("TRADE_SHOW")
 eventFrame:RegisterEvent("TRADE_CLOSED")
 eventFrame:RegisterEvent("TRADE_ACCEPT_UPDATE")
+eventFrame:RegisterEvent("UI_INFO_MESSAGE")
+eventFrame:RegisterEvent("UI_ERROR_MESSAGE")
 
 -- Alias für lokale Nutzung in Event-Handlern (Roster-Vergleiche)
 local NormalizeName = function(name) return GL.NormalizeName(name) end
@@ -83,6 +85,8 @@ local function OnEventPlayerLogin()
             GL.CloseContainer()
         end
     end
+    -- Auto-Trade-Queue aus den gespeicherten Einträgen wiederherstellen
+    if GL.TradeLog then GL.TradeLog.OnLogin(time()) end
     if GL.UI and GL.UI.Init then GL.UI.Init() end
     -- Gildenroster anfordern; die Daten laufen über GUILD_ROSTER_UPDATE nach.
     GL.RefreshGuildRoster()
@@ -137,6 +141,12 @@ local function OnEventTradeAcceptUpdate(playerAccepted, targetAccepted)
     if GL.Loot and GL.Loot.OnTradeAcceptUpdate then
         GL.Loot.OnTradeAcceptUpdate(playerAccepted, targetAccepted)
     end
+end
+
+-- Systemmeldungen: "Handel abgeschlossen" ist das zweite Erfolgssignal für den Auto-Trade,
+-- die übrigen ERR_TRADE_*-Meldungen landen im Trade-Protokoll.
+local function OnEventUIMessage(_, message)
+    if GL.Loot and GL.Loot.OnTradeUIMessage then GL.Loot.OnTradeUIMessage(message) end
 end
 
 local function OnEventGroupRosterUpdate()
@@ -312,6 +322,8 @@ local eventDispatch = {
     TRADE_SHOW                    = OnEventTradeShow,
     TRADE_CLOSED                  = OnEventTradeClosed,
     TRADE_ACCEPT_UPDATE           = OnEventTradeAcceptUpdate,
+    UI_INFO_MESSAGE               = OnEventUIMessage,
+    UI_ERROR_MESSAGE              = OnEventUIMessage,
     RAID_ROSTER_UPDATE            = OnEventGroupRosterUpdate,
     GROUP_ROSTER_UPDATE           = OnEventGroupRosterUpdate,
     GUILD_ROSTER_UPDATE           = function() GL.OnGuildRosterUpdate() end,

@@ -285,11 +285,12 @@ function Loot.AssignLootConfirm(fullName, diff, clearAfter)
     -- Session-Log: direkt in aktive Session schreiben
     local db  = GuildLootDB
     local idx = db.activeContainerIdx
+    local logEntry  -- Referenz für den Auto-Trade (TradeLog hängt seinen Zustand daran)
     if idx and db.raidContainers and db.raidContainers[idx] then
         -- raidID/sessionID direkt aus currentItem (bei ActivateItem aus pendingLoot gestempelt)
         local itemRaidID    = (currentItem.raidID    and currentItem.raidID    ~= "") and currentItem.raidID    or db.currentRaid.id or ""
         local itemSessionID = (currentItem.sessionID and currentItem.sessionID ~= "") and currentItem.sessionID or db.raidContainers[idx].id
-        table.insert(db.raidContainers[idx].lootLog, {
+        logEntry = {
             player     = fullName,
             item       = link,
             link       = link,
@@ -302,7 +303,8 @@ function Loot.AssignLootConfirm(fullName, diff, clearAfter)
             timestamp  = ts,
             raidID     = itemRaidID,
             sessionID  = itemSessionID,
-        })
+        }
+        table.insert(db.raidContainers[idx].lootLog, logEntry)
     end
 
     -- Raid-Chat
@@ -323,9 +325,18 @@ function Loot.AssignLootConfirm(fullName, diff, clearAfter)
         end
     end
 
-    -- Ausstehenden Handel vormerken (ML legt Item bei nächstem Handel automatisch rein)
+    -- Ausstehenden Handel vormerken (ML legt Item bei nächstem Handel automatisch rein).
+    -- Der Zustand hängt am lootLog-Eintrag und überlebt /reload; ohne Raid Session
+    -- führt TradeLog einen Laufzeit-Eintrag.
     if GL.IsMasterLooter() then
-        table.insert(Loot._pendingTrades, { itemID = itemID, shortName = GL.ShortName(fullName) })
+        if not logEntry then
+            logEntry = { player = fullName, link = link, item = link, itemID = itemID, timestamp = ts }
+            GL.TradeLog.AddOrphan(logEntry)
+        end
+        GL.TradeLog.Track(logEntry)
+        GL.TradeLog.SyncMirror(time())
+    elseif GL.TradeTrace then
+        GL.TradeTrace.Add("assign", "%s → %s: kein ML — kein Auto-Trade", tostring(link), fullName)
     end
 
     -- Observer informieren (fullName ist bereits realm-qualifiziert)
