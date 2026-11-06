@@ -13,6 +13,10 @@ local _tradeAccepted = false
 local _finalizePending   = false  -- TRADE_CLOSED feuert oft doppelt; Auswertung nur einmal
 local _tradeSlotSnapshot = nil    -- { [itemID-String] = Anzahl } der belegten Handelsslots
 local _lastClosed        = nil    -- { at, entries, snapshot } nach einem als Abbruch gewerteten Handel
+-- Letzter lesbar aufgelöster Handelspartner (Kurzname). Als Modulfeld wie
+-- _inTradeItems/_pendingTrades: der Auto-Trade weicht darauf aus, wenn der Client
+-- den Namen schützt, und Tests können ihn zurücksetzen.
+Loot._lastPartner = nil
 
 -- Verzögerung zwischen TRADE_CLOSED und Auswertung. Die Systemmeldung
 -- "Handel abgeschlossen" (ERR_TRADE_COMPLETE) kommt teils erst NACH TRADE_CLOSED.
@@ -45,6 +49,24 @@ local function SafeNotify()
     if not ok then
         Trace("ui", "trade window refresh failed: %s", tostring(err))
     end
+end
+
+-- WoW 11.2+: Blizzard kann UI-Werte als "secret value" schützen. Lesen ist erlaubt,
+-- String-Operationen darauf werfen aber einen Lua-Fehler. Fehlt die Globale, kennt
+-- der laufende Client das Konzept nicht und es gibt nichts abzufangen.
+local function IsSecret(v)
+    return issecretvalue ~= nil and issecretvalue(v) == true
+end
+
+-- Meldet, warum der Auto-Trade nicht greift, und liefert false, damit Aufrufer
+-- `return TradeAbort(...)` schreiben können. Vorher brachen alle diese Pfade stumm ab.
+-- quiet=true nur protokollieren (für Fälle, die bei jedem Gold-Handel auftreten).
+local function TradeAbort(reason, quiet)
+    Trace("skip", "%s", reason)
+    if not quiet then
+        GL.Print("|cffff9900[ReqRT] Auto-Trade skipped: " .. reason .. "|r")
+    end
+    return false
 end
 
 -- Handelsslots pro Fenster (WoW: 6, der siebte ist "wird nicht gehandelt")
@@ -122,24 +144,62 @@ local function SnapshotTradeSlots()
     return counts, (#list > 0) and table.concat(list, " ") or "empty"
 end
 
+--- Zerlegt den Anzeigenamen des Handelsfensters zu einem Kurznamen.
+--- Komplett in pcall: ein geschützter Wert, den IsSecret nicht erkennt, würde sonst
+--- den ganzen TRADE_SHOW-Callback mitnehmen — vor jeder Protokollausgabe.
+--- @return string|nil kurzName, string|nil rohtext  (nil,nil wenn nicht lesbar)
+local function CleanPartnerText(text)
+    local ok, short, raw = pcall(function()
+        local r     = strtrim(text)
+        local clean = strtrim(r:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""))
+        -- Cross-Realm-Suffix entfernen: "Name(*)" oder "Name (Realm)" → "Name"
+        clean = strtrim(clean:gsub("%s*%(.*%)$", ""))
+        return GL.ShortName(clean), r
+    end)
+    if not ok then return nil, nil end
+    return short or "", raw or ""
+end
+
 --- Ermittelt den Handelspartner. Primär TradeFrame-Element, Fallback UnitName("NPC")
 --- ("NPC" ist in WoW die Unit-ID des aktuellen Interaktionspartners: Handel, Händler...).
---- @return string partnerName (Kurzname, "" wenn unbekannt), string raw, string npc
+--- Beide Quellen können seit WoW 11.2 geschützte Werte liefern. Dann bleibt der Name
+--- leer und secret ist true — der Aufrufer weicht auf den letzten Partner aus.
+--- @return string partnerName (Kurzname, "" wenn unbekannt), string raw, string npc, boolean secret
 local function ResolvePartnerName()
-    local partnerName, rawText, npcName = "", "", ""
+    local partnerName, rawText, npcName, secret = "", "", "", false
+
     local recipientFrame = TradeFrameRecipientNameText
     if recipientFrame then
-        rawText = strtrim(recipientFrame:GetText() or "")
-        local cleanText = strtrim(rawText:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""))
-        -- Cross-Realm-Suffix entfernen: "Name(*)" oder "Name (Realm)" → "Name"
-        cleanText = strtrim(cleanText:gsub("%s*%(.*%)$", ""))
-        partnerName = GL.ShortName(cleanText)
+        local ok, text = pcall(function() return recipientFrame:GetText() end)
+        if not ok or IsSecret(text) then
+            secret = true
+        elseif text then
+            local short, raw = CleanPartnerText(text)
+            if short then
+                partnerName, rawText = short, raw
+            else
+                secret = true
+            end
+        end
     end
+
     if partnerName == "" then
-        npcName = UnitName("NPC") or ""
-        partnerName = GL.ShortName(npcName)
+        local ok, unitName = pcall(UnitName, "NPC")
+        if ok and unitName then
+            if IsSecret(unitName) then
+                secret = true
+            else
+                local okShort, short = pcall(GL.ShortName, unitName)
+                if okShort then
+                    npcName, partnerName = unitName, short or ""
+                else
+                    secret = true
+                end
+            end
+        end
     end
-    return partnerName, rawText, npcName
+
+    return partnerName, rawText, npcName, secret
 end
 
 -- Wird bei TRADE_SHOW aufgerufen: legt alle zugewiesenen Items automatisch in den Handel,
@@ -149,28 +209,53 @@ end
 -- Fix: strtrim() auf Partner-Namen (Whitespace-Schutz).
 -- Fix: Cross-Realm-Suffix "(*)"-Stripping (RCLootCouncil-Pattern).
 function Loot.OnTradeShow()
-    if not GL.IsMasterLooter() then return end
     local TradeLog = GL.TradeLog
-    if #TradeLog.BuildQueue(time()) == 0 then return end
+    local isML     = GL.IsMasterLooter()
+    local queueLen = #TradeLog.BuildQueue(time())
+    -- Allererste Zeile, vor jedem Guard und vor jeder Namensauflösung: fehlt sie im
+    -- Protokoll, ist TRADE_SHOW nie angekommen. Steht sie da, nennt der folgende
+    -- Abbruch den Grund. Diese Unterscheidung fehlte bei allen bisherigen Ausfällen.
+    Trace("show", "TRADE_SHOW received: ML=%s, queue=%d", tostring(isML), queueLen)
+    if not isML then
+        return TradeAbort("you are not set as Master Looter (/reqrt ml)")
+    end
+    -- Leise: trifft jeden gewöhnlichen Handel ohne offene Zuweisung (Gold, Mats).
+    if queueLen == 0 then
+        return TradeAbort("no open assignments in the queue", true)
+    end
 
     C_Timer.After(0.1, function()
         local now = time()
         TradeLog.ExpireStale(now)
         local queue = TradeLog.BuildQueue(now)
         -- Re-Check nach Delay
-        if #queue == 0 then return end
+        if #queue == 0 then
+            return TradeAbort("no open assignments left - did the 2h trade window close?")
+        end
 
-        local partnerName, rawText, npcName = ResolvePartnerName()
+        local partnerName, rawText, npcName, secret = ResolvePartnerName()
         local queued = {}
         for _, e in ipairs(queue) do
             queued[#queued + 1] = GL.ShortName(TradeLog.Recipient(e) or "?") .. ":" .. tostring(TradeLog.ItemID(e))
         end
-        Trace("show", "Partner=%q (Frame=%q, NPC=%q), Queue=%d [%s]",
-            partnerName, rawText, npcName, #queue, table.concat(queued, " "))
-        if partnerName == "" then
-            GL.Print("[ReqRT] Auto-Trade: could not determine the trade partner's name.")
-            return
+        Trace("show", "Partner=%q (Frame=%q, NPC=%q, secret=%s), Queue=%d [%s]",
+            partnerName, rawText, npcName, tostring(secret), #queue, table.concat(queued, " "))
+
+        -- Name vom Client geschützt: auf den letzten bekannten Partner ausweichen,
+        -- wie RCLootCouncil es mit lastAttemptedTradeTarget macht.
+        if partnerName == "" and secret and Loot._lastPartner then
+            partnerName = Loot._lastPartner
+            Trace("show", "partner name protected - falling back to %q", partnerName)
+            GL.Print("|cffff9900[ReqRT] Auto-Trade: the client protected the partner name - assuming "
+                     .. partnerName .. ". Reopen the trade window if that is wrong.|r")
         end
+        if partnerName == "" then
+            if secret then
+                return TradeAbort("the client protected the trade partner name - please reopen the trade window")
+            end
+            return TradeAbort("could not determine the trade partner's name")
+        end
+        Loot._lastPartner = partnerName
 
         -- Bis zu 6 Zuweisungen für diesen Spieler in Staging (WoW-Limit: 6 Slots).
         -- Rest bleibt offen für das nächste Handelsfenster.
@@ -188,7 +273,8 @@ function Loot.OnTradeShow()
             partnerName, #Loot._inTradeItems, #Loot._pendingTrades)
         if #Loot._inTradeItems == 0 then
             SafeNotify()
-            return
+            return TradeAbort(("nothing open for %s (%d queued for other players)")
+                :format(partnerName, #queue))
         end
 
         -- Nächsten freien Handelsslot finden (Hilfsfunktion)
@@ -211,8 +297,7 @@ function Loot.OnTradeShow()
             C_Timer.After(capturedDelay, function()
                 local tradeSlot = nextFreeTradeSlot()
                 if not tradeSlot then
-                    Trace("item", "%s: no free trade slot", tostring(capturedID))
-                    return
+                    return TradeAbort("no free trade slot for item " .. tostring(capturedID))
                 end
 
                 -- Handelbare Kopie bevorzugen (Fallback: erste itemID-Fundstelle)
@@ -295,6 +380,9 @@ end
 function Loot.OnTradeClosed()
     if _finalizePending then return end
     if #Loot._inTradeItems == 0 then
+        -- Protokollieren statt stumm zurück: trennt "Fenster nie gesehen" von
+        -- "Fenster gesehen, aber nichts gestaged".
+        Trace("close", "TRADE_CLOSED with nothing staged")
         _tradeAccepted     = false
         _tradeSlotSnapshot = nil
         return

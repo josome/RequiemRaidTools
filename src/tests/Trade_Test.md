@@ -39,14 +39,18 @@ OnTradeClosed → (0,5 s später) FinalizeTrade:
   DB, Mocks und Trade-Zustand danach wieder her.
 - `Queue(session, {{itemID, player}, ...})` — legt Zuteilungen als offene
   Auto-Trade-Einträge (`trade.status = "queued"`) im lootLog an.
-- `ResetTradeState()` — leert `_pendingTrades`, `_inTradeItems`, `TradeLog._orphans`,
-  ruft `OnTradeClosed()` (setzt `_tradeAccepted = false`).
+- `ResetTradeState()` — leert `_pendingTrades`, `_inTradeItems`, `_lastPartner`,
+  `TradeLog._orphans`, ruft `OnTradeClosed()` (setzt `_tradeAccepted = false`).
+  `_lastPartner` muss mit zurück, sonst greift der Secret-Value-Rückfall quer über Tests.
 - `MockBasics()` — stubbt `IsMasterLooter`, `Print`, **synchrones** `C_Timer.After`
   (Staging-Verzögerung und Auswertung nach `TRADE_CLOSED` laufen sofort),
   `GetTradePlayerItemInfo` (Slot frei), `ClearCursor`, `ClickTradeButton`, leeres `C_Container`.
 - `MockBagWithItems(id, ...)` — Bag 0 ab Slot 1 enthält die Items.
 - `MockTradeSlots(id, ...)` — `GetTradePlayerItemLink(i)` liefert das i-te Item.
 - `MockPartner(name)` — `TradeFrameRecipientNameText` liefert den Namen.
+- `MockSecretPartner()` — `GetText()` liefert einen Wert, bei dem jede String-Operation
+  wirft, und `issecretvalue` erkennt genau diesen Wert. Bildet Blizzards geschützte
+  Werte ab (WoW 11.2+).
 
 ---
 
@@ -116,6 +120,23 @@ Item nicht in den Taschen → Status `notFound`, raus aus dem Staging.
 
 ### `testTradeFlowIsTraced`
 Ein kompletter Handel erzeugt Protokolleinträge `show`, `item`, `accept`, `close`.
+
+### `testSecretPartnerNameDoesNotThrow`
+`TradeFrameRecipientNameText:GetText()` liefert einen geschützten Wert (jede
+String-Operation darauf wirft), `issecretvalue` ist passend gemockt → `OnTradeShow`
+wirft nicht, das Item bleibt `queued`, und Protokoll enthält `show` (Eintritt) sowie
+`skip` (Abbruchgrund). Vorher lief `strtrim`/`gsub` direkt auf dem Wert und der
+Lua-Fehler beendete den Callback vor jeder Ausgabe.
+
+### `testSecretPartnerFallsBackToLastPartner`
+Erster Handel mit lesbarem Namen setzt `Loot._lastPartner`; im zweiten Handelsfenster
+ist der Name geschützt → der Auto-Trade weicht auf den gemerkten Partner aus und
+staged das Item (Muster von RCLootCouncil `lastAttemptedTradeTarget`).
+
+### `testEntryTraceBeforeGuards`
+Ohne Master-Looter-Recht bricht der Auto-Trade ab, die Zeile
+`TRADE_SHOW received: ML=false` steht aber trotzdem im Protokoll. Nur so ist
+„Event kam nicht an" von „Event kam, Guard hat abgelehnt" unterscheidbar.
 
 ### `testPlacementRunsWhenRefreshFails`
 `GL.UI.RefreshTradeDebug` wirft einen Fehler → die Items werden trotzdem in den Handel

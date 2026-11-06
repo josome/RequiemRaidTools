@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.0.5.12
+
+**Fixed**
+- Auto-Trade could fail without a word when the game protected the trade partner's name — a restriction newer clients apply in some situations. Reading that name now cannot break the trade, and the addon falls back to the player you last traded with.
+
+**Changed**
+- Auto-Trade now says in chat why it did nothing: not set as Master Looter, nothing open for this player, trade window closed, or no free trade slot. Previously all of these were silent.
+- The event log records every `TRADE_SHOW` the moment it arrives. If that line is missing after a failed trade, the game never told the addon the window opened — which tells you where to look.
+
 ## v1.0.5.11
 
 **Fixed**

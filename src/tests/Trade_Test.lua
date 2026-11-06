@@ -53,6 +53,7 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
     local function ResetTradeState()
         Loot._inTradeItems  = {}
         Loot._pendingTrades = {}
+        Loot._lastPartner   = nil  -- sonst greift der Secret-Value-Rückfall quer über Tests
         TradeLog._orphans   = {}
         Loot.OnTradeClosed()  -- setzt _tradeAccepted = false
     end
@@ -66,6 +67,9 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
         db.activeContainerIdx = 1
         db.tradeTrace         = {}
         ResetTradeState()
+        -- Erst nach dem Reset leeren: dessen OnTradeClosed() schreibt selbst eine
+        -- close-Zeile, die sonst jede Protokollprüfung trivial grün machen würde.
+        db.tradeTrace         = {}
         local ok, err = pcall(fn, session)
         MockRestore()
         ResetTradeState()
@@ -540,6 +544,92 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
             local kinds = {}
             for _, ev in ipairs(GuildLootDB.tradeTrace) do kinds[ev.kind] = true end
             IsTrue(kinds.ui, "Fehlgeschlagener Refresh nicht protokolliert")
+        end)
+    end
+
+    -- Ein Wert, der sich wie ein geschützter WoW-Wert verhält: jede String-Operation
+    -- darauf wirft. issecretvalue wird passend dazu gemockt.
+    local function MockSecretPartner()
+        local protected = setmetatable({}, {
+            __index    = function() error("secret value touched") end,
+            __concat   = function() error("secret value touched") end,
+            __tostring = function() error("secret value touched") end,
+        })
+        Mock(_G, "TradeFrameRecipientNameText", { GetText = function() return protected end })
+        Mock(_G, "UnitName",       function() return nil end)
+        Mock(_G, "issecretvalue",  function(v) return v == protected end)
+        return protected
+    end
+
+    -- --------------------------------------------------------
+    -- Test 19: Ein geschützter Partnername darf den Callback nicht sprengen.
+    -- Vorher lief strtrim/gsub direkt auf GetText() — der Lua-Fehler beendete
+    -- TRADE_SHOW vor jeder Protokoll- und Chatausgabe (lautloser Totalausfall).
+    -- --------------------------------------------------------
+    function Tests:testSecretPartnerNameDoesNotThrow()
+        WithSession(function(session)
+            local e = Queue(session, { { 1900, "Barbossbär" } })[1]
+            MockBasics()
+            MockSecretPartner()
+
+            Loot.OnTradeShow()   -- darf nicht werfen
+
+            AreEqual(0,        #Loot._inTradeItems)
+            AreEqual("queued", e.trade.status)   -- Item bleibt offen
+
+            local kinds = {}
+            for _, ev in ipairs(GuildLootDB.tradeTrace) do kinds[ev.kind] = true end
+            IsTrue(kinds.show, "Eintritts-Trace fehlt")
+            IsTrue(kinds.skip, "Abbruchgrund nicht protokolliert")
+        end)
+    end
+
+    -- --------------------------------------------------------
+    -- Test 20: Ist der Name geschützt, aber ein Partner aus einem früheren
+    -- Handelsfenster bekannt, wird darauf ausgewichen (RCLootCouncil-Muster).
+    -- --------------------------------------------------------
+    function Tests:testSecretPartnerFallsBackToLastPartner()
+        WithSession(function(session)
+            Queue(session, { { 1910, "Barbossbär" } })
+            MockBasics()
+            MockBagWithItems(1910)
+
+            -- 1. Durchgang: Name lesbar → merkt sich den Partner
+            MockPartner("Barbossbär")
+            Loot.OnTradeShow()
+            AreEqual("Barbossbär", Loot._lastPartner)
+            Loot.OnTradeClosed()
+
+            -- 2. Durchgang: Name geschützt → Rückfall greift, Item wird gestaged
+            Queue(session, { { 1911, "Barbossbär" } })
+            MockBagWithItems(1911)
+            MockSecretPartner()
+            Loot.OnTradeShow()
+
+            IsTrue(#Loot._inTradeItems > 0, "Rückfall auf den letzten Partner griff nicht")
+        end)
+    end
+
+    -- --------------------------------------------------------
+    -- Test 21: Der Eintritts-Trace steht VOR allen Guards. Ohne ML bricht der
+    -- Auto-Trade ab, die Zeile muss aber trotzdem im Protokoll stehen — nur so ist
+    -- "Event kam nicht an" von "Event kam, Guard hat abgelehnt" unterscheidbar.
+    -- --------------------------------------------------------
+    function Tests:testEntryTraceBeforeGuards()
+        WithSession(function(session)
+            Queue(session, { { 1920, "Barbossbär" } })
+            MockBasics()
+            MockPartner("Barbossbär")
+            Mock(GL, "IsMasterLooter", function() return false end)
+
+            Loot.OnTradeShow()
+
+            AreEqual(0, #Loot._inTradeItems)
+            local found = false
+            for _, ev in ipairs(GuildLootDB.tradeTrace) do
+                if ev.kind == "show" and ev.text:find("ML=false", 1, true) then found = true end
+            end
+            IsTrue(found, "Eintritts-Trace mit ML=false fehlt")
         end)
     end
 
