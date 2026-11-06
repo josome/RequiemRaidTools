@@ -3,7 +3,7 @@
 ## Notes: Structured raid loot distribution for guild officers and raid leaders. Priority system, automatic roll evaluation and real-time sync between all raid members.
 ## Category: Raid
 ## IconTexture: Interface\AddOns\RequiemRaidTools\Media\icon
-## Version: 1.0.5.10
+## Version: 1.0.5.11
 ## SavedVariables: GuildLootDB GuildLootDBBackup RequiemRaidToolsMinimapIconDB
 ## X-Curse-Project-ID: 1502142
 

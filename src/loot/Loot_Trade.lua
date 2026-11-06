@@ -34,6 +34,19 @@ local function Trace(kind, fmt, ...)
     if GL.TradeTrace then GL.TradeTrace.Add(kind, fmt, ...) end
 end
 
+-- UI-Auffrischung, die den Aufrufer nie mitreißt.
+-- Das Trade-Debug-Fenster rendert eine Frame-Zeile pro Loot-Eintrag der Session
+-- (UI_TradeDebug.RefreshList). Diese Liste wächst über den Raidabend mit jeder
+-- Zuteilung — sie darf nicht darüber entscheiden, ob ein Handel zustande kommt.
+local function SafeNotify()
+    local TradeLog = GL.TradeLog
+    if not (TradeLog and TradeLog.NotifyChanged) then return end
+    local ok, err = pcall(TradeLog.NotifyChanged)
+    if not ok then
+        Trace("ui", "trade window refresh failed: %s", tostring(err))
+    end
+end
+
 -- Handelsslots pro Fenster (WoW: 6, der siebte ist "wird nicht gehandelt")
 local function MaxSlots()
     return (GL.TradeLog and GL.TradeLog.MAX_SLOTS) or 6
@@ -173,8 +186,10 @@ function Loot.OnTradeShow()
         TradeLog.SyncMirror(now)
         Trace("show", "%s: %d item(s) staged, %d remain in queue",
             partnerName, #Loot._inTradeItems, #Loot._pendingTrades)
-        TradeLog.NotifyChanged()
-        if #Loot._inTradeItems == 0 then return end
+        if #Loot._inTradeItems == 0 then
+            SafeNotify()
+            return
+        end
 
         -- Nächsten freien Handelsslot finden (Hilfsfunktion)
         local function nextFreeTradeSlot()
@@ -221,9 +236,14 @@ function Loot.OnTradeShow()
                         break
                     end
                 end
-                TradeLog.NotifyChanged()
+                SafeNotify()
             end)
         end
+
+        -- Erst auffrischen, nachdem alle Platzierungen eingeplant sind. C_Timer.After
+        -- kann nicht fehlschlagen, ein Fehler im Render erreicht die Platzierung also
+        -- nicht mehr — vorher hing der Handel am Rendern der ganzen Session.
+        SafeNotify()
     end)
 end
 

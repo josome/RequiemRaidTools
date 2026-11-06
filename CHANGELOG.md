@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.0.5.11
+
+**Fixed**
+- Auto-Trade could silently stop putting items into the trade window once a lot of loot had been handed out during the night. Refreshing the Auto-Trade window was on the same path as placing the items, so a hiccup there cost you the trade. Placing items no longer depends on the window being drawn.
+
+**Changed**
+- The Auto-Trade window now starts on "Open only" and shows at most 200 rows. It used to draw a row for every item of the whole Raid Session, which got slower with every assignment.
+
 ## v1.0.5.9
 
 **New**

@@ -11,6 +11,10 @@ local UI = GL.UI
 local FRAME_W, FRAME_H = 800, 460
 local ROW_H            = 20
 local DROP_H           = 34
+-- Obergrenze gerenderter Zeilen. Jede Zeile ist ein Frame aus dem Pool; eine ganze
+-- Raidnacht als Frame-Liste zu zeichnen kostet pro Auffrischung spürbar Zeit, und
+-- aufgefrischt wird bei jedem Handelsfenster. Der Rest wird als Hinweis gezählt.
+local MAX_ROWS         = 200
 
 -- Spalten: x-Offset und Breite innerhalb einer Zeile
 local COL = {
@@ -43,7 +47,9 @@ local NEEDS_ACTION = { queued = true, staged = true, aborted = true, bound = tru
 local frame, listScroll, listContent, traceScroll, traceText, summaryText, dropZone
 local rowPool, picker, ticker
 local showTrace  = false
-local onlyOpen   = false
+-- Default "nur offene": die Vollansicht rendert die komplette Loot-Historie der
+-- Session und wächst damit über den Raidabend. Handlungsbedarf hat nur das Offene.
+local onlyOpen   = true
 local removeArmed = nil  -- Eintrag, für den "✕" einmal geklickt wurde ("Sure?"-Muster)
 
 -- ============================================================
@@ -278,21 +284,28 @@ end
 
 local function RefreshList(now)
     rowPool:ReleaseAll()
-    local rows, shown = GL.TradeLog.Rows(nil, now), 0
+    local rows, shown, hidden = GL.TradeLog.Rows(nil, now), 0, 0
     local y = 0
     for _, row in ipairs(rows) do
         if not onlyOpen or (row.status and NEEDS_ACTION[row.status]) then
-            shown = shown + 1
-            local r = rowPool:Acquire()
-            r:SetPoint("TOPLEFT",  listContent, "TOPLEFT",  0, y)
-            r:SetPoint("TOPRIGHT", listContent, "TOPRIGHT", 0, y)
-            FillRow(r, row, shown)
-            r:Show()
-            y = y - ROW_H
+            if shown >= MAX_ROWS then
+                hidden = hidden + 1
+            else
+                shown = shown + 1
+                local r = rowPool:Acquire()
+                r:SetPoint("TOPLEFT",  listContent, "TOPLEFT",  0, y)
+                r:SetPoint("TOPRIGHT", listContent, "TOPRIGHT", 0, y)
+                FillRow(r, row, shown)
+                r:Show()
+                y = y - ROW_H
+            end
         end
     end
     listContent:SetHeight(math.max(1, -y))
     frame.emptyText:SetShown(shown == 0)
+    frame.moreText:SetText(hidden > 0
+        and ("… and " .. hidden .. " more — use \"Open only\" or the event log")
+        or "")
 end
 
 local function RefreshTrace()
@@ -320,6 +333,8 @@ function UI.RefreshTradeDebug()
     frame.onlyOpen:SetShown(not showTrace)
     traceScroll:SetShown(showTrace)
     frame.emptyText:SetShown(false)
+    -- moreText hängt an frame, nicht an listScroll: in der Protokollansicht selbst ausblenden
+    frame.moreText:SetShown(not showTrace)
     frame.viewBtn:SetText(showTrace and "List" or "Events")
 
     if showTrace then RefreshTrace() else RefreshList(now) end
@@ -423,6 +438,7 @@ local function Build()
     cb.text = cb:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     cb.text:SetPoint("LEFT", cb, "RIGHT", 2, 0)
     cb.text:SetText("Open only")
+    cb:SetChecked(onlyOpen)
     cb:SetScript("OnClick", function(self) onlyOpen = self:GetChecked() and true or false; UI.RefreshTradeDebug() end)
     frame.onlyOpen = cb
 
@@ -441,6 +457,11 @@ local function Build()
     frame.emptyText = frame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     frame.emptyText:SetPoint("CENTER", listScroll, "CENTER")
     frame.emptyText:SetText("No entries.")
+
+    -- Hinweis, wenn die Liste bei MAX_ROWS abgeschnitten wurde
+    frame.moreText = frame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    frame.moreText:SetPoint("BOTTOM", listScroll, "BOTTOM", 0, 2)
+    frame.moreText:SetText("")
 
     -- Ereignisprotokoll
     traceScroll = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")

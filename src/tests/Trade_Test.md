@@ -117,6 +117,13 @@ Item nicht in den Taschen → Status `notFound`, raus aus dem Staging.
 ### `testTradeFlowIsTraced`
 Ein kompletter Handel erzeugt Protokolleinträge `show`, `item`, `accept`, `close`.
 
+### `testPlacementRunsWhenRefreshFails`
+`GL.UI.RefreshTradeDebug` wirft einen Fehler → die Items werden trotzdem in den Handel
+gelegt (`ClickTradeButton` läuft), und der Fehlschlag landet als `ui` im Protokoll.
+Sichert ab, dass das Auffrischen des Debug-Fensters nie auf dem kritischen Pfad der
+Platzierung liegt: das Fenster rendert eine Frame-Zeile pro Loot-Eintrag der Session,
+und diese Liste wächst über den Raidabend mit jeder Zuteilung.
+
 ---
 
 ## Was diese Tests nicht abdecken
@@ -126,4 +133,4 @@ Ein kompletter Handel erzeugt Protokolleinträge `show`, `item`, `accept`, `clos
 | Echte Tooltip-Daten | `C_TooltipInfo.GetBagItem` wird gemockt |
 | 2h-Trade-Timer-Ablauf (Server) | WoW-Serverlogik; der Client-seitige Ablauf steht in `ReqRT.TradeLog` |
 | Reihenfolge der echten WoW-Events | Ob `ERR_TRADE_COMPLETE` vor oder nach `TRADE_CLOSED` kommt, zeigt erst das Protokoll im Spiel |
-| UI-Rendering | `UI_TradeDebug.lua` wird im busted-Lauf nicht geladen |
+| UI-Rendering | `UI_TradeDebug.lua` wird im busted-Lauf nicht geladen — getestet ist nur, dass ein Fehler daraus die Platzierung nicht mitreißt |

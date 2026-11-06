@@ -516,4 +516,31 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
         end)
     end
 
+    -- --------------------------------------------------------
+    -- Test 18: Ein Fehler beim Auffrischen des Trade-Debug-Fensters darf die
+    -- Platzierung nicht verhindern. Das Fenster rendert eine Frame-Zeile pro
+    -- Loot-Eintrag der Session, die Liste wächst über den Raidabend — vorher lief
+    -- NotifyChanged() vor der Platzierung im selben Callback und riss sie mit.
+    -- --------------------------------------------------------
+    function Tests:testPlacementRunsWhenRefreshFails()
+        WithSession(function(session)
+            Queue(session, { { 1800, "Barbossbär" } })
+            MockBasics()
+            MockBagWithItems(1800)
+            MockPartner("Barbossbär")
+            Mock(GL.UI, "RefreshTradeDebug", function() error("render exploded") end)
+
+            local clickCount = 0
+            Mock(_G, "ClickTradeButton", function() clickCount = clickCount + 1 end)
+
+            Loot.OnTradeShow()
+
+            AreEqual(1, clickCount)
+
+            local kinds = {}
+            for _, ev in ipairs(GuildLootDB.tradeTrace) do kinds[ev.kind] = true end
+            IsTrue(kinds.ui, "Fehlgeschlagener Refresh nicht protokolliert")
+        end)
+    end
+
 end)
