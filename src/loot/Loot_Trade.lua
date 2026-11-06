@@ -173,46 +173,55 @@ local function CleanPartnerText(text)
     return short or "", raw or ""
 end
 
---- Ermittelt den Handelspartner. Primär TradeFrame-Element, Fallback UnitName("NPC")
---- ("NPC" ist in WoW die Unit-ID des aktuellen Interaktionspartners: Handel, Händler...).
---- Beide Quellen können seit WoW 11.2 geschützte Werte liefern. Dann bleibt der Name
---- leer und secret ist true — der Aufrufer weicht auf den letzten Partner aus.
+--- Partnername über die Unit-API. "NPC" ist in WoW die Unit-ID des aktuellen
+--- Interaktionspartners (Handel, Händler...). Bevorzugte Quelle: hängt an keinem
+--- UI-Widget und ist damit weniger anfällig für geschützte Werte.
+--- @return string|nil kurzName, string|nil roh, boolean warGeschützt
+local function PartnerFromUnit()
+    local ok, unitName = pcall(UnitName, "NPC")
+    if not ok then return nil, nil, true end
+    if unitName == nil then return nil, nil, false end   -- kein Partner, nicht geschützt
+    if IsSecret(unitName) then return nil, nil, true end
+    local okShort, short = pcall(GL.ShortName, unitName)
+    if not okShort then return nil, nil, true end
+    return short or "", unitName, false
+end
+
+--- Partnername aus dem Anzeigetext des Handelsfensters. Nur Rückfall: dieses
+--- Widget liefert in getaintetem Addon-Code nachweislich geschützte Werte
+--- ("Secret values are only allowed during untainted execution" aus strtrim),
+--- und Addon-Code ist praktisch immer getaintet.
+--- @return string|nil kurzName, string|nil rohtext, boolean warGeschützt
+local function PartnerFromFrame()
+    local recipientFrame = TradeFrameRecipientNameText
+    if not recipientFrame then return nil, nil, false end
+    local ok, text = pcall(function() return recipientFrame:GetText() end)
+    if not ok then return nil, nil, true end
+    if text == nil then return nil, nil, false end
+    if IsSecret(text) then return nil, nil, true end
+    local short, raw = CleanPartnerText(text)
+    if not short then return nil, nil, true end          -- String-Kette ist geflogen
+    return short, raw, false
+end
+
+--- Ermittelt den Handelspartner: Unit-API zuerst, Anzeigetext als Rückfall.
+--- secret ist nur true, wenn eine Quelle tatsächlich einen geschützten Wert
+--- geliefert hat — nicht wenn einfach kein Partner da ist. Der Aufrufer weicht
+--- nur im secret-Fall auf den letzten bekannten Partner aus, sonst würde er bei
+--- einem leeren Fenster Items dem falschen Spieler zuordnen.
 --- @return string partnerName (Kurzname, "" wenn unbekannt), string raw, string npc, boolean secret
 local function ResolvePartnerName()
-    local partnerName, rawText, npcName, secret = "", "", "", false
-
-    local recipientFrame = TradeFrameRecipientNameText
-    if recipientFrame then
-        local ok, text = pcall(function() return recipientFrame:GetText() end)
-        if not ok or IsSecret(text) then
-            secret = true
-        elseif text then
-            local short, raw = CleanPartnerText(text)
-            if short then
-                partnerName, rawText = short, raw
-            else
-                secret = true
-            end
-        end
+    local uShort, uRaw, uSecret = PartnerFromUnit()
+    if uShort and uShort ~= "" then
+        return uShort, "", uRaw or "", false
     end
 
-    if partnerName == "" then
-        local ok, unitName = pcall(UnitName, "NPC")
-        if ok and unitName then
-            if IsSecret(unitName) then
-                secret = true
-            else
-                local okShort, short = pcall(GL.ShortName, unitName)
-                if okShort then
-                    npcName, partnerName = unitName, short or ""
-                else
-                    secret = true
-                end
-            end
-        end
+    local fShort, fRaw, fSecret = PartnerFromFrame()
+    if fShort and fShort ~= "" then
+        return fShort, fRaw or "", uRaw or "", false
     end
 
-    return partnerName, rawText, npcName, secret
+    return "", fRaw or "", uRaw or "", (uSecret or fSecret) and true or false
 end
 
 -- Wird bei TRADE_SHOW aufgerufen: legt alle zugewiesenen Items automatisch in den Handel,

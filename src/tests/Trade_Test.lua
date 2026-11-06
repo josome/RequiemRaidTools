@@ -162,7 +162,7 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
     -- --------------------------------------------------------
     -- Test 2: Fallback — UnitName("NPC") wenn TradeFrame nil ist
     -- --------------------------------------------------------
-    function Tests:testFallbackToUnitName()
+    function Tests:testResolvesViaUnitName()
         WithSession(function(session)
             Queue(session, { { 200, "Barbossbär-Malfurion" } })
             MockBasics()
@@ -607,6 +607,55 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
             Loot.OnTradeShow()
 
             IsTrue(#Loot._inTradeItems > 0, "Rückfall auf den letzten Partner griff nicht")
+        end)
+    end
+
+    -- --------------------------------------------------------
+    -- Test 25: Der echte Fall aus dem Raid-Log — das Handelsfenster-Widget liefert
+    -- einen geschützten Wert ("Secret values are only allowed during untainted
+    -- execution" aus strtrim, 21x aufgetreten), aber UnitName("NPC") funktioniert.
+    -- Der Auto-Trade muss dann normal durchlaufen, ohne Rückfall und ohne Warnung.
+    -- --------------------------------------------------------
+    function Tests:testSecretFrameTextStillResolvesViaUnit()
+        WithSession(function(session)
+            local e = Queue(session, { { 1960, "Barbossbär" } })[1]
+            MockBasics()
+            MockBagWithItems(1960)
+
+            local protected = setmetatable({}, {
+                __index = function() error("secret value touched") end,
+            })
+            Mock(_G, "TradeFrameRecipientNameText", { GetText = function() return protected end })
+            Mock(_G, "issecretvalue", function(v) return v == protected end)
+            Mock(_G, "UnitName",      function(unit) return unit == "NPC" and "Barbossbär-Antonidas" or nil end)
+
+            local clicks = 0
+            Mock(_G, "ClickTradeButton", function() clicks = clicks + 1 end)
+
+            Loot.OnTradeShow()
+
+            AreEqual(1,        clicks)
+            AreEqual("staged", e.trade.status)
+            AreEqual("Barbossbär", Loot._lastPartner)
+        end)
+    end
+
+    -- --------------------------------------------------------
+    -- Test 26: Die Unit-API hat Vorrang vor dem Anzeigetext. Das Widget wird nur
+    -- noch angefasst, wenn UnitName("NPC") nichts liefert.
+    -- --------------------------------------------------------
+    function Tests:testPrefersUnitNameOverFrameText()
+        WithSession(function(session)
+            Queue(session, { { 1970, "Alpha" } })
+            MockBasics()
+            MockBagWithItems(1970)
+            Mock(_G, "TradeFrameRecipientNameText", { GetText = function() return "Beta" end })
+            Mock(_G, "UnitName", function(unit) return unit == "NPC" and "Alpha-Antonidas" or nil end)
+
+            Loot.OnTradeShow()
+
+            AreEqual("Alpha", Loot._lastPartner)      -- nicht "Beta" aus dem Widget
+            AreEqual(1, #Loot._inTradeItems)
         end)
     end
 

@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.0.5.15
+
+**Fixed**
+- Auto-Trade now asks the game who you are trading with instead of reading the name off the trade window. Reading the window was the actual cause of Auto-Trade dying mid-raid: the game refuses to hand that text to an addon in certain situations, which aborted the whole attempt before anything was logged. Confirmed from an error report — it had happened 21 times in one session.
+
 ## v1.0.5.14
 
 **New**

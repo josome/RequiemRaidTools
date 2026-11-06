@@ -47,7 +47,8 @@ OnTradeClosed → (0,5 s später) FinalizeTrade:
   `GetTradePlayerItemInfo` (Slot frei), `ClearCursor`, `ClickTradeButton`, leeres `C_Container`.
 - `MockBagWithItems(id, ...)` — Bag 0 ab Slot 1 enthält die Items.
 - `MockTradeSlots(id, ...)` — `GetTradePlayerItemLink(i)` liefert das i-te Item.
-- `MockPartner(name)` — `TradeFrameRecipientNameText` liefert den Namen.
+- `MockPartner(name)` — `TradeFrameRecipientNameText` liefert den Namen und `UnitName`
+  liefert nil, damit gezielt der Widget-Pfad geprüft wird (die Unit-API hat Vorrang).
 - `MockSecretPartner()` — `GetText()` liefert einen Wert, bei dem jede String-Operation
   wirft, und `issecretvalue` erkennt genau diesen Wert. Bildet Blizzards geschützte
   Werte ab (WoW 11.2+).
@@ -61,8 +62,9 @@ Partnername aus `TradeFrameRecipientNameText` (inkl. Cross-Realm-Suffix-Strip
 „Name (*)" → „Name"). Item wandert nach `_inTradeItems`, raus aus `_pendingTrades`;
 Status `staged`, `attempts == 1`.
 
-### `testFallbackToUnitName`
-`TradeFrameRecipientNameText` nil → Fallback `UnitName("NPC")`.
+### `testResolvesViaUnitName`
+Widget nicht vorhanden → Name aus `UnitName("NPC")`. Das ist seit dem Secret-Value-Fix
+die **primäre** Quelle; das Widget ist nur noch Rückfall.
 
 ### `testBothSourcesEmpty`
 Beide Namensquellen leer → kein Crash, Eintrag bleibt `queued`.
@@ -120,6 +122,16 @@ Item nicht in den Taschen → Status `notFound`, raus aus dem Staging.
 
 ### `testTradeFlowIsTraced`
 Ein kompletter Handel erzeugt Protokolleinträge `show`, `item`, `accept`, `close`.
+
+### `testSecretFrameTextStillResolvesViaUnit`
+Der belegte Fall aus dem Raid-Log: `TradeFrameRecipientNameText:GetText()` liefert
+einen geschützten Wert, `UnitName("NPC")` funktioniert. Der Auto-Trade läuft normal
+durch — ein `ClickTradeButton`, Status `staged`, `_lastPartner` gesetzt, **kein**
+Rückfall und keine Warnung.
+
+### `testPrefersUnitNameOverFrameText`
+Widget und Unit-API liefern verschiedene Namen → die Unit-API gewinnt. Das Widget
+wird nur noch angefasst, wenn `UnitName("NPC")` nichts liefert.
 
 ### `testSecretPartnerNameDoesNotThrow`
 `TradeFrameRecipientNameText:GetText()` liefert einen geschützten Wert (jede
