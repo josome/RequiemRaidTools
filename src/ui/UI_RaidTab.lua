@@ -128,9 +128,9 @@ local function BuildRaidActions(panel, cs)
         local ci = selectedRaid and selectedRaid.ci
         local session = ci and GuildLootDB.raidContainers[ci]
         if not session then return end
-        UI.ShowRenameDialog("Session umbenennen:", session.label, function(name)
+        UI.ShowRenameDialog("Rename session:", session.label, function(name)
             if GL.IsSessionLabelTaken(name, ci) then
-                GL.Print("Name bereits vergeben: " .. name)
+                GL.Print("Name already taken: " .. name)
                 return
             end
             session.label = name
@@ -227,7 +227,7 @@ local function BuildRaidDetail(panel, listFrame)
     panel.detailHeader:SetPoint("TOPRIGHT", detailFrame, "TOPRIGHT", -28, -6)
     panel.detailHeader:SetWordWrap(true)
     panel.detailHeader:SetJustifyH("LEFT")
-    panel.detailHeader:SetText("|cff888888— Auswahl treffen —|r")
+    panel.detailHeader:SetText("|cff888888— Select an entry —|r")
 
     local detailScroll = CreateFrame("ScrollFrame", "GuildLootRaidDetailScroll", detailFrame, "UIPanelScrollFrameTemplate")
     detailScroll:SetPoint("TOPLEFT",     panel.detailHeader, "BOTTOMLEFT",  0, -4)
@@ -484,7 +484,7 @@ local function MakeRaidRow(parent, session, raidID, meta, yOff, isCurrentActive,
     infoLbl:SetPoint("TOPRIGHT", row, "TOPRIGHT", -4, -2)
     infoLbl:SetJustifyV("TOP")
     if isCurrentActive then
-        infoLbl:SetText("|cff00ff00aktiv  |r|cff888888" .. lootCount .. "x|r")
+        infoLbl:SetText("|cff00ff00active  |r|cff888888" .. lootCount .. "x|r")
     else
         local dateStr = meta.closedAt and date("%d.%m", meta.closedAt) or "?"
         infoLbl:SetText("|cff888888" .. dateStr .. "  " .. lootCount .. "x|r")
@@ -626,7 +626,7 @@ function UI.RefreshRaidTab()
                 rbg:SetColorTexture(0, 0.4, 0.05, 0.22)
                 local l = r:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
                 l:SetPoint("LEFT", r, "LEFT", 14, 0)
-                l:SetText("|cff00ff00• aktiv|r  |cff555555(kein Boss-Kill)|r")
+                l:SetText("|cff00ff00• active|r  |cff555555(no boss kill)|r")
                 r:Show()
                 table.insert(listRows, r)
                 yOff = yOff - RAID_ROW_H
@@ -639,7 +639,7 @@ function UI.RefreshRaidTab()
                 r:SetHeight(RAID_ROW_H)
                 local l = r:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
                 l:SetPoint("LEFT", r, "LEFT", 14, 0)
-                l:SetText("|cff555555(keine Raids)|r")
+                l:SetText("|cff555555(no raids)|r")
                 r:Show()
                 table.insert(listRows, r)
                 yOff = yOff - RAID_ROW_H
@@ -701,7 +701,7 @@ function UI.RefreshRaidTab()
     if #(db.raidContainers or {}) == 0 and #unassigned == 0 then
         local empty = content:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         empty:SetPoint("TOPLEFT", content, "TOPLEFT", 8, -8)
-        empty:SetText("|cff888888Keine Raid Sessions. 'New Raid Session' drücken.|r")
+        empty:SetText("|cff888888No Raid Sessions. Press 'New Raid Session'.|r")
         table.insert(listRows, empty)
         yOff = -20
     end
@@ -728,7 +728,7 @@ function UI.RefreshRaidDetail()
     local yOff    = 0
 
     if not selectedRaid then
-        UI.raidPanel.detailHeader:SetText("|cff888888— Auswahl treffen —|r")
+        UI.raidPanel.detailHeader:SetText("|cff888888— Select an entry —|r")
         content:SetHeight(1)
         return
     end
@@ -738,7 +738,7 @@ function UI.RefreshRaidDetail()
     -- Session selektiert (kein Raid)
     if selectedRaid.ci and not selectedRaid.raidID then
         local session = (db.raidContainers or {})[selectedRaid.ci]
-        if not session then selectedRaid = nil; UI.raidPanel.detailHeader:SetText("|cff888888— Auswahl treffen —|r"); content:SetHeight(1); return end
+        if not session then selectedRaid = nil; UI.raidPanel.detailHeader:SetText("|cff888888— Select an entry —|r"); content:SetHeight(1); return end
         local lootCount = #(session.lootLog or {})
         local raidCount = 0; for _ in pairs(session.raidMeta or {}) do raidCount = raidCount + 1 end
         UI.raidPanel.detailHeader:SetText((session.label or "?")
@@ -746,7 +746,7 @@ function UI.RefreshRaidDetail()
         if lootCount == 0 then
             local e = content:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
             e:SetPoint("TOPLEFT", content, "TOPLEFT", 6, -8)
-            e:SetText("|cff888888Kein Loot in dieser Session.|r")
+            e:SetText("|cff888888No loot in this session.|r")
             table.insert(detailRows, e)
             yOff = -20
         else
@@ -761,14 +761,14 @@ function UI.RefreshRaidDetail()
     -- Unassigned Raid
     if selectedRaid.unassignedIdx then
         local snap = (db.unassignedRaids or {})[selectedRaid.unassignedIdx]
-        if not snap then selectedRaid = nil; UI.raidPanel.detailHeader:SetText("|cff888888— Auswahl treffen —|r"); content:SetHeight(1); return end
+        if not snap then selectedRaid = nil; UI.raidPanel.detailHeader:SetText("|cff888888— Select an entry —|r"); content:SetHeight(1); return end
         local diffStr = (snap.difficulty and snap.difficulty ~= "") and (" " .. ColorDiff(snap.difficulty)) or ""
         UI.raidPanel.detailHeader:SetText("|cffff9900Unassigned|r  " .. (snap.tier or "?") .. diffStr)
         local log = snap.lootLog or {}
         if #log == 0 then
             local e = content:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
             e:SetPoint("TOPLEFT", content, "TOPLEFT", 6, -8)
-            e:SetText("|cff888888Kein Loot.|r")
+            e:SetText("|cff888888No loot.|r")
             table.insert(detailRows, e)
             yOff = -20
         else
@@ -783,7 +783,7 @@ function UI.RefreshRaidDetail()
     for _, s in ipairs(db.raidContainers or {}) do
         if s.id == selectedRaid.sessionID then session = s; break end
     end
-    if not session then selectedRaid = nil; UI.raidPanel.detailHeader:SetText("|cff888888— Auswahl treffen —|r"); content:SetHeight(1); return end
+    if not session then selectedRaid = nil; UI.raidPanel.detailHeader:SetText("|cff888888— Select an entry —|r"); content:SetHeight(1); return end
 
     local raidID = selectedRaid.raidID
     local meta   = session.raidMeta and session.raidMeta[raidID]
@@ -792,7 +792,7 @@ function UI.RefreshRaidDetail()
     local isActive = (db.activeContainerIdx ~= nil)
                   and (db.currentRaid.id == raidID)
                   and not (meta and meta.closedAt)
-    UI.raidPanel.detailHeader:SetText(tierStr .. diffStr .. (isActive and " |cff00ff00aktiv|r" or ""))
+    UI.raidPanel.detailHeader:SetText(tierStr .. diffStr .. (isActive and " |cff00ff00active|r" or ""))
 
     local log = {}
     for _, item in ipairs(session.lootLog or {}) do
@@ -802,7 +802,7 @@ function UI.RefreshRaidDetail()
     if #log == 0 then
         local e = content:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         e:SetPoint("TOPLEFT", content, "TOPLEFT", 6, -8)
-        e:SetText("|cff888888Kein Loot für diesen Raid.|r")
+        e:SetText("|cff888888No loot for this raid.|r")
         table.insert(detailRows, e)
         yOff = -20
     else
@@ -921,9 +921,9 @@ function UI.ShowSessionPickerForAssign(anchorBtn)
 end
 
 StaticPopupDialogs["RLT_NEW_SESSION"] = {
-    text         = "Session-Name:",
+    text         = "Session name:",
     button1      = "Start",
-    button2      = "Abbrechen",
+    button2      = "Cancel",
     hasEditBox   = true,
     maxLetters   = 48,
     OnShow       = function(self)
@@ -934,7 +934,7 @@ StaticPopupDialogs["RLT_NEW_SESSION"] = {
         local sd = date("*t", now - daysSinceWed * 86400)
         local ed = date("*t", now + (6 - daysSinceWed) * 86400)
         self.EditBox:SetWidth(260)
-        self.EditBox:SetText(string.format("RW %02d.%02d. - %02d.%02d.", sd.day, sd.month, ed.day, ed.month))
+        self.EditBox:SetText(string.format("Week %02d.%02d. - %02d.%02d.", sd.day, sd.month, ed.day, ed.month))
         self.EditBox:HighlightText()
     end,
     OnAccept     = function(self)

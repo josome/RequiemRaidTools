@@ -454,7 +454,7 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
     end
 
     function Tests:testVersionWarn_IncompatibleOld()
-        -- senderMinor < MIN_PROTO_MINOR (5) → "inkompatibel" + return (Handler NICHT aufgerufen)
+        -- senderMinor < MIN_PROTO_MINOR (5) → "incompatible" + return (Handler NICHT aufgerufen)
         local handlerCalled = false
         Mock(GuildLoot.Loot, "OnCommItemActivate", function() handlerCalled = true end)
         local prints = CapturePrints()
@@ -465,7 +465,7 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
 
         IsFalse(handlerCalled)
         IsTrue(#prints >= 1)
-        IsTrue(prints[1]:find("inkompatibel", 1, true) ~= nil)
+        IsTrue(prints[1]:find("incompatible", 1, true) ~= nil)
         MockRestore()
     end
 
@@ -500,8 +500,8 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
 
         IsTrue(handlerCalled)
         IsTrue(#prints >= 1)
-        -- "Deine Version ... ist älter" Warnung
-        IsTrue(prints[1]:find("älter", 1, true) ~= nil)
+        -- "Your version ... is older" Warnung
+        IsTrue(prints[1]:find("is older", 1, true) ~= nil)
         MockRestore()
     end
 
@@ -534,7 +534,7 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
 
         IsFalse(handlerCalled)
         IsTrue(#prints >= 1)
-        IsTrue(prints[1]:find("ohne Version", 1, true) ~= nil)
+        IsTrue(prints[1]:find("without version", 1, true) ~= nil)
         MockRestore()
     end
 

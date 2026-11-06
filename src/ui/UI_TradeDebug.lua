@@ -25,15 +25,15 @@ local COL = {
 }
 
 local STATUS_TEXT = {
-    queued   = { "wartet",          1.0, 0.82, 0.0 },
-    staged   = { "im Handel",       1.0, 0.82, 0.0 },
-    traded   = { "gehandelt",       0.2, 0.9,  0.2 },
-    aborted  = { "abgebrochen",     1.0, 0.55, 0.1 },
-    bound    = { "gebunden",        1.0, 0.27, 0.27 },
-    notFound = { "nicht in Tasche", 1.0, 0.27, 0.27 },
-    expired  = { "abgelaufen",      1.0, 0.27, 0.27 },
-    self     = { "eigenes Item",    0.6, 0.6,  0.6 },
-    removed  = { "entfernt",        0.6, 0.6,  0.6 },
+    queued   = { "waiting",         1.0, 0.82, 0.0 },
+    staged   = { "in trade",        1.0, 0.82, 0.0 },
+    traded   = { "traded",          0.2, 0.9,  0.2 },
+    aborted  = { "cancelled",       1.0, 0.55, 0.1 },
+    bound    = { "bound",           1.0, 0.27, 0.27 },
+    notFound = { "not in bags",     1.0, 0.27, 0.27 },
+    expired  = { "expired",         1.0, 0.27, 0.27 },
+    self     = { "own item",        0.6, 0.6,  0.6 },
+    removed  = { "removed",         0.6, 0.6,  0.6 },
 }
 local STATUS_NONE = { "—", 0.5, 0.5, 0.5 }
 
@@ -102,7 +102,7 @@ end
 local function ShowPicker(title, onPick)
     if not picker then
         local inner
-        picker, inner = UI.CreateSidePanel(nil, UIParent, "Trade an …")
+        picker, inner = UI.CreateSidePanel(nil, UIParent, "Trade to …")
         picker:SetFrameStrata("DIALOG")
         picker:SetClampedToScreen(true)
         picker:SetWidth(200)
@@ -141,7 +141,7 @@ local function ShowPicker(title, onPick)
         yOff = yOff - 22
     end
     if #names == 0 then
-        GL.Print("Keine Raidteilnehmer bekannt — Raid Session starten oder Gruppe beitreten.")
+        GL.Print("No raid members known — start a Raid Session or join a group.")
         picker:Hide()
         return
     end
@@ -208,9 +208,9 @@ local function CreateRow(pool)
     r.sure:SetPoint("LEFT", r.removeBtn, "RIGHT", 3, 0)
     r.sure:SetText("|cffff4444Sure?|r")
 
-    SetTooltip(r.doneBtn,    { "Erledigt", "Als gehandelt markieren, z.B. nach einem Handel von Hand." })
-    SetTooltip(r.requeueBtn, { "Wieder in Queue", "Der Auto-Trade bietet das Item beim nächsten Handel wieder an. Startet das 2h-Fenster neu." })
-    SetTooltip(r.removeBtn,  { "Entfernen", "Aus dem Auto-Trade nehmen. Zweimal klicken. Die Zuteilung selbst bleibt erhalten; von Hand vorbereitete Einträge werden gelöscht." })
+    SetTooltip(r.doneBtn,    { "Done", "Mark as traded, e.g. after a trade by hand." })
+    SetTooltip(r.requeueBtn, { "Requeue", "The auto-trader offers the item again in the next trade. Restarts the 2h window." })
+    SetTooltip(r.removeBtn,  { "Remove", "Take out of the auto-trade. Click twice. The loot assignment itself is kept; entries prepared by hand are deleted." })
     return r
 end
 
@@ -233,16 +233,16 @@ local function FillRow(r, row, index)
         end
     end)
 
-    r.assigned:SetText(row.manual and "|cff888888(manuell)|r" or GL.ShortName(row.assigned or "?"))
+    r.assigned:SetText(row.manual and "|cff888888(manual)|r" or GL.ShortName(row.assigned or "?"))
     local recip = GL.ShortName(row.recipient or "?")
     r.recipText:SetText(row.redirected and ("|cff88ccff→ " .. recip .. "|r") or recip)
     r.recipBtn:SetScript("OnClick", function()
         ShowPicker(nil, function(name) GL.TradeLog.Redirect(e, name) end)
     end)
     SetTooltip(r.recipBtn, function()
-        local lines = { "Trade an: " .. tostring(row.recipient) }
-        if row.redirected then lines[#lines + 1] = "Umgeleitet — zugeteilt war " .. tostring(row.assigned) end
-        lines[#lines + 1] = "Klicken, um einen anderen Empfänger für den Auto-Trade zu wählen. Die Zuteilung bleibt unverändert."
+        local lines = { "Trade to: " .. tostring(row.recipient) }
+        if row.redirected then lines[#lines + 1] = "Redirected — assigned to " .. tostring(row.assigned) end
+        lines[#lines + 1] = "Click to pick a different auto-trade recipient. The loot assignment stays unchanged."
         return lines
     end)
 
@@ -298,7 +298,7 @@ end
 local function RefreshTrace()
     local lines = {}
     for _, e in ipairs(GL.TradeTrace.Entries()) do lines[#lines + 1] = GL.TradeTrace.Format(e) end
-    traceText:SetText(#lines > 0 and table.concat(lines, "\n") or "|cff888888Noch keine Ereignisse aufgezeichnet.|r")
+    traceText:SetText(#lines > 0 and table.concat(lines, "\n") or "|cff888888No events recorded yet.|r")
     traceText:SetWidth(traceScroll:GetWidth() - 8)
     traceText:GetParent():SetHeight(math.max(1, traceText:GetStringHeight() + 8))
 end
@@ -310,8 +310,8 @@ function UI.RefreshTradeDebug()
 
     local session = ActiveSession()
     local waiting, staged = GL.TradeLog.QueueSummary(now)
-    summaryText:SetText(string.format("%s   ·   Queue: |cffffd100%d wartend|r · |cffffd100%d im Handel|r   ·   Protokoll: %d",
-        session and (session.label or "Raid Session") or "|cffff8888Keine aktive Raid Session|r",
+    summaryText:SetText(string.format("%s   ·   Queue: |cffffd100%d waiting|r · |cffffd100%d in trade|r   ·   Log: %d",
+        session and (session.label or "Raid Session") or "|cffff8888No active Raid Session|r",
         waiting, staged, #(GuildLootDB.tradeTrace or {})))
 
     listScroll:SetShown(not showTrace)
@@ -320,7 +320,7 @@ function UI.RefreshTradeDebug()
     frame.onlyOpen:SetShown(not showTrace)
     traceScroll:SetShown(showTrace)
     frame.emptyText:SetShown(false)
-    frame.viewBtn:SetText(showTrace and "Liste" or "Ereignisse")
+    frame.viewBtn:SetText(showTrace and "List" or "Events")
 
     if showTrace then RefreshTrace() else RefreshList(now) end
 end
@@ -341,14 +341,14 @@ local function BuildHeader()
         fs:SetJustifyH(justify or "LEFT")
         fs:SetText(text)
     end
-    Head("time", "Zeit")
+    Head("time", "Time")
     Head("item", "Item")
-    Head("assigned", "Zugeteilt an")
-    Head("recipient", "Trade an")
+    Head("assigned", "Assigned to")
+    Head("recipient", "Trade to")
     Head("status", "Status")
-    Head("attempts", "Vers.", "CENTER")
-    Head("remaining", "Rest", "RIGHT")
-    Head("actions", "Aktionen")
+    Head("attempts", "Tries", "CENTER")
+    Head("remaining", "Left", "RIGHT")
+    Head("actions", "Actions")
     frame.header = h
 end
 
@@ -363,7 +363,7 @@ local function BuildDropZone()
     dropZone:RegisterForDrag("LeftButton")
     local hint = dropZone:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     hint:SetPoint("CENTER")
-    hint:SetText("|cff888888Item aus der Tasche hier ablegen, um einen Handel von Hand vorzubereiten|r")
+    hint:SetText("|cff888888Drop an item from your bags here to prepare a trade by hand|r")
 
     dropZone:SetScript("OnEnter", function(self) self:SetBackdropBorderColor(1, 0.8, 0, 1) end)
     dropZone:SetScript("OnLeave", function(self) self:SetBackdropBorderColor(0.4, 0.4, 0.6, 1) end)
@@ -371,7 +371,7 @@ local function BuildDropZone()
         local infoType, _, itemLink = GetCursorInfo()
         if infoType ~= "item" or not itemLink then return end
         ClearCursor()
-        ShowPicker("Empfänger für " .. itemLink .. " wählen:", function(name)
+        ShowPicker("Pick a recipient for " .. itemLink .. ":", function(name)
             GL.TradeLog.AddManual(itemLink, name)
         end)
     end
@@ -405,11 +405,11 @@ local function Build()
     local copyBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
     copyBtn:SetSize(80, 20)
     copyBtn:SetPoint("RIGHT", viewBtn, "LEFT", -4, 0)
-    copyBtn:SetText("Kopieren")
+    copyBtn:SetText("Copy")
     copyBtn:SetScript("OnClick", function()
         UI.ShowExportPopup(nil, GL.TradeTrace.AsText())
     end)
-    SetTooltip(copyBtn, { "Protokoll kopieren", "Öffnet das gesamte Ereignisprotokoll als Text zum Kopieren (Strg+C)." })
+    SetTooltip(copyBtn, { "Copy log", "Opens the complete event log as text for copying (Ctrl+C)." })
 
     local refreshBtn = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
     refreshBtn:SetSize(70, 20)
@@ -422,7 +422,7 @@ local function Build()
     cb:SetPoint("RIGHT", refreshBtn, "LEFT", -80, 0)
     cb.text = cb:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     cb.text:SetPoint("LEFT", cb, "RIGHT", 2, 0)
-    cb.text:SetText("Nur offene")
+    cb.text:SetText("Open only")
     cb:SetScript("OnClick", function(self) onlyOpen = self:GetChecked() and true or false; UI.RefreshTradeDebug() end)
     frame.onlyOpen = cb
 
@@ -440,7 +440,7 @@ local function Build()
 
     frame.emptyText = frame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     frame.emptyText:SetPoint("CENTER", listScroll, "CENTER")
-    frame.emptyText:SetText("Keine Einträge.")
+    frame.emptyText:SetText("No entries.")
 
     -- Ereignisprotokoll
     traceScroll = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")

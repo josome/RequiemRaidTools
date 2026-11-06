@@ -141,7 +141,7 @@ function Loot.OnItemInfoReceived(itemID)
                 if di.manual then
                     local category = GL.GetItemCategory(di.itemID, equipLoc, quality or 0)
                     table.insert(Loot.GetPendingLoot(), { link = di.link, name = name or "?", itemID = di.itemID, quality = quality or 0, category = category })
-                    GL.Print("Item manuell hinzugefügt: " .. di.link)
+                    GL.Print("Item added manually: " .. di.link)
                 else
                     Loot.TryAddPendingItem(di, equipLoc)
                 end
@@ -257,7 +257,7 @@ end
 
 -- clearAfter: ob currentItem nach Zuweisung geleert wird (default true; false bei Multi-Assign)
 function Loot.AssignLootConfirm(fullName, diff, clearAfter)
-    if not fullName then GL.Print("Fehler: kein Spielername bei Zuweisung"); return end
+    if not fullName then GL.Print("Error: no player name on assignment"); return end
     if clearAfter == nil then clearAfter = true end
     local category = currentItem.category or "other"
     local link     = currentItem.link
@@ -336,7 +336,7 @@ function Loot.AssignLootConfirm(fullName, diff, clearAfter)
         GL.TradeLog.Track(logEntry)
         GL.TradeLog.SyncMirror(time())
     elseif GL.TradeTrace then
-        GL.TradeTrace.Add("assign", "%s → %s: kein ML — kein Auto-Trade", tostring(link), fullName)
+        GL.TradeTrace.Add("assign", "%s → %s: not ML — no auto-trade", tostring(link), fullName)
     end
 
     -- Observer informieren (fullName ist bereits realm-qualifiziert)

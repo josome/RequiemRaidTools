@@ -379,7 +379,7 @@ function GL.BuildAttendanceColumns(nights, expanded)
                                  .. ((kill.difficulty and kill.difficulty ~= "")
                                      and ("  ·  " .. kill.difficulty) or "")
                                  .. "  |cff888888(Boss " .. i .. "/" .. killCount
-                                 .. " — klicken zum Zuklappen)|r",
+                                 .. " — click to collapse)|r",
                     groupLabel = groupLabel,
                     difficulty = kill.difficulty,
                     -- Rückweg zum Löschen
@@ -399,8 +399,8 @@ function GL.BuildAttendanceColumns(nights, expanded)
                 label      = dateLabel,
                 tooltipT   = (night.label ~= "" and night.label) or dateLabel,
                 tooltipD   = expandable
-                             and (killCount .. " Bosse — klicken zum Aufklappen")
-                             or  "Keine einzelnen Bosskills aufgezeichnet",
+                             and (killCount .. " bosses — click to expand")
+                             or  "No individual boss kills recorded",
                 groupLabel = groupLabel,
                 -- nur wenn der ganze Abend eine Difficulty hatte
                 difficulty = UnifiedDifficulty(kills),

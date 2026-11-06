@@ -250,7 +250,7 @@ Setzt intern drei Mocks (SendAddonMessage, IsInRaid, IsInGroup), ruft `sendFn()`
 
 **Setup:** Mock auf `GuildLoot.Print` und `GuildLoot.Loot.OnCommItemActivate`. Künstliche Nachricht `"0.4\tITEM_ON\t..."`.
 
-**Prüft:** Handler nicht aufgerufen, Warnung enthält Substring "inkompatibel".
+**Prüft:** Handler nicht aufgerufen, Warnung enthält Substring "incompatible".
 
 ---
 
@@ -264,9 +264,9 @@ Setzt intern drei Mocks (SendAddonMessage, IsInRaid, IsInGroup), ruft `sendFn()`
 
 ### `testVersionWarn_NewerSender_HandlerStillCalled`
 
-**Testet:** Sender-Minor > lokal-Minor → Warnung "Deine Version ... älter" + Dispatch.
+**Testet:** Sender-Minor > lokal-Minor → Warnung "Your version ... is older" + Dispatch.
 
-**Prüft:** Handler aufgerufen, Warnung enthält "älter".
+**Prüft:** Handler aufgerufen, Warnung enthält "is older".
 
 ---
 
@@ -284,7 +284,7 @@ Setzt intern drei Mocks (SendAddonMessage, IsInRaid, IsInGroup), ruft `sendFn()`
 
 **Testet:** Nachricht ohne Version-Trennzeichen erzeugt spezielle Warnung und early-return.
 
-**Prüft:** Handler nicht aufgerufen, Warnung enthält "ohne Version".
+**Prüft:** Handler nicht aufgerufen, Warnung enthält "without version".
 
 ---
 

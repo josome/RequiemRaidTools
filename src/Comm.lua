@@ -304,9 +304,9 @@ local VERSION_CHECKS = {
         predicate    = function(senderMinor, localMinor) return senderMinor < MIN_PROTO_MINOR end,
         message      = function(sender, senderVersion)
             return "|cffff4444[ReqRT] " .. (sender or "?")
-                .. " hat v" .. senderVersion
-                .. " — inkompatibel (min Minor: " .. MIN_PROTO_MINOR
-                .. "). Bitte Addon aktualisieren.|r"
+                .. " has v" .. senderVersion
+                .. " — incompatible (min minor: " .. MIN_PROTO_MINOR
+                .. "). Please update the addon.|r"
         end,
     },
     {
@@ -314,17 +314,17 @@ local VERSION_CHECKS = {
         predicate    = function(senderMinor, localMinor) return senderMinor < localMinor end,
         message      = function(sender, senderVersion)
             return "|cffff8800[ReqRT] " .. (sender or "?")
-                .. " hat eine ältere Version (v" .. senderVersion
-                .. ") — bitte Addon aktualisieren.|r"
+                .. " has an older version (v" .. senderVersion
+                .. ") — please update the addon.|r"
         end,
     },
     {
         skipDispatch = false,
         predicate    = function(senderMinor, localMinor) return senderMinor > localMinor end,
         message      = function(sender, senderVersion)
-            return "|cffff8800[ReqRT] Deine Version (v" .. ADDON_VERSION
-                .. ") ist älter als die von " .. (sender or "?")
-                .. " (v" .. senderVersion .. ") — bitte Addon aktualisieren.|r"
+            return "|cffff8800[ReqRT] Your version (v" .. ADDON_VERSION
+                .. ") is older than " .. (sender or "?")
+                .. " (v" .. senderVersion .. ") — please update the addon.|r"
         end,
     },
 }
@@ -349,8 +349,8 @@ function Comm.OnMessage(msg, sender)
     -- Addon-Version aus erstem Feld extrahieren
     local sep1 = msg:find(SEP, 1, true)
     if not sep1 then
-        GL.Print("|cffff4444[ReqRT] Nachricht ohne Version von "
-                 .. GL.ShortName(sender or "?") .. " — bitte Addon aktualisieren.|r")
+        GL.Print("|cffff4444[ReqRT] Message without version from "
+                 .. GL.ShortName(sender or "?") .. " — please update the addon.|r")
         return
     end
     local senderVersion = msg:sub(1, sep1 - 1)

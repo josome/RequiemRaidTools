@@ -136,7 +136,7 @@ function Loot.AddItemManually(link)
                    difficulty = db.currentRaid.difficulty or "" }
     table.insert(pendingLoot(), item)
     if GL.UI and GL.UI.RefreshLootTab then GL.UI.RefreshLootTab() end
-    GL.Print("Item manuell hinzugefügt: " .. link)
+    GL.Print("Item added manually: " .. link)
 end
 
 -- Prüft Loot-Filter und fügt Item ggf. in pendingLoot ein

@@ -250,7 +250,7 @@ function UI.BuildAttendancePanel(parent)
                 if not self.tooltipT then return end
                 GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
                 GameTooltip:AddLine(self.tooltipT, 1, 1, 1)
-                GameTooltip:AddLine("Klicken zum Zuklappen", 0.8, 0.8, 0.8, true)
+                GameTooltip:AddLine("Click to collapse", 0.8, 0.8, 0.8, true)
                 GameTooltip:Show()
             end)
             btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -345,7 +345,7 @@ function UI.BuildAttendancePanel(parent)
     -- Trenner zwischen Kader- und Gast-Block (es gibt höchstens einen)
     local sep = content:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     sep:SetJustifyH("LEFT")
-    sep:SetText("|cff888888weitere Teilnehmer|r")
+    sep:SetText("|cff888888Other participants|r")
     sep:Hide()
     panel.sepLbl = sep
 
@@ -442,15 +442,15 @@ function UI.RefreshAttendanceTab()
     -- ── Leerzustände: ein leerer Tab darf nicht wie ein Defekt aussehen ──
     local msg = nil
     if not season then
-        msg = "Noch keine Season angelegt.\n|cff888888Oben auf \"New Season\".|r"
+        msg = "No season created yet.\n|cff888888Click \"New Season\" above.|r"
     elseif #data.rows == 0 then
         -- Ohne Kader-Schnappschuss bildet sich die Liste aus der Attendance — leer ist sie
         -- also nur, wenn in dieser Season auch niemand geraidet hat
-        msg = "Niemand in dieser Season.\n"
-              .. "|cff888888Kein Raid im Zeitraum, und kein Kader eingelesen.|r"
+        msg = "Nobody in this season.\n"
+              .. "|cff888888No raid in this period, and no roster read.|r"
     elseif #data.nights == 0 then
-        msg = "Noch keine Raid-Abende in dieser Season.\n"
-              .. "|cff888888Liegen die Raids davor? Dann das Startdatum der Season zurücksetzen.|r"
+        msg = "No raid nights in this season yet.\n"
+              .. "|cff888888Are the raids earlier? Then move the season's start date back.|r"
     end
 
     -- ── Spaltenfenster bestimmen ──────────────────────────────

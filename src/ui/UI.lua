@@ -259,7 +259,7 @@ function UI.BuildMainFrame()
                 -- Aktueller ML ist noch in der Gruppe → Anfrage stellen + Observer-seitiger Timer
                 self:SetChecked(false)  -- noch nicht setzen, erst auf Bestätigung warten
                 if GL.Comm then GL.Comm.SendMLRequest(UnitName("player") or "") end
-                GL.Print("ML-Anfrage an " .. GL.ShortName(currentML) .. " gesendet (15s Timeout)...")
+                GL.Print("ML request sent to " .. GL.ShortName(currentML) .. " (15s timeout)...")
                 -- Nach 15s ohne Antwort automatisch übernehmen
                 GL._mlClaimTimer = C_Timer.NewTimer(15, function()
                     GL._mlClaimTimer = nil
@@ -269,7 +269,7 @@ function UI.BuildMainFrame()
                     if GL.Comm and (IsInRaid() or IsInGroup()) then
                         GL.Comm.SendMLAnnounce(UnitName("player") or "")
                     end
-                    GL.Print("ML-Übernahme nach Timeout.")
+                    GL.Print("ML taken over after timeout.")
                     if GL.UI and GL.UI.RefreshMLButton then GL.UI.RefreshMLButton() end
                     if UI.RefreshLootTab then UI.RefreshLootTab() end
                 end)
@@ -328,7 +328,7 @@ function UI.BuildMainFrame()
     local crashWarnLbl = sessionBar:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     crashWarnLbl:SetPoint("RIGHT", sessionBar, "RIGHT", -8, 0)
     crashWarnLbl:SetJustifyH("RIGHT")
-    crashWarnLbl:SetText("|cffff4444Absturz gefährdet Log-Daten — /reload sichert.|r")
+    crashWarnLbl:SetText("|cffff4444A crash can lose log data — /reload saves.|r")
     crashWarnLbl:Hide()
     UI.sessionCrashWarnLbl = crashWarnLbl
 

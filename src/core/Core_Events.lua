@@ -74,14 +74,14 @@ local function OnEventPlayerLogin()
         local reset   = GL.GetLastWeeklyReset()
         local session = db.raidContainers[db.activeContainerIdx]
         if session and (session.startedAt or 0) < reset then
-            GL.Print("Session automatisch geschlossen (Weekly Reset).")
+            GL.Print("Session closed automatically (weekly reset).")
             GL.CloseContainer()
         end
     end
     -- Auto-Close nach >4h offline
     if db.activeContainerIdx and db.lastLogout and db.lastLogout > 0 then
         if (time() - db.lastLogout) > 4 * 3600 then
-            GL.Print("Session automatisch geschlossen (>4h offline).")
+            GL.Print("Session closed automatically (>4h offline).")
             GL.CloseContainer()
         end
     end

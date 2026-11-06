@@ -158,7 +158,7 @@ function UI.BuildSettingsPanel(parent)
 
     MakeCheck("Announce item start as raid warning", "raidWarnItem")
     MakeCheck("Whisper winner on assign", "whisperWinner")
-    local cbDance = MakeCheck("Tanzende Figur bei leerem Loot", "danceEmptyState")
+    local cbDance = MakeCheck("Dancing character when no loot", "danceEmptyState")
     cbDance:HookScript("OnClick", function() UI.RefreshLootTab() end)
 
     -- Export Format Dropdown

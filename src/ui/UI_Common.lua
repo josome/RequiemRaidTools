@@ -417,7 +417,7 @@ end
 StaticPopupDialogs[RENAME_DIALOG] = {
     text       = "%s",
     button1    = "OK",
-    button2    = "Abbrechen",
+    button2    = "Cancel",
     hasEditBox = true,
     maxLetters = 48,
     OnShow     = function(self)
@@ -441,7 +441,7 @@ StaticPopupDialogs[RENAME_DIALOG] = {
 function UI.ShowRenameDialog(title, current, apply)
     if type(apply) ~= "function" then return end
     renameState = { current = current or "", apply = apply }
-    StaticPopup_Show(RENAME_DIALOG, title or "Umbenennen:")
+    StaticPopup_Show(RENAME_DIALOG, title or "Rename:")
 end
 
 -- ============================================================

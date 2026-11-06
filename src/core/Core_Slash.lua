@@ -67,13 +67,13 @@ SlashCmdList["REQUIEMRAIDTOOLS"] = function(input)
         end
         if simLink and GL.UI and GL.UI.ShowPlayerPopup then
             if GL.PopupFilterMatches and not GL.PopupFilterMatches(simLink, simCat, true) then
-                GL.Print("|cffff4444Item vom Announce-Filter geblockt: " .. simLink .. "|r")
+                GL.Print("|cffff4444Item blocked by announce filter: " .. simLink .. "|r")
             else
                 GL.UI.ShowPlayerPopup(simLink, simCat)
                 GL.Print("Simulated ITEM_ON (Popup): " .. simLink .. " [" .. (simCat or "?") .. "]")
             end
         else
-            GL.Print("|cffff4444Kein equippables Item in den Taschen gefunden.|r")
+            GL.Print("|cffff4444No equippable item found in bags.|r")
         end
 
     elseif cmd == "popup" then
@@ -173,11 +173,11 @@ SlashCmdList["REQUIEMRAIDTOOLS"] = function(input)
 
     elseif cmd == "simmlannounce" then
         GL.OnCommMLAnnounce("FakeML2")
-        GL.Print("Simulated ML_ANNOUNCE: FakeML2 ist jetzt ML.")
+        GL.Print("Simulated ML_ANNOUNCE: FakeML2 is now ML.")
 
     elseif cmd == "simraidquery" then
         GL.OnCommRaidQuery(UnitName("player") or "")
-        GL.Print("Simulated RAID_QUERY (als eigener Sender).")
+        GL.Print("Simulated RAID_QUERY (as own sender).")
 
     elseif cmd == "loopback" then
         local s = GuildLootDB.settings
@@ -210,23 +210,23 @@ SlashCmdList["REQUIEMRAIDTOOLS"] = function(input)
 
     elseif cmd == "backup" then
         if not GuildLootDBBackup or not GuildLootDBBackup.savedAt then
-            GL.Print("Kein Backup vorhanden.")
+            GL.Print("No backup available.")
         else
             local loot = 0
             for _, s in ipairs(GuildLootDBBackup.raidContainers or {}) do
                 loot = loot + #(s.lootLog or {})
             end
-            GL.Print(string.format("Backup vom %s: %d Sessions, %d Loot-Einträge, %d unassigned",
+            GL.Print(string.format("Backup from %s: %d sessions, %d loot entries, %d unassigned",
                 date("%d.%m.%Y %H:%M", GuildLootDBBackup.savedAt),
                 #(GuildLootDBBackup.raidContainers or {}),
                 loot,
                 #(GuildLootDBBackup.unassignedRaids or {})))
-            GL.Print("Zum Wiederherstellen: /reqrt restore")
+            GL.Print("To restore: /reqrt restore")
         end
 
     elseif cmd == "restore" then
         if not GuildLootDBBackup or not GuildLootDBBackup.savedAt then
-            GL.Print("Kein Backup vorhanden.")
+            GL.Print("No backup available.")
         elseif GL._restorePending then
             GL._restorePending = false
             GuildLootDB.raidContainers  = CopyTable(GuildLootDBBackup.raidContainers or {})
@@ -234,11 +234,11 @@ SlashCmdList["REQUIEMRAIDTOOLS"] = function(input)
             GuildLootDB.raidHistory     = CopyTable(GuildLootDBBackup.raidHistory or {})
             GuildLootDB.activeContainerIdx = nil
             GL.ResetCurrentRaid()
-            GL.Print("|cff00ff00Backup wiederhergestellt.|r Bitte /reload ausführen.")
+            GL.Print("|cff00ff00Backup restored.|r Please run /reload.")
             if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
         else
             GL._restorePending = true
-            GL.Print("Backup wiederherstellen? /reqrt restore nochmal eingeben (10s).")
+            GL.Print("Restore backup? Type /reqrt restore again (10s).")
             C_Timer.After(10, function() GL._restorePending = false end)
         end
 
@@ -253,10 +253,10 @@ SlashCmdList["REQUIEMRAIDTOOLS"] = function(input)
     elseif cmd == "tradetrace" then
         if arg == "clear" then
             GL.TradeTrace.Clear()
-            GL.Print("Trade-Protokoll geleert.")
+            GL.Print("Trade log cleared.")
             if GL.UI and GL.UI.RefreshTradeDebug then GL.UI.RefreshTradeDebug() end
         else
-            GL.Print("Trade-Protokoll: " .. #(GuildLootDB.tradeTrace or {}) .. " Einträge. Anzeigen: /reqrt tradelog | Leeren: /reqrt tradetrace clear")
+            GL.Print("Trade log: " .. #(GuildLootDB.tradeTrace or {}) .. " entries. Show: /reqrt tradelog | Clear: /reqrt tradetrace clear")
         end
 
     elseif cmd == "dbinfo" then
@@ -270,7 +270,7 @@ SlashCmdList["REQUIEMRAIDTOOLS"] = function(input)
             local raidCount = 0; for _ in pairs(s.raidMeta or {}) do raidCount = raidCount + 1 end
             GL.Print(string.format("  [%d] %s  raids:%d  loot:%d  closed:%s",
                 i, s.label or "?", raidCount, #(s.lootLog or {}),
-                s.closedAt and date("%d.%m.%Y", s.closedAt) or "nein"))
+                s.closedAt and date("%d.%m.%Y", s.closedAt) or "no"))
         end
         for i, snap in ipairs(db.unassignedRaids or {}) do
             GL.Print(string.format("  unassigned[%d] %s  loot:%d",

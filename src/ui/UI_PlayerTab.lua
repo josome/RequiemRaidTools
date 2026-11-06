@@ -153,7 +153,7 @@ local function BuildItemSubRows(content, fullName, rowW, yOff)
         emptyRow:SetPoint("TOPLEFT", content, "TOPLEFT", SUB_INDENT, yOff)
         local emptyLbl = emptyRow:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         emptyLbl:SetPoint("TOPLEFT", emptyRow, "TOPLEFT", 4, -3)
-        emptyLbl:SetText("|cff666666Kein Loot in diesem Raid|r")
+        emptyLbl:SetText("|cff666666No loot in this raid|r")
         emptyRow:Show()
         table.insert(playerRows, emptyRow)
         yOff = yOff - SUB_ROW_H
@@ -230,7 +230,7 @@ function UI.RefreshPlayerTab()  -- war: RefreshSpielerTab
         nameLbl:SetWidth(colW[1])
         local displayName = GL.ShortName(fullName)
         if isAbsent then
-            nameLbl:SetText("|cff888888" .. displayName .. " (abw.)|r")
+            nameLbl:SetText("|cff888888" .. displayName .. " (absent)|r")
         else
             nameLbl:SetText(GL.ColoredName(displayName, data.class))
         end
@@ -326,7 +326,7 @@ function UI.ShowDifficultyOverrideMenu(anchor, fullName, category, label)
         { text = "Normal (N)",  diff = "N" },
         { text = "Heroic (H)",  diff = "H" },
         { text = "Mythic (M)",  diff = "M" },
-        { text = "— (keine)",   diff = nil },
+        { text = "— (none)",   diff = nil },
     }
     UIDropDownMenu_Initialize(menu, function(self, level)
         for _, opt in ipairs(options) do

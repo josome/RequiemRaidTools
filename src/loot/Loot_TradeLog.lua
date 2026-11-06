@@ -123,10 +123,10 @@ function TradeLog.Track(entry)
     local who = TradeLog.Recipient(entry)
     if TradeLog.IsSelf(who) then
         TradeLog.SetStatus(entry, "self")
-        Trace("assign", "%s → %s: eigenes Item, kein Auto-Trade", LinkOf(entry), tostring(who))
+        Trace("assign", "%s → %s: own item, no auto-trade", LinkOf(entry), tostring(who))
     else
         TradeLog.SetStatus(entry, "queued")
-        Trace("assign", "%s → %s: in Queue", LinkOf(entry), tostring(who))
+        Trace("assign", "%s → %s: queued", LinkOf(entry), tostring(who))
     end
     TradeLog.NotifyChanged()
 end
@@ -134,7 +134,7 @@ end
 --- Zuteilung ohne aktive Raid Session: Eintrag nur zur Laufzeit führen.
 function TradeLog.AddOrphan(entry)
     table.insert(TradeLog._orphans, entry)
-    Trace("assign", "%s: keine aktive Raid Session — Auto-Trade nur bis /reload", LinkOf(entry))
+    Trace("assign", "%s: no active Raid Session — auto-trade only until /reload", LinkOf(entry))
 end
 
 -- ============================================================
@@ -149,7 +149,7 @@ function TradeLog.ExpireStale(now)
         local t = e.trade
         if t and OPEN[t.status] and not TradeLog.IsOpen(e, now) then
             TradeLog.SetStatus(e, "expired", now)
-            Trace("expire", "%s → %s: 2h-Handelsfenster abgelaufen", LinkOf(e), tostring(TradeLog.Recipient(e)))
+            Trace("expire", "%s → %s: 2h trade window expired", LinkOf(e), tostring(TradeLog.Recipient(e)))
             n = n + 1
         end
     end)
@@ -200,7 +200,7 @@ end
 function TradeLog.OnLogin(now)
     TradeLog.ExpireStale(now)
     TradeLog.SyncMirror(now)
-    Trace("login", "Queue nach Login/Reload: %d offen", #GL.Loot._pendingTrades)
+    Trace("login", "Queue after login/reload: %d open", #GL.Loot._pendingTrades)
 end
 
 --- Zahlen für die Kopfzeile des Debug-Fensters.
@@ -265,7 +265,7 @@ function TradeLog.Redirect(entry, fullName, now)
         TradeLog.SetStatus(entry, "queued", now)
         entry.trade.since = now
     end
-    Trace("manual", "%s: Auto-Trade umgeleitet %s → %s", LinkOf(entry), tostring(before), fullName)
+    Trace("manual", "%s: auto-trade redirected %s → %s", LinkOf(entry), tostring(before), fullName)
     TradeLog.NotifyChanged()
 end
 
@@ -274,7 +274,7 @@ function TradeLog.MarkDone(entry, now)
     if not entry then return end
     TradeLog.SetStatus(entry, "traded", now)
     entry.trade.manualDone = true
-    Trace("manual", "%s → %s: von Hand als erledigt markiert", LinkOf(entry), tostring(TradeLog.Recipient(entry)))
+    Trace("manual", "%s → %s: marked as done by hand", LinkOf(entry), tostring(TradeLog.Recipient(entry)))
     TradeLog.NotifyChanged()
 end
 
@@ -286,14 +286,14 @@ function TradeLog.Requeue(entry, now)
     -- Mit sich selbst kann man nicht handeln — nie in die Queue
     if TradeLog.IsSelf(TradeLog.Recipient(entry)) then
         TradeLog.SetStatus(entry, "self", now)
-        Trace("manual", "%s: eigenes Item, nicht in Queue genommen", LinkOf(entry))
+        Trace("manual", "%s: own item, not queued", LinkOf(entry))
         TradeLog.NotifyChanged()
         return
     end
     TradeLog.SetStatus(entry, "queued", now)
     entry.trade.since = now
     entry.trade.manualDone = nil
-    Trace("manual", "%s → %s: von Hand wieder in Queue", LinkOf(entry), tostring(TradeLog.Recipient(entry)))
+    Trace("manual", "%s → %s: requeued by hand", LinkOf(entry), tostring(TradeLog.Recipient(entry)))
     TradeLog.NotifyChanged()
 end
 
@@ -310,13 +310,13 @@ function TradeLog.Remove(entry, now)
             end
         end)
         if removed then
-            Trace("manual", "%s → %s: manueller Eintrag gelöscht", LinkOf(entry), tostring(TradeLog.Recipient(entry)))
+            Trace("manual", "%s → %s: manual entry deleted", LinkOf(entry), tostring(TradeLog.Recipient(entry)))
             TradeLog.NotifyChanged()
             return
         end
     end
     TradeLog.SetStatus(entry, "removed", now)
-    Trace("manual", "%s → %s: aus Auto-Trade entfernt", LinkOf(entry), tostring(TradeLog.Recipient(entry)))
+    Trace("manual", "%s → %s: removed from auto-trade", LinkOf(entry), tostring(TradeLog.Recipient(entry)))
     TradeLog.NotifyChanged()
 end
 
@@ -344,8 +344,8 @@ function TradeLog.AddManual(link, fullName, now)
     end
     TradeLog.SetStatus(entry, TradeLog.IsSelf(fullName) and "self" or "queued", now)
     entry.trade.attempts = 0
-    Trace("manual", "%s → %s: von Hand vorbereitet%s", link, fullName,
-        session and "" or " (keine Raid Session — nur bis /reload)")
+    Trace("manual", "%s → %s: prepared by hand%s", link, fullName,
+        session and "" or " (no Raid Session — only until /reload)")
     TradeLog.NotifyChanged()
     return entry
 end
@@ -356,7 +356,7 @@ end
 function TradeLog.OnReassign(entry, oldName, newName)
     if not entry then return end
     local redirected = entry.trade and entry.trade.recipient
-    Trace("reassign", "%s: Zuteilung %s → %s%s", LinkOf(entry), tostring(oldName), tostring(newName),
-        redirected and (" (Auto-Trade bleibt umgeleitet an " .. redirected .. ")") or "")
+    Trace("reassign", "%s: assignment %s → %s%s", LinkOf(entry), tostring(oldName), tostring(newName),
+        redirected and (" (auto-trade stays redirected to " .. redirected .. ")") or "")
     TradeLog.NotifyChanged()
 end

@@ -25,7 +25,7 @@ function UI.ShowDifficultyPopup(recipientShortName, callback)
 
     local lbl = popup:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     lbl:SetPoint("TOP", popup, "TOP", 0, -12)
-    lbl:SetText("Schwierigkeitsgrad auswählen:")
+    lbl:SetText("Select difficulty:")
 
     local function MakeDiffBtn(text, diff, xPos)
         local btn = MakeButton(popup, text, 60, 24, function()

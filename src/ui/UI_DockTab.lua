@@ -42,9 +42,9 @@ function UI.BuildDockTab()
         GameTooltip:SetText("RequiemRaidTools", 1, 0.8, 0)
         local pending = GL.Loot and GL.Loot.GetPendingLoot and #GL.Loot.GetPendingLoot() or 0
         if pending > 0 then
-            GameTooltip:AddLine(pending .. " Item(s) warten", 1, 1, 0)
+            GameTooltip:AddLine(pending .. " item(s) waiting", 1, 1, 0)
         end
-        GameTooltip:AddLine("Klicken zum Öffnen", 0.6, 0.6, 0.6)
+        GameTooltip:AddLine("Click to open", 0.6, 0.6, 0.6)
         GameTooltip:Show()
     end)
     dockTab:SetScript("OnLeave", function() GameTooltip:Hide() end)

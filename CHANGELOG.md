@@ -9,6 +9,7 @@
 - Event log: every auto-trade step is recorded and kept across reloads. Switch the window to "Events" and use "Copy" to share what happened when a trade went wrong. `/reqrt tradetrace clear` empties it.
 
 - The addon now shows its own icon in the game's AddOns list instead of a question mark.
+- All texts in the interface and chat are now in English (previously mixed German/English). New Raid Sessions are named "Week 42 2026" instead of "KW 42 2026"; existing names stay as they are.
 
 **Bug Fixes**
 - Assigned items no longer drop out of the auto-trade after a `/reload`, disconnect or crash. The queue is now rebuilt from the saved Raid Session.

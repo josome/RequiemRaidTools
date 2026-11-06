@@ -108,7 +108,7 @@ function GL.MigratePendingLoot()
     }
     table.insert(db.raidContainers, legacy)
     db.currentRaid.pendingLoot = {}
-    GL.Print(string.format("%d Item(s) in Legacy-Session gesichert.", count))
+    GL.Print(string.format("%d item(s) saved to a legacy session.", count))
 end
 
 --- Löscht eine Session aus raidContainers und passt activeContainerIdx an.
@@ -143,14 +143,14 @@ end
 function GL.StartContainer(label)
     local db = GuildLootDB
     if db.activeContainerIdx then
-        GL.Print("Session bereits offen.")
+        GL.Print("Session already open.")
         return
     end
     local ts  = time()
     local kw  = GL.ISOWeek(ts)
     local yr  = tonumber(date("%Y", ts))
     local finalLabel = uniqueSessionLabel(
-        (label and label ~= "") and label or string.format("KW %02d %d", kw, yr)
+        (label and label ~= "") and label or string.format("Week %02d %d", kw, yr)
     )
     local session = {
         id             = string.format("%04d-W%02d-%08x", yr, kw, ts),
@@ -167,7 +167,7 @@ function GL.StartContainer(label)
 
     table.insert(db.raidContainers, session)
     db.activeContainerIdx = #db.raidContainers
-    GL.Print("Session gestartet: " .. finalLabel)
+    GL.Print("Session started: " .. finalLabel)
     -- Wer die Session startet, ist automatisch ML
     db.settings.isMasterLooter = true
     -- Falls bereits Bosskills stattgefunden haben (currentRaid.tier gesetzt durch ENCOUNTER_END),
@@ -207,7 +207,7 @@ function GL.CloseContainer()
     GL.ResetCurrentRaid()
     session.closedAt      = closedAt
     db.activeContainerIdx = nil
-    GL.Print("Session geschlossen.")
+    GL.Print("Session closed.")
     if GL.Comm and GL.Comm.SendSessionEnd then
         GL.Comm.SendSessionEnd(sessionID, closedAt)
     end
@@ -221,11 +221,11 @@ end
 function GL.MergeSessionIntoActive(sourceCI)
     local db = GuildLootDB
     if not db.activeContainerIdx then
-        GL.Print("Kein aktive Session zum Mergen.")
+        GL.Print("No active session to merge into.")
         return
     end
     if sourceCI == db.activeContainerIdx then
-        GL.Print("Kann aktive Session nicht mit sich selbst mergen.")
+        GL.Print("Cannot merge the active session with itself.")
         return
     end
     local source = db.raidContainers[sourceCI]
@@ -241,7 +241,7 @@ function GL.MergeSessionIntoActive(sourceCI)
     if sourceCI < db.activeContainerIdx then
         db.activeContainerIdx = db.activeContainerIdx - 1
     end
-    GL.Print(string.format("%d Item(s) aus '%s' übernommen.", count, sourceLabel))
+    GL.Print(string.format("%d item(s) taken over from '%s'.", count, sourceLabel))
     if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
 end
 
@@ -254,7 +254,7 @@ end
 function GL.ResumeContainer(ci)
     local db = GuildLootDB
     if db.activeContainerIdx then
-        GL.Print("Session bereits offen. Erst schließen.")
+        GL.Print("Session already open. Close it first.")
         return
     end
     local session = (db.raidContainers or {})[ci]
@@ -281,7 +281,7 @@ function GL.ResumeContainer(ci)
             table.insert(cr.participants, p)
         end
     end
-    GL.Print("Session fortgesetzt: " .. (session.label or "?"))
+    GL.Print("Session resumed: " .. (session.label or "?"))
     if GL.Comm and GL.Comm.SendSessionStart then
         GL.Comm.SendSessionStart(session.id, session.label or "", session.startedAt or 0, session.priorityConfig)
     end
@@ -507,7 +507,7 @@ end
 function GL.EnsureActiveSession()
     if GuildLootDB.activeContainerIdx then return end
     local kw = GL.ISOWeek(time())
-    GL.StartContainer(string.format("Auto KW %02d", kw))
+    GL.StartContainer(string.format("Auto Week %02d", kw))
 end
 
 -- ============================================================
@@ -663,7 +663,7 @@ function GL.SyncRoster()
         if not GL.TableContains(raid.participants, name) then
             GL.CreatePlayerRecord(name)
             table.insert(raid.participants, name)
-            GL.Print(GL.ShortName(name) .. " ist dem Raid beigetreten.")
+            GL.Print(GL.ShortName(name) .. " joined the raid.")
         end
         -- Reconnect
         if raid.absent[name] and online then
@@ -753,7 +753,7 @@ local function ResumeSession(s, i)
     local db = GuildLootDB
     if s.closedAt then
         s.closedAt = nil
-        GL.Print("Session fortgesetzt von ML: " .. (s.label or "?"))
+        GL.Print("Session resumed by ML: " .. (s.label or "?"))
     end
     db.activeContainerIdx = i
 end
@@ -795,7 +795,7 @@ function GL.OnCommSessionStart(sessionID, label, startedAt, sender, prioCfg)
     local session = BuildSessionFromSync(sessionID, label, startedAt, prioCfg)
     table.insert(db.raidContainers, session)
     db.activeContainerIdx = #db.raidContainers
-    GL.Print("Session von ML synchronisiert: " .. (label or "?"))
+    GL.Print("Session synced from ML: " .. (label or "?"))
     if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
 end
 
@@ -889,9 +889,9 @@ function GL.OnCommMLAnnounce(newMLName)
         GuildLootDB.settings.isMasterLooter = false
     end
     if normalNew == "" then
-        GL.Print("Kein Master Looter aktiv.")
+        GL.Print("No Master Looter active.")
     else
-        GL.Print(GL.ShortName(newMLName or "") .. " ist jetzt Master Looter.")
+        GL.Print(GL.ShortName(newMLName or "") .. " is now Master Looter.")
     end
     if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
 end
@@ -909,9 +909,9 @@ function GL.OnCommMLRequest(claimantName, sender)
     end
     GL._pendingMLClaim = normalClaim
     StaticPopupDialogs["RLT_ML_REQUEST"] = {
-        text         = (GL.ShortName(claimantName or "") .. " möchte Master Looter werden. Übergeben?"),
-        button1      = "Ja",
-        button2      = "Nein",
+        text         = (GL.ShortName(claimantName or "") .. " wants to become Master Looter. Hand over?"),
+        button1      = "Yes",
+        button2      = "No",
         OnAccept     = function()
             GL._pendingMLClaim = nil
             GuildLootDB.settings.isMasterLooter = false
@@ -937,7 +937,7 @@ function GL.OnCommMLDeny(claimantName)
     GL._mlDenied = true
     if GL._mlClaimTimer then GL._mlClaimTimer:Cancel(); GL._mlClaimTimer = nil end
     GuildLootDB.settings.isMasterLooter = false
-    GL.Print("|cffff4444ML-Anfrage abgelehnt.|r")
+    GL.Print("|cffff4444ML request declined.|r")
     if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
 end
 

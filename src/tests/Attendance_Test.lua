@@ -580,7 +580,7 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
               kills = { { name = "Ulgrax", ts = 110 }, { name = "Sikran", ts = 120 } } },
         }), {})
         AreEqual("Mittwoch", cols[1].tooltipT)
-        Exists(cols[1].tooltipD:find("2 Bosse"))    -- Aufklapp-Hinweis
+        Exists(cols[1].tooltipD:find("2 bosses"))    -- Aufklapp-Hinweis
 
         local open = GL.BuildAttendanceColumns(Nights({
             { id = "n1", startedAt = 100,

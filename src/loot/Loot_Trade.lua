@@ -106,7 +106,7 @@ local function SnapshotTradeSlots()
             list[#list + 1] = i .. ":" .. id
         end
     end
-    return counts, (#list > 0) and table.concat(list, " ") or "leer"
+    return counts, (#list > 0) and table.concat(list, " ") or "empty"
 end
 
 --- Ermittelt den Handelspartner. Primär TradeFrame-Element, Fallback UnitName("NPC")
@@ -155,7 +155,7 @@ function Loot.OnTradeShow()
         Trace("show", "Partner=%q (Frame=%q, NPC=%q), Queue=%d [%s]",
             partnerName, rawText, npcName, #queue, table.concat(queued, " "))
         if partnerName == "" then
-            GL.Print("[ReqRT] Auto-Trade: Handelspartner-Name konnte nicht ermittelt werden.")
+            GL.Print("[ReqRT] Auto-Trade: could not determine the trade partner's name.")
             return
         end
 
@@ -171,7 +171,7 @@ function Loot.OnTradeShow()
             e.trade.attempts = (e.trade.attempts or 0) + 1
         end
         TradeLog.SyncMirror(now)
-        Trace("show", "%s: %d Item(s) gestaged, %d bleiben in Queue",
+        Trace("show", "%s: %d item(s) staged, %d remain in queue",
             partnerName, #Loot._inTradeItems, #Loot._pendingTrades)
         TradeLog.NotifyChanged()
         if #Loot._inTradeItems == 0 then return end
@@ -196,7 +196,7 @@ function Loot.OnTradeShow()
             C_Timer.After(capturedDelay, function()
                 local tradeSlot = nextFreeTradeSlot()
                 if not tradeSlot then
-                    Trace("item", "%s: kein freier Handelsslot", tostring(capturedID))
+                    Trace("item", "%s: no free trade slot", tostring(capturedID))
                     return
                 end
 
@@ -207,7 +207,7 @@ function Loot.OnTradeShow()
                     C_Container.PickupContainerItem(bag, slot)
                     ClickTradeButton(tradeSlot)
                     if not tradeable then TradeLog.SetStatus(captured.entry, "bound") end
-                    Trace("item", "%s → Tasche %d/%d → Handelsslot %d (handelbar=%s)",
+                    Trace("item", "%s → bag %d/%d → trade slot %d (tradable=%s)",
                         tostring(capturedID), bag, slot, tradeSlot, tostring(tradeable))
                     return
                 end
@@ -216,8 +216,8 @@ function Loot.OnTradeShow()
                     if inPt == captured then
                         table.remove(Loot._inTradeItems, i2)
                         TradeLog.SetStatus(captured.entry, "notFound")
-                        Trace("item", "%s: nicht im Inventar", tostring(capturedID))
-                        GL.Print("|cffff4444[ReqRT] Item " .. tostring(capturedID) .. " nicht im Inventar — wurde es verkauft oder gelöscht?|r")
+                        Trace("item", "%s: not in inventory", tostring(capturedID))
+                        GL.Print("|cffff4444[ReqRT] Item " .. tostring(capturedID) .. " not in inventory — was it sold or destroyed?|r")
                         break
                     end
                 end
@@ -233,7 +233,7 @@ function Loot.OnTradeAcceptUpdate(playerAccepted, targetAccepted)
     if #Loot._inTradeItems > 0 then
         local snap, list = SnapshotTradeSlots()
         if next(snap) then _tradeSlotSnapshot = snap end
-        Trace("accept", "ich=%s Partner=%s, Slots: %s", tostring(playerAccepted), tostring(targetAccepted), list)
+        Trace("accept", "me=%s partner=%s, slots: %s", tostring(playerAccepted), tostring(targetAccepted), list)
     end
     if playerAccepted == 1 and targetAccepted == 1 then
         _tradeAccepted = true
@@ -311,7 +311,7 @@ function Loot.FinalizeTrade()
             local inSlot, verified = ConsumeFromSnapshot(snap, pt.itemID)
             if inSlot then
                 TradeLog.SetStatus(pt.entry, "traded", now)
-                done[#done + 1] = id .. (verified and "" or "(ungeprüft)")
+                done[#done + 1] = id .. (verified and "" or "(unverified)")
             else
                 -- Lag nicht im Handelsfenster (z.B. gebundene Kopie) → bleibt offen
                 local keep = pt.entry and pt.entry.trade and pt.entry.trade.status == "bound"
@@ -324,8 +324,8 @@ function Loot.FinalizeTrade()
             back[#back + 1] = id
         end
     end
-    Trace("close", "%s: gehandelt [%s], offen [%s]",
-        _tradeAccepted and "Erfolg" or "Abbruch", table.concat(done, " "), table.concat(back, " "))
+    Trace("close", "%s: traded [%s], open [%s]",
+        _tradeAccepted and "success" or "cancelled", table.concat(done, " "), table.concat(back, " "))
 
     _lastClosed = (not _tradeAccepted and #aborted > 0)
         and { at = now, entries = aborted, snapshot = snap } or nil
@@ -352,7 +352,7 @@ function Loot.ApplyLateComplete()
             fixed = fixed + 1
         end
     end
-    Trace("close", "spätes ERR_TRADE_COMPLETE: %d Eintrag/Einträge nachträglich auf gehandelt", fixed)
+    Trace("close", "late ERR_TRADE_COMPLETE: %d entry/entries set to traded afterwards", fixed)
     TradeLog.SyncMirror(now)
     TradeLog.NotifyChanged()
 end

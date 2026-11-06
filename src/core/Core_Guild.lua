@@ -116,9 +116,9 @@ function GL.CheckGuildRosterCompleteness()
     if reported > readCount and not warnedIncomplete then
         warnedIncomplete = true
         GL.Print(string.format(
-            "|cffff8000Gildenroster unvollständig gelesen: %d von %d Mitgliedern.|r " ..
-            "Im Gildenfenster \"Offline-Mitglieder anzeigen\" aktivieren, sonst fehlen " ..
-            "ausgeloggte Raider im Kader.", readCount, reported))
+            "|cffff8000Guild roster read incompletely: %d of %d members.|r " ..
+            "Enable \"Show Offline Members\" in the guild window, otherwise " ..
+            "logged-out raiders are missing from the roster.", readCount, reported))
     end
     return reported, readCount
 end
@@ -133,7 +133,7 @@ function GL.PrintGuildRosterDiagnostics()
         if row.group == "roster" then kader = kader + 1 end
     end
     GL.Print(string.format(
-        "[Guild] gemeldet: %d | gelesen: %d | Kader: %d", reported, readCount, kader))
+        "[Guild] reported: %d | read: %d | roster: %d", reported, readCount, kader))
 end
 
 --- Diagnose: listet alle Namens-Strings auf, die einen Suchbegriff enthalten — je Quelle,
@@ -145,7 +145,7 @@ function GL.PrintNameVariants(needle)
     if not db then return end
     needle = tostring(needle or ""):lower()
     if needle == "" then
-        GL.Print("Verwendung: /reqrt names <Namensteil>")
+        GL.Print("Usage: /reqrt names <part of name>")
         return
     end
 
@@ -188,13 +188,13 @@ function GL.PrintNameVariants(needle)
                 rawSeen[raw] = true
                 hits = hits + 1
                 GL.Print(string.format("  |cffff8000%-14s|r %s   |cff888888→ %s|r",
-                                       "gilde-API roh", raw, GL.NormalizeName(raw)))
+                                       "guild API raw", raw, GL.NormalizeName(raw)))
             end
         end
     end
 
-    GL.Print(string.format("Namensvarianten für \"%s\": %d Fundstellen. "
-                           .. "Gleiche |cff888888key=|r → gleicher Spieler.", needle, hits))
+    GL.Print(string.format("Name variants for \"%s\": %d matches. "
+                           .. "Same |cff888888key=|r → same player.", needle, hits))
 end
 
 --- Diagnose: zählt, auf welche Realms sich die Namen je Quelle verteilen.
@@ -205,7 +205,7 @@ function GL.PrintRealmSpread()
     if not db then return end
 
     local function Realm(name)
-        return (tostring(name or ""):match("%-(.+)$")) or "|cffff4444(ohne Realm)|r"
+        return (tostring(name or ""):match("%-(.+)$")) or "|cffff4444(no realm)|r"
     end
     local function Report(label, names)
         local count, total = {}, 0
@@ -243,10 +243,10 @@ function GL.PrintRealmSpread()
             local name = GetGuildRosterInfo(i)
             if name then table.insert(raw, name) end
         end
-        Report("gilde-API roh", raw)
+        Report("guild API raw", raw)
     end
-    GL.Print("Realm-Verteilung. |cffff4444(ohne Realm)|r in der Gilden-API heißt: "
-             .. "NormalizeName hängt den EIGENEN Realm an.")
+    GL.Print("Realm distribution. |cffff4444(no realm)|r in the guild API means: "
+             .. "NormalizeName appends YOUR OWN realm.")
 end
 
 --- Läuft ein angeforderter Roster-Read noch? Der Schnappschuss wartet dann auf die Daten.
@@ -272,11 +272,11 @@ local function FinishRosterRead()
     pendingSeasonId = nil
     local kader  = season and GL.SnapshotSeasonRoster(season.id)
     if kader then
-        GL.Print(string.format("Gildenroster gelesen: %d Mitglieder, Kader: %d.",
+        GL.Print(string.format("Guild roster read: %d members, roster: %d.",
                                readCount, kader))
     else
-        GL.Print(string.format("Gildenroster gelesen: %d Mitglieder. "
-                               .. "|cff888888Keine Season gewählt — kein Kader gesetzt.|r",
+        GL.Print(string.format("Guild roster read: %d members. "
+                               .. "|cff888888No season selected — no roster set.|r",
                                readCount))
     end
     if GL.UI and GL.UI.RefreshAttendanceTab then GL.UI.RefreshAttendanceTab() end
@@ -309,9 +309,9 @@ function GL.ReadGuildRosterNow(force, seasonId)
         local stored, current = GL.SeasonRosterGuildMismatch(season.id)
         if stored then
             GL.Print(string.format(
-                "|cffff8000Kader stammt aus \"%s\", du bist gerade in \"%s\".|r "
-                .. "Lesen würde den Kader durch die falsche Gilde ersetzen — "
-                .. "nochmal klicken, wenn das gewollt ist.", stored, current))
+                "|cffff8000Roster comes from \"%s\", you are currently in \"%s\".|r "
+                .. "Reading would replace the roster with the wrong guild — "
+                .. "click again if that is intended.", stored, current))
             return
         end
     end
@@ -328,7 +328,7 @@ function GL.ReadGuildRosterNow(force, seasonId)
         pendingReadTimer = nil
         if pendingRosterRead then FinishRosterRead() end
     end)
-    GL.Print("|cff888888Gildenroster wird angefordert…|r")
+    GL.Print("|cff888888Requesting guild roster…|r")
 end
 
 --- Handler für GUILD_ROSTER_UPDATE. Das Event feuert häufig, daher gedrosselt.

@@ -117,7 +117,7 @@ function GL.Test.SimulatePrio()
 
     if GL.UI and GL.UI.RefreshLootTab     then GL.UI.RefreshLootTab()     end
     if GL.UI and GL.UI.RefreshCandidates  then GL.UI.RefreshCandidates()  end
-    GL.Print("Prio simulation active — X-Button pro Kandidat sichtbar (nur als ML).")
+    GL.Print("Prio simulation active — X button per candidate visible (ML only).")
 end
 
 -- Simuliert einen laufenden Roll-Vorgang mit Fake-Kandidaten verschiedener Prios,
@@ -285,11 +285,11 @@ end
 function GL.Test.SimulatePending(count)
     count = tonumber(count) or 2
     if count < 1 or count > 10 then
-        GL.Print("testpending: count muss zwischen 1 und 10 liegen.")
+        GL.Print("testpending: count must be between 1 and 10.")
         return
     end
     if GuildLootDB.activeContainerIdx then
-        GL.Print("testpending: Session ist offen — erst schließen.")
+        GL.Print("testpending: Session is open — close it first.")
         return
     end
     local chosen = nil
@@ -308,7 +308,7 @@ function GL.Test.SimulatePending(count)
         if chosen then break end
     end
     if not chosen then
-        GL.Print("testpending: Kein episches Equip-Item im Inventar gefunden.")
+        GL.Print("testpending: No epic equippable item found in inventory.")
         return
     end
     local itemID   = tonumber(chosen.link:match("item:(%d+)"))
@@ -348,7 +348,7 @@ end
 function GL.Test.SimulateMultiRoll(count)
     count = tonumber(count) or 2
     if count < 2 or count > 5 then
-        GL.Print("testmulti: count muss zwischen 2 und 5 liegen.")
+        GL.Print("testmulti: count must be between 2 and 5.")
         return
     end
 
@@ -444,7 +444,7 @@ function GL.Test.SimulateMultiRoll(count)
     -- Direkt auswerten → Winners werden gesetzt, "Assign All (N)" erscheint
     GL.Loot.FinalizeRoll()
 
-    GL.Print("testmulti: " .. count .. "x Drop simuliert — Gewinner bestimmt. 'Assign All (" .. count .. ")' klicken.")
+    GL.Print("testmulti: " .. count .. "x drop simulated — winners determined. Click 'Assign All (" .. count .. ")'.")
 end
 
 -- Erstellt einen Unassigned-Raid-Snapshot (ohne Session) mit Fake-Loot-Einträgen.
@@ -495,7 +495,7 @@ function GL.Test.AddUnassignedRaid()
 
     db.unassignedRaids = db.unassignedRaids or {}
     table.insert(db.unassignedRaids, snap)
-    GL.Print(string.format("testunassigned: Unassigned Raid '%s %s' mit %d Loot-Einträgen erstellt.",
+    GL.Print(string.format("testunassigned: Unassigned raid '%s %s' created with %d loot entries.",
         snap.tier, diff, #lootLog))
     if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
 end
@@ -506,7 +506,7 @@ end
 function GL.Test.SetupTestSession()
     local db = GuildLootDB
     if db.activeContainerIdx then
-        GL.Print("testsetup: Erst aktive Session schließen.")
+        GL.Print("testsetup: Close the active session first.")
         return
     end
 
@@ -537,7 +537,7 @@ function GL.Test.SetupTestSession()
     local yr = tonumber(date("%Y", ts))
     local session = {
         id          = string.format("%04d-W%02d-testdata", yr, kw),
-        label       = string.format("KW %02d %d (Test)", kw, yr),
+        label       = string.format("Week %02d %d (Test)", kw, yr),
         startedAt   = ts,
         closedAt    = ts + 14400,
         lootLog     = {},
@@ -599,7 +599,7 @@ function GL.Test.SetupTestSession()
     end
 
     table.insert(db.raidContainers, session)
-    GL.Print(string.format("testsetup: Session '%s' mit 2 Raids und %d Loot-Einträgen erstellt.",
+    GL.Print(string.format("testsetup: Session '%s' created with 2 raids and %d loot entries.",
         session.label, #session.lootLog))
     if GL.UI and GL.UI.Refresh then GL.UI.Refresh() end
 end

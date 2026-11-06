@@ -19,7 +19,7 @@ function UI.BuildDropPanel(parent)
     dropPanel:SetFrameStrata("DIALOG")
     dropPanel:SetClampedToScreen(true)
     dropPanel:Hide()
-    dropPanel.TitleText:SetText("Item hinzufügen")
+    dropPanel.TitleText:SetText("Add item")
 
     -- Drop-Zone innen
     local dropZone = CreateFrame("Button", nil, dropPanel, "BackdropTemplate")
@@ -40,7 +40,7 @@ function UI.BuildDropPanel(parent)
 
     local dropHint = dropZone:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     dropHint:SetPoint("CENTER", dropZone, "CENTER", 0, -12)
-    dropHint:SetText("|cff888888Item hier ablegen|r")
+    dropHint:SetText("|cff888888Drop item here|r")
 
     -- Hover: aufleuchten
     dropZone:SetScript("OnEnter", function(self)

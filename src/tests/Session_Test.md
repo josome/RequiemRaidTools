@@ -60,7 +60,7 @@ Session anlegen, dann erneut `StartContainer` aufrufen.
 
 ### `testDefaultLabel`
 `StartContainer("")` aufrufen.
-- `label` ist nicht nil und nicht leer (auto-generiert als "KW XX YYYY")
+- `label` ist nicht nil und nicht leer (auto-generiert als "Week XX YYYY")
 
 ### `testPriorityConfig`
 `settings.priorities` mit bekannten Werten belegen, dann `StartContainer`.

@@ -253,6 +253,6 @@ function GL.MigrateRaidHistory()
     local count = #(db.raidHistory or {})
     db.raidHistory = {}
     if count > 0 then
-        GL.Print("Migration: " .. count .. " Raids nach unassignedRaids verschoben.")
+        GL.Print("Migration: " .. count .. " raids moved to unassignedRaids.")
     end
 end
