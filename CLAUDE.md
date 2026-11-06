@@ -23,8 +23,8 @@
 
 ## Protokoll-Versionierung
 - Die Minor-Version (`0.X.y.z`) ist die Protokoll-Version. `MIN_PROTO_MINOR` in `src/Comm.lua` nur erhöhen wenn das Nachrichtenformat inkompatibel geändert wird (Felder hinzugefügt/entfernt/umsortiert). Bewusste Entscheidung bei jedem Minor-Version-Bump.
-- Bei jeder Änderung an `src/Comm.lua` (neues Telegramm, Felder geändert, Sender/Empfänger geändert) **muss** `docs/COMM_PROTOCOL.md` synchron aktualisiert werden — Größenangabe, Format-Zeile, Felder-Tabelle und ggf. die "Bekannte Einschränkungen"-Tabelle.
-- Wiki-Spiegelung: https://github.com/josome/RequiemRaidTools/wiki/COMM-Protokoll — der User pflegt das Wiki manuell aus `docs/COMM_PROTOCOL.md`.
+- Bei jeder Änderung an `src/Comm.lua` (neues Telegramm, Felder geändert, Sender/Empfänger geändert) **muss** die Protokoll-Doku synchron aktualisiert werden — Größenangabe, Format-Zeile, Felder-Tabelle und ggf. die "Bekannte Einschränkungen"-Tabelle.
+- Die Doku liegt im Wiki-Repo: `D:\work\WOWAddons\RequiemRaidTools.wiki\COMM-Protokoll.md`. Das ist das Original, keine Spiegelung — `docs/COMM_PROTOCOL.md` wurde in `1482f29` (v0.5.9.7) ins Wiki verschoben und existiert nicht mehr.
 
 ## Wiki
 - Lokales Wiki-Repo: `D:\work\WOWAddons\RequiemRaidTools.wiki` — bei Wiki-Änderungen dort direkt bearbeiten und pushen, nie temporäre Klone anlegen.
