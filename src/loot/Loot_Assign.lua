@@ -41,7 +41,7 @@ end
 -- Gibt eine Tabelle zurück: { copyCount, boss, raidID, difficulty, sessionID }
 local function ResolvePendingMeta(link, itemID)
     local copyCount = 0
-    local boss, raidID, difficulty, sessionID
+    local boss, raidID, difficulty, sessionID, lootedAt
     local exactFound = false
     for _, p in ipairs(Loot.GetPendingLoot()) do
         local pid = tonumber(p.link:match("item:(%d+)"))
@@ -53,11 +53,13 @@ local function ResolvePendingMeta(link, itemID)
                     raidID     = p.raidID
                     difficulty = p.difficulty
                     sessionID  = p.sessionID
+                    lootedAt   = p.lootedAt
                 end
                 if p.link == link then
                     raidID     = p.raidID
                     difficulty = p.difficulty
                     sessionID  = p.sessionID
+                    lootedAt   = p.lootedAt
                     exactFound = true
                 end
             end
@@ -69,6 +71,9 @@ local function ResolvePendingMeta(link, itemID)
         raidID     = raidID     or "",
         difficulty = difficulty or "",
         sessionID  = sessionID  or "",
+        -- nil bei Altdaten und bei Items ohne pendingLoot-Eintrag: TradeLog fällt
+        -- dann auf entry.timestamp zurück, also auf das bisherige Verhalten.
+        lootedAt   = lootedAt,
     }
 end
 
@@ -179,6 +184,7 @@ function Loot.ActivateItem(link, name, iLevel, equipLoc, quality)
     currentItem.raidID     = meta.raidID
     currentItem.difficulty = meta.difficulty
     currentItem.sessionID  = meta.sessionID
+    currentItem.lootedAt   = meta.lootedAt
 
     -- Prio-Sammel-Timer starten
     local prioSecs = GuildLootDB.settings.prioSeconds or 15
@@ -301,6 +307,9 @@ function Loot.AssignLootConfirm(fullName, diff, clearAfter)
             winnerPrio = winnerPrio,
             boss       = currentItem.boss,
             timestamp  = ts,
+            -- Start des 2h-Handelsfensters (WoW rechnet ab dem Looten, nicht ab
+            -- der Zuweisung). nil bei Altdaten → TradeLog nutzt timestamp.
+            lootedAt   = currentItem.lootedAt,
             raidID     = itemRaidID,
             sessionID  = itemSessionID,
         }
@@ -330,7 +339,8 @@ function Loot.AssignLootConfirm(fullName, diff, clearAfter)
     -- führt TradeLog einen Laufzeit-Eintrag.
     if GL.IsMasterLooter() then
         if not logEntry then
-            logEntry = { player = fullName, link = link, item = link, itemID = itemID, timestamp = ts }
+            logEntry = { player = fullName, link = link, item = link, itemID = itemID,
+                         timestamp = ts, lootedAt = currentItem.lootedAt }
             GL.TradeLog.AddOrphan(logEntry)
         end
         GL.TradeLog.Track(logEntry)

@@ -37,7 +37,11 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
             containers = db.raidContainers, idx = db.activeContainerIdx,
             trace = db.tradeTrace, players = db.players,
             pending = Loot._pendingTrades, inTrade = Loot._inTradeItems, orphans = TradeLog._orphans,
+            isML = db.settings and db.settings.isMasterLooter,
         }
+        -- TradeLog ist das ML-seitige Modul; WarnExpiring prüft die Rolle. Explizit
+        -- setzen, damit die Suite nicht von der Testreihenfolge abhängt.
+        if db.settings then db.settings.isMasterLooter = true end
         local session = { id = "tl-test", lootLog = {}, manualTrades = {} }
         db.raidContainers     = { session }
         db.activeContainerIdx = 1
@@ -50,6 +54,7 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
         db.raidContainers, db.activeContainerIdx = saved.containers, saved.idx
         db.tradeTrace, db.players = saved.trace, saved.players
         Loot._pendingTrades, Loot._inTradeItems, TradeLog._orphans = saved.pending, saved.inTrade, saved.orphans
+        if db.settings then db.settings.isMasterLooter = saved.isML end
         if not ok then error(err, 0) end
     end
 
@@ -337,6 +342,104 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
                 if ev.kind == "manual" then manual = manual + 1 end
             end
             AreEqual(2, manual)
+        end)
+    end
+
+    -- --------------------------------------------------------
+    -- 2h-Fenster: Startzeitpunkt
+    -- --------------------------------------------------------
+
+    -- WoW rechnet die zwei Stunden ab dem Looten. Item vor 90 Min gelootet, gerade
+    -- erst zugeteilt → nach weiteren 40 Min ist das Fenster zu, obwohl die
+    -- Zuweisung erst eine Minute alt ist. Vorher zählte das Addon ab der Zuweisung
+    -- und hielt das Item noch fast zwei Stunden für handelbar.
+    function Tests:testWindowStartsAtLootTime()
+        WithSession(function(session)
+            local e = Assign(session, 30, "Alpha", NOW - 60)
+            e.lootedAt = NOW - 90 * 60
+
+            AreEqual(NOW - 90 * 60, TradeLog.WindowStart(e))
+            IsTrue(TradeLog.IsOpen(e, NOW), "innerhalb des Fensters bereits zu")
+            IsFalse(TradeLog.IsOpen(e, NOW + 40 * 60), "Fenster nach 2h ab Looten noch offen")
+        end)
+    end
+
+    -- Altdaten ohne lootedAt verhalten sich wie bisher: ab Zuweisungszeit.
+    function Tests:testFallsBackToTimestampWithoutLootedAt()
+        WithSession(function(session)
+            local e = Assign(session, 31, "Alpha", NOW - 60)
+
+            AreEqual(NOW - 60, TradeLog.WindowStart(e))
+            IsTrue(TradeLog.IsOpen(e, NOW + HOUR))
+            IsFalse(TradeLog.IsOpen(e, NOW + 3 * HOUR))
+        end)
+    end
+
+    -- Ein manueller Requeue startet das Fenster neu und überstimmt lootedAt.
+    function Tests:testRequeueOverridesLootTime()
+        WithSession(function(session)
+            local e = Assign(session, 32, "Alpha", NOW - 60)
+            e.lootedAt = NOW - 90 * 60
+            TradeLog.Requeue(e, NOW)
+
+            AreEqual(NOW, TradeLog.WindowStart(e))
+            IsTrue(TradeLog.IsOpen(e, NOW + HOUR))
+        end)
+    end
+
+    -- --------------------------------------------------------
+    -- Vorwarnung zum Fensterende
+    -- --------------------------------------------------------
+
+    -- Zwei Items für Alpha, eines für Beta, alle kurz vor Ablauf → zwei Gruppen,
+    -- Alpha mit count 2. Die Gruppe nennt die KLEINSTE Restzeit.
+    function Tests:testExpiringSoonGroupsByRecipient()
+        WithSession(function(session)
+            local soon = NOW - (2 * HOUR - 10 * 60)   -- 10 Min Restzeit
+            local a1 = Assign(session, 40, "Alpha", soon)
+            local a2 = Assign(session, 41, "Alpha", NOW - (2 * HOUR - 5 * 60))  -- 5 Min
+            local b1 = Assign(session, 42, "Beta",  soon)
+            AreEqual(3, #TradeLog.BuildQueue(NOW))
+
+            local groups = TradeLog.ExpiringSoon(NOW)
+            AreEqual(2, #groups)
+            local byName = {}
+            for _, g in ipairs(groups) do byName[g.name] = g end
+            Exists(byName.Alpha)
+            Exists(byName.Beta)
+            AreEqual(2, byName.Alpha.count)
+            AreEqual(1, byName.Beta.count)
+            AreEqual(5 * 60, byName.Alpha.remaining)  -- kleinste Restzeit der Gruppe
+        end)
+    end
+
+    -- Items mit viel Restzeit tauchen in der Vorwarnung nicht auf.
+    function Tests:testExpiringSoonIgnoresFreshEntries()
+        WithSession(function(session)
+            Assign(session, 43, "Alpha", NOW - 60)
+            AreEqual(0, #TradeLog.ExpiringSoon(NOW))
+        end)
+    end
+
+    -- Der Minutentakt darf nicht spammen: nur der erste Aufruf warnt.
+    function Tests:testWarnsOnlyOnce()
+        WithSession(function(session)
+            local e = Assign(session, 44, "Alpha", NOW - (2 * HOUR - 10 * 60))
+
+            AreEqual(1, TradeLog.WarnExpiring(NOW))
+            IsTrue(e.trade.warned, "warned-Markierung fehlt")
+            AreEqual(0, TradeLog.WarnExpiring(NOW))
+        end)
+    end
+
+    -- Nach einem manuellen Requeue darf erneut gewarnt werden.
+    function Tests:testRequeueClearsWarnedFlag()
+        WithSession(function(session)
+            local e = Assign(session, 45, "Alpha", NOW - (2 * HOUR - 10 * 60))
+            AreEqual(1, TradeLog.WarnExpiring(NOW))
+
+            TradeLog.Requeue(e, NOW)
+            IsFalse(e.trade.warned or false, "warned nach Requeue noch gesetzt")
         end)
     end
 

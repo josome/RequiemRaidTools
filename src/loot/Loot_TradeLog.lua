@@ -17,7 +17,14 @@
 --   attempts  = 0,                   -- geöffnete Handelsfenster mit diesem Item
 --   updated   = <unix>,              -- letzte Statusänderung
 --   since     = nil | <unix>,        -- Start des 2h-Fensters nach manuellem Requeue
+--   warned    = nil | true,          -- Vorwarnung zum Fensterende schon raus
 -- }
+--
+-- Der Start des 2h-Fensters kommt aus TradeLog.WindowStart(entry):
+-- trade.since (manueller Requeue) → entry.lootedAt (Loot-Zeitpunkt, von
+-- Loot.TryAddPendingItem gestempelt) → entry.timestamp (Zuweisung, nur Altdaten).
+-- WoW rechnet ab dem Looten; bei "erst alle Bosse, dann verteilen" liegen
+-- zwischen Looten und Zuweisung leicht ein bis zwei Stunden.
 
 local GL = GuildLoot
 GL.TradeLog = GL.TradeLog or {}
@@ -27,6 +34,9 @@ local TradeLog = GL.TradeLog
 TradeLog.TRADE_WINDOW = 2 * 3600
 -- Handelsslots pro Fenster (WoW: 6, der siebte ist "wird nicht gehandelt")
 TradeLog.MAX_SLOTS = 6
+-- Vorwarnzeit, bevor das 2h-Fenster schließt. Wie TIME_REMAINING_WARNING bei
+-- RCLootCouncil: früh genug um noch zu handeln, spät genug um nicht zu nerven.
+TradeLog.WARN_LEAD = 20 * 60
 
 -- Status, bei denen der Auto-Trade das Item beim nächsten Handel anbietet
 local OPEN = { queued = true, aborted = true, staged = true, bound = true }
@@ -72,20 +82,29 @@ function TradeLog.IsSelf(fullName)
     return GL.ShortName(fullName) == GL.ShortName(UnitName("player") or "")
 end
 
+--- Start des 2h-Fensters für einen Eintrag.
+--- Reihenfolge: manueller Requeue (since) → Loot-Zeitpunkt → Zuweisungszeit.
+--- WoW rechnet die zwei Stunden ab dem **Looten**. entry.timestamp ist die
+--- Zuweisungszeit und bleibt nur der Rückfall für Altdaten ohne lootedAt — bei
+--- "erst alle Bosse, dann verteilen" liegen dazwischen ein bis zwei Stunden.
+function TradeLog.WindowStart(entry)
+    local t = entry and entry.trade
+    return (t and t.since) or entry.lootedAt or entry.timestamp or 0
+end
+
 --- Bietet der Auto-Trade dieses Item beim nächsten Handel an?
 --- Manuelle Einträge laufen nie ab — der Spieler hat sie bewusst vorbereitet.
 function TradeLog.IsOpen(entry, now)
     local t = entry and entry.trade
     if not (t and OPEN[t.status]) then return false end
     if entry.manual then return true end
-    return (now - (t.since or entry.timestamp or 0)) <= TradeLog.TRADE_WINDOW
+    return (now - TradeLog.WindowStart(entry)) <= TradeLog.TRADE_WINDOW
 end
 
 --- Verbleibende Sekunden im 2h-Fenster (nil bei manuellen Einträgen).
 function TradeLog.Remaining(entry, now)
     if entry.manual then return nil end
-    local start = (entry.trade and entry.trade.since) or entry.timestamp or 0
-    return math.max(0, TradeLog.TRADE_WINDOW - (now - start))
+    return math.max(0, TradeLog.TRADE_WINDOW - (now - TradeLog.WindowStart(entry)))
 end
 
 --- Ruft fn(entry, session, list, index) für jeden Eintrag mit Trade-Bezug auf.
@@ -196,10 +215,69 @@ function TradeLog.SyncMirror(now)
     GL.Loot._pendingTrades = mirror
 end
 
+--- Offene Einträge, deren 2h-Fenster in weniger als WARN_LEAD schließt, nach
+--- Empfänger gruppiert. Reine Abfrage — markiert und meldet nichts.
+--- @return table { { name, count, remaining, entries }, ... }
+function TradeLog.ExpiringSoon(now)
+    local byName, order = {}, {}
+    for _, e in ipairs(TradeLog.BuildQueue(now)) do
+        local left = TradeLog.Remaining(e, now)
+        if left and left > 0 and left <= TradeLog.WARN_LEAD then
+            local name = GL.ShortName(TradeLog.Recipient(e) or "?")
+            local g = byName[name]
+            if not g then
+                g = { name = name, count = 0, remaining = left, entries = {} }
+                byName[name] = g
+                order[#order + 1] = g
+            end
+            g.count = g.count + 1
+            if left < g.remaining then g.remaining = left end
+            g.entries[#g.entries + 1] = e
+        end
+    end
+    return order
+end
+
+--- Warnt im Chat, dass Handelsfenster zulaufen — eine Zeile je Empfänger.
+--- Höchstens einmal pro Eintrag (entry.trade.warned), damit der Minutentakt
+--- nicht spammt. Im Kampf übersprungen: die Meldung soll nach dem Kill kommen,
+--- nicht im Pull; der nächste Tick holt es nach. Nur der ML hält die Items.
+--- @return number Anzahl gewarnter Empfänger
+function TradeLog.WarnExpiring(now)
+    if not GL.IsMasterLooter() then return 0 end
+    if InCombatLockdown and InCombatLockdown() then return 0 end
+    local warned = 0
+    for _, g in ipairs(TradeLog.ExpiringSoon(now)) do
+        local fresh = {}
+        for _, e in ipairs(g.entries) do
+            if not e.trade.warned then fresh[#fresh + 1] = e end
+        end
+        if #fresh > 0 then
+            for _, e in ipairs(fresh) do e.trade.warned = true end
+            local mins = math.max(1, math.floor(g.remaining / 60))
+            GL.Print(("|cffff8800[ReqRT] %d item(s) for %s can only be traded for another %d min.|r")
+                :format(g.count, g.name, mins))
+            Trace("expire", "warning: %d item(s) for %s, %d min left", g.count, g.name, mins)
+            warned = warned + 1
+        end
+    end
+    return warned
+end
+
+--- Prüft im Minutentakt, ob Handelsfenster zulaufen. Ein Tick ohne Fund kostet
+--- nur den Queue-Durchlauf. Mehrfachaufruf ersetzt den laufenden Ticker.
+function TradeLog.StartExpiryWatch()
+    if TradeLog._expiryTicker then TradeLog._expiryTicker:Cancel() end
+    TradeLog._expiryTicker = C_Timer.NewTicker(60, function()
+        TradeLog.WarnExpiring(time())
+    end)
+end
+
 --- Login/Reload: Abgelaufenes markieren, Spiegel aufbauen, Ergebnis protokollieren.
 function TradeLog.OnLogin(now)
     TradeLog.ExpireStale(now)
     TradeLog.SyncMirror(now)
+    TradeLog.StartExpiryWatch()
     Trace("login", "Queue after login/reload: %d open", #GL.Loot._pendingTrades)
 end
 
@@ -293,6 +371,7 @@ function TradeLog.Requeue(entry, now)
     TradeLog.SetStatus(entry, "queued", now)
     entry.trade.since = now
     entry.trade.manualDone = nil
+    entry.trade.warned = nil  -- Fenster startet neu → darf erneut vorwarnen
     Trace("manual", "%s → %s: requeued by hand", LinkOf(entry), tostring(TradeLog.Recipient(entry)))
     TradeLog.NotifyChanged()
 end

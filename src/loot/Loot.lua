@@ -175,6 +175,10 @@ function Loot.TryAddPendingItem(item, equipLoc)
     local idx      = db.activeContainerIdx
     item.sessionID = (idx and db.raidContainers and db.raidContainers[idx])
                      and db.raidContainers[idx].id or ""
+    -- Loot-Zeitpunkt festhalten: WoWs 2h-Handelsfenster läuft ab dem Looten, nicht
+    -- ab der Zuweisung. Bei "erst alle Bosse, dann verteilen" liegen dazwischen
+    -- leicht ein bis zwei Stunden. TradeLog rechnet damit die Restzeit.
+    item.lootedAt  = item.lootedAt or time()
     table.insert(pendingLoot(), item)
 end
 

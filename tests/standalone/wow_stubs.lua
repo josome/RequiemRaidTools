@@ -132,6 +132,9 @@ function CreateFrame(frameType, name, parent, template)
     return f
 end
 
+-- Kein Kampf im Testlauf: TradeLog.WarnExpiring schweigt sonst.
+InCombatLockdown = function() return false end
+
 -- ── WoW-Tabellen (C_*) ───────────────────────────────────────────────────────
 
 C_Timer = {

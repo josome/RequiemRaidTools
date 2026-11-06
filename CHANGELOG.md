@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.0.5.14
+
+**New**
+- Auto-Trade warns you in chat before a trade window closes: "3 item(s) for Vloxx can only be traded for another 18 min." One message per player, checked every minute, held back during a boss fight so it arrives after the kill. Useful if you clear the bosses first and hand out loot afterwards.
+
+**Fixed**
+- The 2-hour trade window is now counted from the moment an item was looted, which is how the game counts it — previously it was counted from the moment you assigned the item. If you assign loot an hour or two after the kill, the time left shown was far too optimistic and Auto-Trade offered items the game had already bound to you. Items assigned before this version keep their old behaviour.
+
 ## v1.0.5.13
 
 **Fixed**

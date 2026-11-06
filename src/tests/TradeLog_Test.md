@@ -22,6 +22,9 @@ Eintrag (`entry.trade`). Die Auto-Trade-Queue ist nur eine daraus abgeleitete Si
 
 - `WithSession(fn)` — frische aktive Raid Session, leeres Protokoll, leere `players`;
   Queue-Spiegel, `_inTradeItems`, `_orphans` und DB werden danach wiederhergestellt.
+  Setzt außerdem `settings.isMasterLooter = true` (und stellt es zurück): TradeLog ist
+  das ML-seitige Modul und `WarnExpiring` prüft die Rolle — ohne das hingen die
+  Warn-Tests an der Testreihenfolge und waren allein ausgeführt rot.
 - `Assign(session, itemID, player, ts)` — lootLog-Eintrag wie `AssignLootConfirm` ihn
   schreibt, danach `TradeLog.Track`.
 - Feste Zeit `NOW` wird explizit übergeben, damit das 2h-Fenster deterministisch ist.
@@ -78,6 +81,27 @@ Eintrag (`entry.trade`). Die Auto-Trade-Queue ist nur eine daraus abgeleitete Si
 | `testRowsNewestFirstWithRemaining` | `Rows`: neueste zuerst, Umleitung markiert, Restzeit korrekt |
 | `testQueueSummary` | Zählung „wartend“ / „im Handel“ |
 | `testManualActionsAreTraced` | Jede manuelle Änderung erzeugt einen `manual`-Protokolleintrag |
+
+### 2h-Fenster: Startzeitpunkt
+
+WoW rechnet die zwei Stunden ab dem **Looten**, nicht ab der Zuweisung.
+`TradeLog.WindowStart` entscheidet in der Reihenfolge
+`trade.since` (manueller Requeue) → `entry.lootedAt` → `entry.timestamp`.
+
+| Test | Prüft |
+|---|---|
+| `testWindowStartsAtLootTime` | Vor 90 Min gelootet, gerade zugeteilt → nach weiteren 40 Min ist das Fenster zu. Vorher zählte das Addon ab der Zuweisung und hielt das Item fast zwei Stunden zu lange für handelbar |
+| `testFallsBackToTimestampWithoutLootedAt` | Altdaten ohne `lootedAt` verhalten sich wie bisher (ab Zuweisungszeit) |
+| `testRequeueOverridesLootTime` | Manueller Requeue startet das Fenster neu und überstimmt `lootedAt` |
+
+### Vorwarnung zum Fensterende
+
+| Test | Prüft |
+|---|---|
+| `testExpiringSoonGroupsByRecipient` | Zwei Items für Alpha, eines für Beta → zwei Gruppen, `count` korrekt, die Gruppe nennt die **kleinste** Restzeit |
+| `testExpiringSoonIgnoresFreshEntries` | Items mit viel Restzeit erscheinen nicht in der Vorwarnung |
+| `testWarnsOnlyOnce` | Der Minutentakt spammt nicht: nur der erste Aufruf warnt, danach `trade.warned` |
+| `testRequeueClearsWarnedFlag` | Nach manuellem Requeue darf erneut gewarnt werden |
 
 ---
 
