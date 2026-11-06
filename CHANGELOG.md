@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.0.5.13
+
+**Fixed**
+- When one player won two copies of the same item, Auto-Trade could grab the same copy twice and the second trade slot stayed empty. It now tracks which bag slots it already used and skips slots the game has locked mid-move.
+- Auto-Trade no longer reaches into a trade window that has already closed, for example after the other player cancelled.
+- If an item is no longer tradable, Auto-Trade says so in chat instead of leaving an unexplained empty slot.
+- The number of usable trade slots now comes from the game instead of being hardcoded.
+
 ## v1.0.5.12
 
 **Fixed**

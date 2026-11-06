@@ -611,6 +611,101 @@ _loader:SetScript("OnEvent", function(self, event, addonName)
     end
 
     -- --------------------------------------------------------
+    -- Test 22: Ein gesperrter Taschenplatz (Item noch in Bewegung) wird
+    -- übersprungen, die freie Kopie derselben itemID genommen. PickupContainerItem
+    -- scheitert auf gesperrten Plätzen lautlos.
+    -- --------------------------------------------------------
+    function Tests:testSkipsLockedBagSlot()
+        WithSession(function(session)
+            Queue(session, { { 1930, "Barbossbär" } })
+            MockBasics()
+            local pickedSlot
+            Mock(_G, "C_Container", {
+                GetContainerNumSlots = function(bag) return bag == 0 and 5 or 0 end,
+                GetContainerItemInfo = function(bag, slot)
+                    if bag ~= 0 then return nil end
+                    if slot == 1 then return { itemID = 1930, isBound = false, isLocked = true  } end
+                    if slot == 2 then return { itemID = 1930, isBound = false, isLocked = false } end
+                    return nil
+                end,
+                PickupContainerItem = function(_, slot) pickedSlot = slot end,
+            })
+            MockPartner("Barbossbär")
+
+            Loot.OnTradeShow()
+
+            AreEqual(2, pickedSlot)  -- nicht der gesperrte Slot 1
+        end)
+    end
+
+    -- --------------------------------------------------------
+    -- Test 23: Zwei Zuteilungen derselben itemID an denselben Spieler müssen zwei
+    -- verschiedene Taschenplätze greifen. Vorher wurde zweimal dieselbe physische
+    -- Kopie genommen und die zweite Platzierung scheiterte stumm.
+    -- --------------------------------------------------------
+    function Tests:testDoesNotReuseAlreadyPlacedBagSlot()
+        WithSession(function(session)
+            Queue(session, { { 1940, "Barbossbär" }, { 1940, "Barbossbär" } })
+            MockBasics()
+            local picked = {}
+            Mock(_G, "C_Container", {
+                GetContainerNumSlots = function(bag) return bag == 0 and 5 or 0 end,
+                GetContainerItemInfo = function(bag, slot)
+                    if bag == 0 and (slot == 1 or slot == 2) then
+                        return { itemID = 1940, isBound = false, isLocked = false }
+                    end
+                    return nil
+                end,
+                PickupContainerItem = function(_, slot) picked[#picked + 1] = slot end,
+            })
+            -- Handelsslot 1 ist nach der ersten Platzierung belegt
+            local filled = {}
+            Mock(_G, "ClickTradeButton", function(i) filled[i] = true end)
+            Mock(_G, "GetTradePlayerItemInfo", function(i) return filled[i] and "item" or nil end)
+            MockPartner("Barbossbär")
+
+            Loot.OnTradeShow()
+
+            AreEqual(2, #picked)
+            IsTrue(picked[1] ~= picked[2], "zweimal derselbe Taschenplatz gegriffen")
+            IsTrue(filled[1] and filled[2], "nicht zwei verschiedene Handelsslots belegt")
+        end)
+    end
+
+    -- --------------------------------------------------------
+    -- Test 24: Schließt das Fenster, bevor die verzögerte Platzierung feuert,
+    -- wird nicht mehr ins Leere gegriffen.
+    -- --------------------------------------------------------
+    function Tests:testAbortsWhenTradeWindowClosed()
+        WithSession(function(session)
+            Queue(session, { { 1950, "Barbossbär" } })
+            MockBasics()
+            MockBagWithItems(1950)
+            MockPartner("Barbossbär")
+
+            -- Timer sammeln statt sofort ausführen, damit zwischendurch geschlossen
+            -- werden kann. Der erste After-Aufruf (Staging) läuft weiter synchron.
+            local deferred = {}
+            local depth = 0
+            Mock(C_Timer, "After", function(_, fn)
+                depth = depth + 1
+                if depth == 1 then fn() else deferred[#deferred + 1] = fn end
+            end)
+
+            local clicks = 0
+            Mock(_G, "ClickTradeButton", function() clicks = clicks + 1 end)
+
+            Loot.OnTradeShow()
+            IsTrue(#deferred > 0, "keine verzögerte Platzierung eingeplant")
+
+            Loot.OnTradeClosed()          -- Fenster zu, bevor der Timer feuert
+            for _, fn in ipairs(deferred) do fn() end
+
+            AreEqual(0, clicks)
+        end)
+    end
+
+    -- --------------------------------------------------------
     -- Test 21: Der Eintritts-Trace steht VOR allen Guards. Ohne ML bricht der
     -- Auto-Trade ab, die Zeile muss aber trotzdem im Protokoll stehen — nur so ist
     -- "Event kam nicht an" von "Event kam, Guard hat abgelehnt" unterscheidbar.

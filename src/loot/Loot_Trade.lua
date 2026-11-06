@@ -13,6 +13,8 @@ local _tradeAccepted = false
 local _finalizePending   = false  -- TRADE_CLOSED feuert oft doppelt; Auswertung nur einmal
 local _tradeSlotSnapshot = nil    -- { [itemID-String] = Anzahl } der belegten Handelsslots
 local _lastClosed        = nil    -- { at, entries, snapshot } nach einem als Abbruch gewerteten Handel
+local _tradeOpen         = false  -- Handelsfenster offen? Verzögerte Platzierung prüft das
+local _placedBagSlots    = {}     -- { ["bag:slot"] = true } in diesem Fenster schon gegriffen
 -- Letzter lesbar aufgelöster Handelspartner (Kurzname). Als Modulfeld wie
 -- _inTradeItems/_pendingTrades: der Auto-Trade weicht darauf aus, wenn der Client
 -- den Namen schützt, und Tests können ihn zurücksetzen.
@@ -69,8 +71,12 @@ local function TradeAbort(reason, quiet)
     return false
 end
 
--- Handelsslots pro Fenster (WoW: 6, der siebte ist "wird nicht gehandelt")
+-- Handelsslots pro Fenster. MAX_TRADE_ITEMS zählt den siebten Slot mit
+-- ("wird nicht gehandelt"), der für uns nicht nutzbar ist — daher minus eins.
+-- Ohne die Globale bleibt der bisherige Festwert aus TradeLog.
 local function MaxSlots()
+    local blizz = _G.MAX_TRADE_ITEMS
+    if type(blizz) == "number" and blizz > 1 then return blizz - 1 end
     return (GL.TradeLog and GL.TradeLog.MAX_SLOTS) or 6
 end
 
@@ -116,7 +122,14 @@ local function FindBagSlotForTrade(itemID)
     for bag = 0, 4 do
         for slot = 1, C_Container.GetContainerNumSlots(bag) do
             local info = C_Container.GetContainerItemInfo(bag, slot)
-            if info and info.itemID == itemID then
+            -- Gesperrte Plätze überspringen: das Item ist noch in einer laufenden
+            -- Bewegung (z.B. gerade in einen Handelsslot gelegt). PickupContainerItem
+            -- scheitert dort lautlos, und ClickTradeButton mit leerem Cursor ebenso.
+            -- Schon in diesem Fenster platzierte Plätze ebenfalls auslassen, sonst
+            -- greift man bei zwei Kopien derselben itemID zweimal dieselbe.
+            if info and info.itemID == itemID
+               and not info.isLocked
+               and not _placedBagSlots[bag .. ":" .. slot] then
                 if not firstBag then firstBag, firstSlot = bag, slot end
                 if IsBagItemTradeable(bag, slot) then
                     return bag, slot, true
@@ -263,6 +276,8 @@ function Loot.OnTradeShow()
         _tradeAccepted     = false
         _tradeSlotSnapshot = nil
         _lastClosed        = nil
+        _tradeOpen         = true
+        _placedBagSlots    = {}
         for _, e in ipairs(TradeLog.EntriesFor(partnerName, now)) do
             table.insert(Loot._inTradeItems, { itemID = TradeLog.ItemID(e), shortName = partnerName, entry = e })
             TradeLog.SetStatus(e, "staged", now)
@@ -295,6 +310,13 @@ function Loot.OnTradeShow()
             delay = delay + 0.1
 
             C_Timer.After(capturedDelay, function()
+                -- Fenster inzwischen zu (Partner hat abgebrochen, zu weit weg):
+                -- nicht ins Leere greifen. RCLootCouncil prüft hier dasselbe.
+                if not _tradeOpen then
+                    Trace("item", "%s: trade window already closed", tostring(capturedID))
+                    return
+                end
+
                 local tradeSlot = nextFreeTradeSlot()
                 if not tradeSlot then
                     return TradeAbort("no free trade slot for item " .. tostring(capturedID))
@@ -306,7 +328,15 @@ function Loot.OnTradeShow()
                     ClearCursor()
                     C_Container.PickupContainerItem(bag, slot)
                     ClickTradeButton(tradeSlot)
-                    if not tradeable then TradeLog.SetStatus(captured.entry, "bound") end
+                    _placedBagSlots[bag .. ":" .. slot] = true
+                    if not tradeable then
+                        TradeLog.SetStatus(captured.entry, "bound")
+                        -- Kein Trade-Timer am Tooltip: WoW wird den Slot ablehnen.
+                        -- Wir versuchen es trotzdem (die Erkennung kann irren), sagen
+                        -- es aber, statt den leeren Slot unerklärt zu lassen.
+                        GL.Print("|cffff9900[ReqRT] Item " .. tostring(capturedID)
+                                 .. " looks no longer tradable — the trade slot may stay empty.|r")
+                    end
                     Trace("item", "%s → bag %d/%d → trade slot %d (tradable=%s)",
                         tostring(capturedID), bag, slot, tradeSlot, tostring(tradeable))
                     return
@@ -378,6 +408,9 @@ end
 -- Handelsfenster geschlossen: Auswertung leicht verzögert, damit ein spätes
 -- ERR_TRADE_COMPLETE noch zählt. Doppelte TRADE_CLOSED-Events werden ignoriert.
 function Loot.OnTradeClosed()
+    -- Immer zuerst: ab hier darf keine verzögerte Platzierung mehr greifen,
+    -- auch wenn die Auswertung schon läuft oder nichts gestaged war.
+    _tradeOpen = false
     if _finalizePending then return end
     if #Loot._inTradeItems == 0 then
         -- Protokollieren statt stumm zurück: trennt "Fenster nie gesehen" von
@@ -440,6 +473,7 @@ function Loot.FinalizeTrade()
     Loot._inTradeItems = {}
     _tradeAccepted     = false
     _tradeSlotSnapshot = nil
+    _placedBagSlots    = {}
     TradeLog.SyncMirror(now)
     TradeLog.NotifyChanged()
 end

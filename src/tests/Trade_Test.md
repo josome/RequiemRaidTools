@@ -133,6 +133,20 @@ Erster Handel mit lesbarem Namen setzt `Loot._lastPartner`; im zweiten Handelsfe
 ist der Name geschützt → der Auto-Trade weicht auf den gemerkten Partner aus und
 staged das Item (Muster von RCLootCouncil `lastAttemptedTradeTarget`).
 
+### `testSkipsLockedBagSlot`
+Slot 1 enthält die itemID, ist aber `isLocked` (Item noch in Bewegung) → gegriffen
+wird Slot 2. Auf gesperrten Plätzen scheitert `PickupContainerItem` lautlos, und
+`ClickTradeButton` mit leerem Cursor danach ebenso.
+
+### `testDoesNotReuseAlreadyPlacedBagSlot`
+Zwei Zuteilungen derselben itemID an denselben Spieler → zwei **verschiedene**
+Taschenplätze und zwei verschiedene Handelsslots. Vorher wurde zweimal dieselbe
+physische Kopie gegriffen und die zweite Platzierung scheiterte stumm.
+
+### `testAbortsWhenTradeWindowClosed`
+`C_Timer.After` sammelt die Platzierungs-Callbacks statt sie sofort auszuführen;
+zwischen Einplanen und Ausführen kommt `OnTradeClosed()` → kein `ClickTradeButton`.
+
 ### `testEntryTraceBeforeGuards`
 Ohne Master-Looter-Recht bricht der Auto-Trade ab, die Zeile
 `TRADE_SHOW received: ML=false` steht aber trotzdem im Protokoll. Nur so ist
